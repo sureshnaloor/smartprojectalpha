@@ -2,6 +2,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import dotenv from 'dotenv';
 import { corsMiddleware } from "./cors-middleware";
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config();
@@ -15,6 +21,10 @@ app.use(express.urlencoded({ extended: false }));
 app.get('/api/hello', (req, res) => {
   res.status(200).json({ status: 'healthy', message: 'API is running' });
 });
+
+// Serve static files from the React app build directory
+const frontendBuildPath = path.join(__dirname, '../../frontend-smartproject/dist');
+app.use(express.static(frontendBuildPath));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -57,9 +67,23 @@ app.use((req, res, next) => {
     throw err;
   });
 
+  // Handle SPA routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ message: 'API endpoint not found' });
+    }
+    
+    // Serve the React app for all other routes
+    res.sendFile(path.join(frontendBuildPath, 'index.html'));
+  });
+
   // ALWAYS serve the API on port 8080
-  const port = 8080;
+  const port = process.env.PORT || 8080;
   server.listen(port, () => {
-    console.log(`API server running on port ${port}`);
+    console.log(`🚀 Production server running on port ${port}`);
+    console.log(`📁 Serving static files from: ${frontendBuildPath}`);
+    console.log(`🌐 Frontend: http://localhost:${port}`);
+    console.log(`🔌 API: http://localhost:${port}/api`);
   });
 })();

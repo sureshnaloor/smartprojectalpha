@@ -165,18 +165,18 @@ export class DatabaseStorage implements IStorage {
     const dbItems = await db
       .select()
       .from(wbsItems)
-      .where(eq(wbsItems.projectId, projectId));
+      .where(eq(wbsItems.projectId, projectId))
+      .orderBy(wbsItems.code);
 
     return dbItems.map(item => ({
       ...item,
       budgetedCost: Number(item.budgetedCost),
       actualCost: Number(item.actualCost),
       percentComplete: Number(item.percentComplete),
-      startDate: item.startDate ? new Date(item.startDate) : undefined,
-      endDate: item.endDate ? new Date(item.endDate) : undefined,
-      actualStartDate: item.actualStartDate ? new Date(item.actualStartDate) : undefined,
-      actualEndDate: item.actualEndDate ? new Date(item.actualEndDate) : undefined,
-      type: item.type as "Summary" | "WorkPackage" | "Activity"
+      startDate: item.startDate ? new Date(item.startDate) : null,
+      endDate: item.endDate ? new Date(item.endDate) : null,
+      actualStartDate: item.actualStartDate ? new Date(item.actualStartDate) : null,
+      actualEndDate: item.actualEndDate ? new Date(item.actualEndDate) : null,
     }));
   }
 
@@ -193,67 +193,77 @@ export class DatabaseStorage implements IStorage {
       budgetedCost: Number(item.budgetedCost),
       actualCost: Number(item.actualCost),
       percentComplete: Number(item.percentComplete),
-      startDate: item.startDate ? new Date(item.startDate) : undefined,
-      endDate: item.endDate ? new Date(item.endDate) : undefined,
-      actualStartDate: item.actualStartDate ? new Date(item.actualStartDate) : undefined,
-      actualEndDate: item.actualEndDate ? new Date(item.actualEndDate) : undefined,
-      type: item.type as "Summary" | "WorkPackage" | "Activity"
+      startDate: item.startDate ? new Date(item.startDate) : null,
+      endDate: item.endDate ? new Date(item.endDate) : null,
+      actualStartDate: item.actualStartDate ? new Date(item.actualStartDate) : null,
+      actualEndDate: item.actualEndDate ? new Date(item.actualEndDate) : null,
     };
   }
 
   async createWbsItem(wbsItem: Omit<WbsItem, "id" | "createdAt">): Promise<WbsItem> {
-    const insertValues = {
-      ...wbsItem,
+    const insertData: any = {
+      projectId: wbsItem.projectId,
+      parentId: wbsItem.parentId,
+      name: wbsItem.name,
+      description: wbsItem.description,
+      level: wbsItem.level,
+      code: wbsItem.code,
+      type: wbsItem.type,
       budgetedCost: wbsItem.budgetedCost.toString(),
       actualCost: "0",
       percentComplete: "0",
-      startDate: wbsItem.startDate?.toISOString(),
-      endDate: wbsItem.endDate?.toISOString(),
-      actualStartDate: wbsItem.actualStartDate?.toISOString(),
-      actualEndDate: wbsItem.actualEndDate?.toISOString()
+      isTopLevel: wbsItem.isTopLevel,
     };
 
-    const [newWbsItem] = await db
-      .insert(wbsItems)
-      .values(insertValues)
-      .returning();
+    if (wbsItem.startDate) {
+      insertData.startDate = wbsItem.startDate.toISOString().split('T')[0];
+    }
+    if (wbsItem.endDate) {
+      insertData.endDate = wbsItem.endDate.toISOString().split('T')[0];
+    }
+    if (wbsItem.duration) {
+      insertData.duration = wbsItem.duration;
+    }
+
+    const [newWbsItem] = await db.insert(wbsItems).values(insertData).returning();
 
     return {
       ...newWbsItem,
       budgetedCost: Number(newWbsItem.budgetedCost),
       actualCost: Number(newWbsItem.actualCost),
       percentComplete: Number(newWbsItem.percentComplete),
-      startDate: newWbsItem.startDate ? new Date(newWbsItem.startDate) : undefined,
-      endDate: newWbsItem.endDate ? new Date(newWbsItem.endDate) : undefined,
-      actualStartDate: newWbsItem.actualStartDate ? new Date(newWbsItem.actualStartDate) : undefined,
-      actualEndDate: newWbsItem.actualEndDate ? new Date(newWbsItem.actualEndDate) : undefined,
-      type: newWbsItem.type as "Summary" | "WorkPackage" | "Activity"
+      startDate: newWbsItem.startDate ? new Date(newWbsItem.startDate) : null,
+      endDate: newWbsItem.endDate ? new Date(newWbsItem.endDate) : null,
+      actualStartDate: newWbsItem.actualStartDate ? new Date(newWbsItem.actualStartDate) : null,
+      actualEndDate: newWbsItem.actualEndDate ? new Date(newWbsItem.actualEndDate) : null,
     };
   }
 
   async updateWbsItem(id: number, wbsItem: Partial<Omit<WbsItem, "id" | "createdAt">>): Promise<WbsItem | undefined> {
     const updatedValues: any = { ...wbsItem };
     
-    if (updatedValues.budgetedCost !== undefined) {
-      updatedValues.budgetedCost = updatedValues.budgetedCost.toString();
+    if (updatedValues.name !== undefined) updatedValues.name = updatedValues.name;
+    if (updatedValues.description !== undefined) updatedValues.description = updatedValues.description;
+    if (updatedValues.level !== undefined) updatedValues.level = updatedValues.level;
+    if (updatedValues.code !== undefined) updatedValues.code = updatedValues.code;
+    if (updatedValues.type !== undefined) updatedValues.type = updatedValues.type;
+    if (updatedValues.budgetedCost !== undefined) updatedValues.budgetedCost = updatedValues.budgetedCost.toString();
+    if (updatedValues.actualCost !== undefined) updatedValues.actualCost = updatedValues.actualCost.toString();
+    if (updatedValues.percentComplete !== undefined) updatedValues.percentComplete = updatedValues.percentComplete.toString();
+    if (updatedValues.isTopLevel !== undefined) updatedValues.isTopLevel = updatedValues.isTopLevel;
+    if (updatedValues.duration !== undefined) updatedValues.duration = updatedValues.duration;
+
+    if (updatedValues.startDate !== undefined) {
+      updatedValues.startDate = updatedValues.startDate.toISOString().split('T')[0];
     }
-    if (updatedValues.actualCost !== undefined) {
-      updatedValues.actualCost = updatedValues.actualCost.toString();
+    if (updatedValues.endDate !== undefined) {
+      updatedValues.endDate = updatedValues.endDate.toISOString().split('T')[0];
     }
-    if (updatedValues.percentComplete !== undefined) {
-      updatedValues.percentComplete = updatedValues.percentComplete.toString();
+    if (updatedValues.actualStartDate !== undefined) {
+      updatedValues.actualStartDate = updatedValues.actualStartDate.toISOString().split('T')[0];
     }
-    if (updatedValues.startDate) {
-      updatedValues.startDate = updatedValues.startDate.toISOString();
-    }
-    if (updatedValues.endDate) {
-      updatedValues.endDate = updatedValues.endDate.toISOString();
-    }
-    if (updatedValues.actualStartDate) {
-      updatedValues.actualStartDate = updatedValues.actualStartDate.toISOString();
-    }
-    if (updatedValues.actualEndDate) {
-      updatedValues.actualEndDate = updatedValues.actualEndDate.toISOString();
+    if (updatedValues.actualEndDate !== undefined) {
+      updatedValues.actualEndDate = updatedValues.actualEndDate.toISOString().split('T')[0];
     }
 
     const [updatedWbsItem] = await db
@@ -269,11 +279,10 @@ export class DatabaseStorage implements IStorage {
       budgetedCost: Number(updatedWbsItem.budgetedCost),
       actualCost: Number(updatedWbsItem.actualCost),
       percentComplete: Number(updatedWbsItem.percentComplete),
-      startDate: updatedWbsItem.startDate ? new Date(updatedWbsItem.startDate) : undefined,
-      endDate: updatedWbsItem.endDate ? new Date(updatedWbsItem.endDate) : undefined,
-      actualStartDate: updatedWbsItem.actualStartDate ? new Date(updatedWbsItem.actualStartDate) : undefined,
-      actualEndDate: updatedWbsItem.actualEndDate ? new Date(updatedWbsItem.actualEndDate) : undefined,
-      type: updatedWbsItem.type as "Summary" | "WorkPackage" | "Activity"
+      startDate: updatedWbsItem.startDate ? new Date(updatedWbsItem.startDate) : null,
+      endDate: updatedWbsItem.endDate ? new Date(updatedWbsItem.endDate) : null,
+      actualStartDate: updatedWbsItem.actualStartDate ? new Date(updatedWbsItem.actualStartDate) : null,
+      actualEndDate: updatedWbsItem.actualEndDate ? new Date(updatedWbsItem.actualEndDate) : null,
     };
   }
 
@@ -483,14 +492,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createActivity(data: InsertActivity): Promise<Activity> {
-    return await db.insert(activities).values({
+    const [result] = await db.insert(activities).values({
       ...data,
       updatedAt: new Date(),
     }).returning();
+
+    return {
+      ...result,
+      unitRate: Number(result.unitRate),
+    };
   }
 
   async updateActivity(id: number, data: InsertActivity): Promise<Activity | undefined> {
-    return await db
+    const [result] = await db
       .update(activities)
       .set({
         ...data,
@@ -498,10 +512,12 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(activities.id, id))
       .returning();
+
+    return result || undefined;
   }
 
   async deleteActivity(id: number): Promise<void> {
-    return await db
+    await db
       .delete(activities)
       .where(eq(activities.id, id))
       .returning();
@@ -522,7 +538,12 @@ export class DatabaseStorage implements IStorage {
       ...data,
       updatedAt: new Date(),
     }).returning();
-    return result;
+
+    return {
+      ...result,
+      unitRate: Number(result.unitRate),
+      availability: Number(result.availability),
+    };
   }
 
   async updateResource(id: number, data: InsertResource): Promise<Resource | undefined> {
@@ -534,7 +555,8 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(resources.id, id))
       .returning();
-    return result;
+
+    return result || undefined;
   }
 
   async deleteResource(id: number): Promise<void> {
@@ -551,7 +573,11 @@ export class DatabaseStorage implements IStorage {
       ...data,
       updatedAt: new Date(),
     }).returning();
-    return result;
+
+    return {
+      ...result,
+      quantity: Number(result.quantity),
+    };
   }
 
   async updateTaskResource(id: number, data: InsertTaskResource): Promise<TaskResource | undefined> {
@@ -563,7 +589,8 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(taskResources.id, id))
       .returning();
-    return result;
+
+    return result || undefined;
   }
 
   async deleteTaskResource(id: number): Promise<void> {

@@ -110,23 +110,46 @@ export const taskResources = pgTable("task_resources", {
 export const insertProjectSchema = createInsertSchema(projects)
   .omit({ id: true, createdAt: true })
   .extend({
-    budget: z.string().or(z.number()).pipe(
-      z.coerce.number().positive("Budget must be a positive number")
-    ),
+    budget: z.string().or(z.number()).transform(val => val.toString()),
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
+    startDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    endDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
   });
 
 // Base WBS schema - a simpler version without all the refinements
 const baseWbsSchema = createInsertSchema(wbsItems)
   .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true, actualStartDate: true, actualEndDate: true })
   .extend({
-    budgetedCost: z.string().or(z.number()).pipe(
-      z.coerce.number().nonnegative("Budgeted cost must be a non-negative number")
-    ),
+    budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
     type: z.enum(["Summary", "WorkPackage", "Activity"]),
-    startDate: z.date().or(z.string()).pipe(z.coerce.date()).optional(),
-    endDate: z.date().or(z.string()).pipe(z.coerce.date()).optional(),
-    duration: z.string().or(z.number()).pipe(z.coerce.number().nonnegative()).optional(),
+    startDate: z.date().or(z.string()).transform(val => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }).optional(),
+    endDate: z.date().or(z.string()).transform(val => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }).optional(),
+    duration: z.string().or(z.number()).transform(val => {
+      if (val === undefined || val === null) return undefined;
+      return typeof val === 'string' ? parseInt(val) : val;
+    }).optional(),
   });
 
 // Updated WBS schema with conditional validations
@@ -135,7 +158,7 @@ export const insertWbsItemSchema = baseWbsSchema
     (data) => {
       // Summary and WorkPackage types must have budgetedCost
       if (data.type === "Summary" || data.type === "WorkPackage") {
-        return data.budgetedCost !== undefined && data.budgetedCost >= 0;
+        return data.budgetedCost !== undefined && parseFloat(data.budgetedCost) >= 0;
       }
       return true;
     },
@@ -148,7 +171,7 @@ export const insertWbsItemSchema = baseWbsSchema
     (data) => {
       // Activity types should not have budgetedCost (or set to 0)
       if (data.type === "Activity") {
-        return data.budgetedCost === 0;
+        return parseFloat(data.budgetedCost) === 0;
       }
       return true;
     },
@@ -190,15 +213,25 @@ export const insertWbsItemSchema = baseWbsSchema
   );
 
 export const insertDependencySchema = createInsertSchema(dependencies).omit({ id: true, createdAt: true });
-export const insertCostEntrySchema = createInsertSchema(costEntries).omit({ id: true, createdAt: true });
+export const insertCostEntrySchema = createInsertSchema(costEntries)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    amount: z.string().or(z.number()).transform(val => val.toString()),
+    entryDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+  });
 
 // Task schema
 export const insertTaskSchema = createInsertSchema(tasks)
   .omit({ id: true, createdAt: true, updatedAt: true })
   .extend({
-    duration: z.string().or(z.number()).pipe(
-      z.coerce.number().positive("Duration must be a positive number")
-    ),
+    duration: z.string().or(z.number()).transform(val => {
+      return typeof val === 'string' ? parseInt(val) : val;
+    }),
     status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
   });
 
@@ -206,21 +239,15 @@ export const insertTaskSchema = createInsertSchema(tasks)
 export const insertTaskResourceSchema = createInsertSchema(taskResources)
   .omit({ id: true, createdAt: true, updatedAt: true })
   .extend({
-    quantity: z.string().or(z.number()).pipe(
-      z.coerce.number().positive("Quantity must be a positive number")
-    ),
+    quantity: z.string().or(z.number()).transform(val => val.toString()),
   });
 
 // Resource schema
 export const insertResourceSchema = createInsertSchema(resources)
   .omit({ id: true, createdAt: true, updatedAt: true })
   .extend({
-    unitRate: z.string().or(z.number()).pipe(
-      z.coerce.number().nonnegative("Unit rate must be a non-negative number")
-    ),
-    availability: z.string().or(z.number()).pipe(
-      z.coerce.number().min(0, "Availability must be at least 0%").max(100, "Availability cannot exceed 100%")
-    ).default(100),
+    unitRate: z.string().or(z.number()).transform(val => val.toString()),
+    availability: z.string().or(z.number()).transform(val => val.toString()).default("100"),
     type: z.enum(["manpower", "equipment", "material"]),
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
   });
@@ -337,7 +364,7 @@ export type CsvImportData = z.infer<typeof csvImportSchema>;
 export const insertActivitySchema = createInsertSchema(activities)
   .omit({ id: true, createdAt: true, updatedAt: true })
   .extend({
-    unitRate: z.string().or(z.number()).pipe(z.coerce.number().nonnegative()).optional(),
+    unitRate: z.string().or(z.number()).transform(val => val.toString()),
     currency: z.enum(["USD", "EUR", "GBP", "SAR"]).default("USD"),
   });
 
