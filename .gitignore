@@ -1,3 +1,6 @@
+# Root dependencies
+node_modules/
+
 # Frontend dependencies and build
 frontend-smartproject/node_modules/
 frontend-smartproject/.next/
