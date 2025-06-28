@@ -206,42 +206,42 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         isActive('/resource-master') && "text-teal-600 font-medium bg-teal-50"
                       )}>
                         <Users className="mr-3 h-5 w-5" />
-                        <span>Resource Master</span>
-                      </a>
-                    </Link>
-                  </li>
-                </ul>
+                            <span>Resource Master</span>
+                          </a>
+                        </Link>
+                      </li>
+                    </ul>
 
                 {/* Reports & Analytics */}
-                <div className="px-4 py-2 border-t border-gray-200">
-                  <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Reports & Analytics
-                  </h2>
-                </div>
-                <ul className="py-1">
-                  <li>
-                    <Link href={`/under-construction/Charts`}>
-                      <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/under-construction/Charts') && "text-teal-600 font-medium bg-teal-50"
-                      )}>
-                        <PieChart className="mr-3 h-5 w-5" />
-                        <span>Charts</span>
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href={`/under-construction/Reports`}>
-                      <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/under-construction/Reports') && "text-teal-600 font-medium bg-teal-50"
-                      )}>
-                        <FileText className="mr-3 h-5 w-5" />
-                        <span>Reports</span>
-                      </a>
-                    </Link>
-                  </li>
-                </ul>
+                    <div className="px-4 py-2 border-t border-gray-200">
+                      <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Reports & Analytics
+                      </h2>
+                    </div>
+                    <ul className="py-1">
+                      <li>
+                        <Link href={`/under-construction/Charts`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
+                            isActive('/under-construction/Charts') && "text-teal-600 font-medium bg-teal-50"
+                          )}>
+                            <PieChart className="mr-3 h-5 w-5" />
+                            <span>Charts</span>
+                          </a>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href={`/under-construction/Reports`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
+                            isActive('/under-construction/Reports') && "text-teal-600 font-medium bg-teal-50"
+                          )}>
+                            <FileText className="mr-3 h-5 w-5" />
+                            <span>Reports</span>
+                          </a>
+                        </Link>
+                      </li>
+                    </ul>
               </>
             )}
           </div>
