@@ -110,21 +110,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProject(project: Omit<Project, "id" | "createdAt">): Promise<Project> {
-    const [newProject] = await db.insert(projects).values({
-      ...project,
-      budget: project.budget.toString(),
-      startDate: project.startDate.toISOString(),
-      endDate: project.endDate.toISOString()
-    }).returning();
+    // Handle both string and Date types for dates
+  const startDate = typeof project.startDate === 'string' ? project.startDate : project.startDate.toISOString().split('T')[0];
+  const endDate = typeof project.endDate === 'string' ? project.endDate : project.endDate.toISOString().split('T')[0];
+  
+  const [newProject] = await db.insert(projects).values({
+    ...project,
+    budget: project.budget.toString(),
+    startDate,
+    endDate
+  }).returning();
 
-    return {
-      ...newProject,
-      budget: Number(newProject.budget),
-      startDate: new Date(newProject.startDate),
-      endDate: new Date(newProject.endDate),
-      currency: newProject.currency as "USD" | "EUR" | "SAR"
-    };
-  }
+  return {
+    ...newProject,
+    budget: Number(newProject.budget),
+    startDate: new Date(newProject.startDate),
+    endDate: new Date(newProject.endDate),
+    currency: newProject.currency as "USD" | "EUR" | "SAR"
+  };
+}
 
   async updateProject(id: number, project: Partial<Omit<Project, "id" | "createdAt">>): Promise<Project | undefined> {
     const updatedValues: any = { ...project };
@@ -133,10 +137,14 @@ export class DatabaseStorage implements IStorage {
       updatedValues.budget = updatedValues.budget.toString();
     }
     if (updatedValues.startDate) {
-      updatedValues.startDate = updatedValues.startDate.toISOString();
+      updatedValues.startDate = typeof updatedValues.startDate === 'string' 
+        ? updatedValues.startDate 
+        : updatedValues.startDate.toISOString().split('T')[0];
     }
     if (updatedValues.endDate) {
-      updatedValues.endDate = updatedValues.endDate.toISOString();
+      updatedValues.endDate = typeof updatedValues.endDate === 'string' 
+        ? updatedValues.endDate 
+        : updatedValues.endDate.toISOString().split('T')[0];
     }
 
     const [updatedProject] = await db
@@ -466,8 +474,8 @@ export class DatabaseStorage implements IStorage {
   async createTask(data: InsertTask): Promise<Task> {
     const [result] = await db.insert(tasks).values(data).returning();
     return result;
-  }
-
+    }
+    
   async updateTask(id: number, data: InsertTask): Promise<Task | undefined> {
     const [result] = await db
       .update(tasks)
@@ -475,8 +483,8 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tasks.id, id))
       .returning();
     return result;
-  }
-
+    }
+    
   async deleteTask(id: number): Promise<void> {
     await db.delete(tasks).where(eq(tasks.id, id));
   }
@@ -489,7 +497,7 @@ export class DatabaseStorage implements IStorage {
   async getActivity(id: number): Promise<Activity | undefined> {
     const result = await db.select().from(activities).where(eq(activities.id, id)).limit(1);
     return result[0];
-  }
+    }
 
   async createActivity(data: InsertActivity): Promise<Activity> {
     const [result] = await db.insert(activities).values({
@@ -512,7 +520,7 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(activities.id, id))
       .returning();
-
+    
     return result || undefined;
   }
 
@@ -526,12 +534,12 @@ export class DatabaseStorage implements IStorage {
   // Resource methods
   async getResources(): Promise<Resource[]> {
     return await db.select().from(resources).orderBy(resources.name);
-  }
-
+    }
+    
   async getResource(id: number): Promise<Resource | undefined> {
     const result = await db.select().from(resources).where(eq(resources.id, id)).limit(1);
     return result[0];
-  }
+      }
 
   async createResource(data: InsertResource): Promise<Resource> {
     const [result] = await db.insert(resources).values({
@@ -544,8 +552,8 @@ export class DatabaseStorage implements IStorage {
       unitRate: Number(result.unitRate),
       availability: Number(result.availability),
     };
-  }
-
+    }
+    
   async updateResource(id: number, data: InsertResource): Promise<Resource | undefined> {
     const [result] = await db
       .update(resources)
@@ -561,8 +569,8 @@ export class DatabaseStorage implements IStorage {
 
   async deleteResource(id: number): Promise<void> {
     await db.delete(resources).where(eq(resources.id, id));
-  }
-
+    }
+    
   // Task Resource methods
   async getTaskResources(taskId: number): Promise<TaskResource[]> {
     return await db.select().from(taskResources).where(eq(taskResources.taskId, taskId));
@@ -589,7 +597,7 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(taskResources.id, id))
       .returning();
-
+    
     return result || undefined;
   }
 

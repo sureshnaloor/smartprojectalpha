@@ -1,4 +1,4 @@
-// Re-export types from backend schema
+// Re-export types from shared schema
 export type {
   Project,
   InsertProject,
@@ -13,7 +13,7 @@ export type {
   UpdateWbsProgress,
   ImportCosts,
   CsvImportData
-} from '@backend/schema';
+} from '@shared/schema';
 
 // Re-export schemas
 export {
@@ -23,4 +23,4 @@ export {
   insertCostEntrySchema,
   insertTaskSchema,
   csvImportSchema
-} from '@backend/schema'; 
+} from '@shared/schema'; 

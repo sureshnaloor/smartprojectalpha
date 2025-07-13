@@ -24,8 +24,12 @@ export const pool = new Pool({
   idleTimeoutMillis: 30000,
   // Maximum number of clients
   max: 20,
-  // Minimum number of clients
-  min: 4
+  
+  // Maximum number of connections in the pool
+  maxUses: 10000,
+  // Maximum lifetime of a connection in milliseconds
+  
+  
 });
 
 // Handle pool errors

@@ -185,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const partialProjectSchema = z.object({
         name: z.string().optional(),
         description: z.string().nullable().optional(),
-        budget: z.number().optional(),
+        budget: z.coerce.number().optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         currency: z.enum(["USD", "EUR", "SAR"]).optional(),
@@ -234,7 +234,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const updatedProject = await storage.updateProject(id, projectData);
+      // Convert budget to string if it's a number for storage compatibility
+      const storageData = {
+        ...projectData,
+        budget: projectData.budget !== undefined ? projectData.budget.toString() : undefined
+      };
+      
+      const updatedProject = await storage.updateProject(id, storageData);
       
       res.json(updatedProject);
     } catch (err) {
