@@ -13,7 +13,15 @@ import UnderConstruction from "@/pages/under-construction";
 import ActivityMaster from "@/pages/activity-master";
 import TaskMaster from "@/pages/task-master";
 import ProjectLayout from "@/layouts/project-layout";
+import MasterLayout from "@/layouts/master-layout";
 import ResourceMaster from "@/pages/resource-master";
+import RiskRegister from "@/pages/risk-register";
+import ProjectDailyProgress from "@/pages/project-daily-progress";
+import ResourcePlan from "@/pages/resource-plan";
+import LessonLearntRegister from "@/pages/lesson-learnt-register";
+import DirectManpowerList from "@/pages/direct-manpower-list";
+import IndirectManpowerList from "@/pages/indirect-manpower-list";
+import PlannedActivityTasks from "@/pages/planned-activity-tasks";
 
 // Implementing a flatter routing approach without nesting
 function Router() {
@@ -66,6 +74,78 @@ function Router() {
         )}
       </Route>
       
+      {/* Project-specific Under Construction Pages */}
+      <Route path="/projects/:projectId/under-construction/:pageName">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <UnderConstruction />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Risk Register */}
+      <Route path="/projects/:projectId/risk-register">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <RiskRegister />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Project Daily Progress */}
+      <Route path="/projects/:projectId/project-daily-progress">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectDailyProgress />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Resource Plan */}
+      <Route path="/projects/:projectId/resource-plan">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ResourcePlan />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Lesson Learnt Register */}
+      <Route path="/projects/:projectId/lesson-learnt-register">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <LessonLearntRegister />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Direct Manpower List */}
+      <Route path="/projects/:projectId/direct-manpower-list">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <DirectManpowerList />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Indirect Manpower List */}
+      <Route path="/projects/:projectId/indirect-manpower-list">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <IndirectManpowerList />
+          </ProjectLayout>
+        )}
+      </Route>
+      
+      {/* Planned Activity/Tasks */}
+      <Route path="/projects/:projectId/planned-activity-tasks">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <PlannedActivityTasks />
+          </ProjectLayout>
+        )}
+      </Route>
+
       {/* Activity Master */}
       <Route path="/activity-master" component={ActivityMaster} />
       
@@ -75,10 +155,12 @@ function Router() {
       {/* Resource Master */}
       <Route path="/resource-master" component={ResourceMaster} />
       
-      {/* Under Construction Pages */}
+      {/* Global Under Construction Pages */}
       <Route path="/under-construction/:pageName">
         {params => (
-          <UnderConstruction />
+          <MasterLayout>
+            <UnderConstruction />
+          </MasterLayout>
         )}
       </Route>
       

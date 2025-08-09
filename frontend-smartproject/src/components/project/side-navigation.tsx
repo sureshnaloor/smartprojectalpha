@@ -14,7 +14,31 @@ import {
   ListTodo,
   Users,
   PieChart,
-  FileText
+  FileText,
+  FolderOpen,
+  Folder,
+  ChevronDown,
+  ChevronRight,
+  FileImage,
+  FileSpreadsheet,
+  FileText as FileTextIcon,
+  HardDrive,
+  MessageSquare,
+  MessageCircle,
+  MessageSquareText,
+  ClipboardCheck,
+  FileCheck,
+  BarChart3,
+  FolderOpen as FolderOpenIcon,
+  BookOpen,
+  Calendar,
+  UserCheck,
+  AlertTriangle,
+  Lightbulb,
+  User,
+  UserPlus,
+  ClipboardList,
+  MoreHorizontal
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -27,6 +51,8 @@ interface SideNavigationProps {
 export function SideNavigation({ currentProjectId }: SideNavigationProps) {
   const [location, setLocation] = useLocation();
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(false);
+  const [isWikiExpanded, setIsWikiExpanded] = useState(false);
   const isMobile = useMobile();
   const [isOpen, setIsOpen] = useState(!isMobile);
 
@@ -166,6 +192,258 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                           </a>
                         </Link>
                       </li>
+                      
+                      {/* Project Documents Section */}
+                      <li>
+                        <button
+                          onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
+                          className={cn(
+                            "flex items-center justify-between w-full px-4 py-2 text-gray-600 hover:bg-gray-50",
+                            isActive('/documents') && "text-teal-600 font-medium bg-teal-50"
+                          )}
+                        >
+                          <div className="flex items-center">
+                            <FolderOpen className="mr-3 h-5 w-5" />
+                            <span>Project Documents</span>
+                          </div>
+                          {isDocumentsExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                        
+                        {/* Documents Sub-menu */}
+                        {isDocumentsExpanded && (
+                          <ul className="ml-6 border-l border-gray-200">
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/ProjectDrawings`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/project-drawings') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <FileImage className="mr-3 h-4 w-4" />
+                                  <span>Project Drawings</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/ProjectBOQ`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/project-boq') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <FileSpreadsheet className="mr-3 h-4 w-4" />
+                                  <span>Project BOQ</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/ProjectScope`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/project-scope') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <FileTextIcon className="mr-3 h-4 w-4" />
+                                  <span>Project Scope Document (PTS)</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/EquipmentDrawings`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/equipment-drawings') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <HardDrive className="mr-3 h-4 w-4" />
+                                  <span>Equipment Drawings</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/ClientCorrespondence`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/client-correspondence') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <MessageSquare className="mr-3 h-4 w-4" />
+                                  <span>Client Correspondence</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/SupplierCorrespondence`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/supplier-correspondence') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <MessageCircle className="mr-3 h-4 w-4" />
+                                  <span>Supplier Correspondence</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/SubcontractCorrespondence`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/subcontract-correspondence') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <MessageSquareText className="mr-3 h-4 w-4" />
+                                  <span>Subcontract Correspondence</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/RequestForInspection`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/request-for-inspection') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <ClipboardCheck className="mr-3 h-4 w-4" />
+                                  <span>Request for Inspection</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/ITPAndReports`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/itp-and-reports') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <FileCheck className="mr-3 h-4 w-4" />
+                                  <span>ITP and Reports</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/OtherDocuments`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/other-documents') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <FolderOpenIcon className="mr-3 h-4 w-4" />
+                                  <span>Others</span>
+                                </a>
+                              </Link>
+                            </li>
+                          </ul>
+                        )}
+                      </li>
+
+                      {/* Project Wiki Section */}
+                      <li>
+                        <button
+                          onClick={() => setIsWikiExpanded(!isWikiExpanded)}
+                          className={cn(
+                            "flex items-center justify-between w-full px-4 py-2 text-gray-600 hover:bg-gray-50",
+                            isActive('/wiki') && "text-teal-600 font-medium bg-teal-50"
+                          )}
+                        >
+                          <div className="flex items-center">
+                            <BookOpen className="mr-3 h-5 w-5" />
+                            <span>Project Wiki</span>
+                          </div>
+                          {isWikiExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                        
+                        {/* Wiki Sub-menu */}
+                        {isWikiExpanded && (
+                          <ul className="ml-6 border-l border-gray-200">
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/project-daily-progress`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/project-daily-progress') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <Calendar className="mr-3 h-4 w-4" />
+                                  <span>Project Daily Progress</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/resource-plan`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/resource-plan') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <UserCheck className="mr-3 h-4 w-4" />
+                                  <span>Resource Plan</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/risk-register`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/risk-register') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <AlertTriangle className="mr-3 h-4 w-4" />
+                                  <span>Risk Register</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/lesson-learnt-register`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/lesson-learnt-register') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <Lightbulb className="mr-3 h-4 w-4" />
+                                  <span>Lesson Learnt Register</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/direct-manpower-list`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/direct-manpower-list') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <User className="mr-3 h-4 w-4" />
+                                  <span>Direct Manpower List</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/indirect-manpower-list`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/indirect-manpower-list') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <UserPlus className="mr-3 h-4 w-4" />
+                                  <span>Indirect Manpower List</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/planned-activity-tasks`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/planned-activity-tasks') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <ClipboardList className="mr-3 h-4 w-4" />
+                                  <span>Daily Activity/Tasks Planned</span>
+                                </a>
+                              </Link>
+                            </li>
+                            <li>
+                              <Link href={`/projects/${currentProjectId}/under-construction/OtherWiki`}>
+                                <a className={cn(
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  isActive('/other-wiki') && "text-teal-600 font-medium bg-teal-50"
+                                )}>
+                                  <MoreHorizontal className="mr-3 h-4 w-4" />
+                                  <span>Others</span>
+                                </a>
+                              </Link>
+                            </li>
+                          </ul>
+                        )}
+                      </li>
                     </ul>
                   </>
                 )}
@@ -206,42 +484,42 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         isActive('/resource-master') && "text-teal-600 font-medium bg-teal-50"
                       )}>
                         <Users className="mr-3 h-5 w-5" />
-                            <span>Resource Master</span>
-                          </a>
-                        </Link>
-                      </li>
-                    </ul>
+                        <span>Resource Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                </ul>
 
                 {/* Reports & Analytics */}
-                    <div className="px-4 py-2 border-t border-gray-200">
-                      <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Reports & Analytics
-                      </h2>
-                    </div>
-                    <ul className="py-1">
-                      <li>
-                        <Link href={`/under-construction/Charts`}>
-                          <a className={cn(
-                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                            isActive('/under-construction/Charts') && "text-teal-600 font-medium bg-teal-50"
-                          )}>
-                            <PieChart className="mr-3 h-5 w-5" />
-                            <span>Charts</span>
-                          </a>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href={`/under-construction/Reports`}>
-                          <a className={cn(
-                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                            isActive('/under-construction/Reports') && "text-teal-600 font-medium bg-teal-50"
-                          )}>
-                            <FileText className="mr-3 h-5 w-5" />
-                            <span>Reports</span>
-                          </a>
-                        </Link>
-                      </li>
-                    </ul>
+                <div className="px-4 py-2 border-t border-gray-200">
+                  <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Reports & Analytics
+                  </h2>
+                </div>
+                <ul className="py-1">
+                  <li>
+                    <Link href={`/under-construction/Charts`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
+                        isActive('/under-construction/Charts') && "text-teal-600 font-medium bg-teal-50"
+                      )}>
+                        <PieChart className="mr-3 h-5 w-5" />
+                        <span>Charts</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={`/under-construction/Reports`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
+                        isActive('/under-construction/Reports') && "text-teal-600 font-medium bg-teal-50"
+                      )}>
+                        <FileText className="mr-3 h-5 w-5" />
+                        <span>Reports</span>
+                      </a>
+                    </Link>
+                  </li>
+                </ul>
               </>
             )}
           </div>
