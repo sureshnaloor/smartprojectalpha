@@ -73,6 +73,7 @@ export interface IStorage {
 
   // Task Resource methods
   getTaskResources(taskId: number): Promise<TaskResource[]>;
+  getTaskResource(id: number): Promise<TaskResource | undefined>;
   createTaskResource(data: InsertTaskResource): Promise<TaskResource>;
   updateTaskResource(id: number, data: InsertTaskResource): Promise<TaskResource | undefined>;
   deleteTaskResource(id: number): Promise<void>;
@@ -85,9 +86,9 @@ export class DatabaseStorage implements IStorage {
     const dbProjects = await db.select().from(projects);
     return dbProjects.map(p => ({
       ...p,
-      budget: Number(p.budget),
-      startDate: new Date(p.startDate),
-      endDate: new Date(p.endDate),
+      budget: p.budget,
+      startDate: p.startDate,
+      endDate: p.endDate,
       currency: p.currency as "USD" | "EUR" | "SAR"
     }));
   }
@@ -102,33 +103,33 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...project,
-      budget: Number(project.budget),
-      startDate: new Date(project.startDate),
-      endDate: new Date(project.endDate),
+      budget: project.budget,
+      startDate: project.startDate,
+      endDate: project.endDate,
       currency: project.currency as "USD" | "EUR" | "SAR"
     };
   }
 
   async createProject(project: Omit<Project, "id" | "createdAt">): Promise<Project> {
     // Handle both string and Date types for dates
-  const startDate = typeof project.startDate === 'string' ? project.startDate : project.startDate.toISOString().split('T')[0];
-  const endDate = typeof project.endDate === 'string' ? project.endDate : project.endDate.toISOString().split('T')[0];
-  
-  const [newProject] = await db.insert(projects).values({
-    ...project,
-    budget: project.budget.toString(),
-    startDate,
-    endDate
-  }).returning();
+    const startDate = typeof project.startDate === 'string' ? project.startDate : project.startDate;
+    const endDate = typeof project.endDate === 'string' ? project.endDate : project.endDate;
+    
+    const [newProject] = await db.insert(projects).values({
+      ...project,
+      budget: project.budget.toString(),
+      startDate,
+      endDate
+    }).returning();
 
-  return {
-    ...newProject,
-    budget: Number(newProject.budget),
-    startDate: new Date(newProject.startDate),
-    endDate: new Date(newProject.endDate),
-    currency: newProject.currency as "USD" | "EUR" | "SAR"
-  };
-}
+    return {
+      ...newProject,
+      budget: newProject.budget,
+      startDate: newProject.startDate,
+      endDate: newProject.endDate,
+      currency: newProject.currency as "USD" | "EUR" | "SAR"
+    };
+  }
 
   async updateProject(id: number, project: Partial<Omit<Project, "id" | "createdAt">>): Promise<Project | undefined> {
     const updatedValues: any = { ...project };
@@ -139,12 +140,12 @@ export class DatabaseStorage implements IStorage {
     if (updatedValues.startDate) {
       updatedValues.startDate = typeof updatedValues.startDate === 'string' 
         ? updatedValues.startDate 
-        : updatedValues.startDate.toISOString().split('T')[0];
+        : updatedValues.startDate;
     }
     if (updatedValues.endDate) {
       updatedValues.endDate = typeof updatedValues.endDate === 'string' 
         ? updatedValues.endDate 
-        : updatedValues.endDate.toISOString().split('T')[0];
+        : updatedValues.endDate;
     }
 
     const [updatedProject] = await db
@@ -157,9 +158,9 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...updatedProject,
-      budget: Number(updatedProject.budget),
-      startDate: new Date(updatedProject.startDate),
-      endDate: new Date(updatedProject.endDate),
+      budget: updatedProject.budget,
+      startDate: updatedProject.startDate,
+      endDate: updatedProject.endDate,
       currency: updatedProject.currency as "USD" | "EUR" | "SAR"
     };
   }
@@ -178,13 +179,13 @@ export class DatabaseStorage implements IStorage {
 
     return dbItems.map(item => ({
       ...item,
-      budgetedCost: Number(item.budgetedCost),
-      actualCost: Number(item.actualCost),
-      percentComplete: Number(item.percentComplete),
-      startDate: item.startDate ? new Date(item.startDate) : null,
-      endDate: item.endDate ? new Date(item.endDate) : null,
-      actualStartDate: item.actualStartDate ? new Date(item.actualStartDate) : null,
-      actualEndDate: item.actualEndDate ? new Date(item.actualEndDate) : null,
+      budgetedCost: item.budgetedCost,
+      actualCost: item.actualCost,
+      percentComplete: item.percentComplete,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      actualStartDate: item.actualStartDate,
+      actualEndDate: item.actualEndDate,
     }));
   }
 
@@ -198,85 +199,55 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...item,
-      budgetedCost: Number(item.budgetedCost),
-      actualCost: Number(item.actualCost),
-      percentComplete: Number(item.percentComplete),
-      startDate: item.startDate ? new Date(item.startDate) : null,
-      endDate: item.endDate ? new Date(item.endDate) : null,
-      actualStartDate: item.actualStartDate ? new Date(item.actualStartDate) : null,
-      actualEndDate: item.actualEndDate ? new Date(item.actualEndDate) : null,
+      budgetedCost: item.budgetedCost,
+      actualCost: item.actualCost,
+      percentComplete: item.percentComplete,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      actualStartDate: item.actualStartDate,
+      actualEndDate: item.actualEndDate,
     };
   }
 
   async createWbsItem(wbsItem: Omit<WbsItem, "id" | "createdAt">): Promise<WbsItem> {
-    const insertData: any = {
-      projectId: wbsItem.projectId,
-      parentId: wbsItem.parentId,
-      name: wbsItem.name,
-      description: wbsItem.description,
-      level: wbsItem.level,
-      code: wbsItem.code,
-      type: wbsItem.type,
-      budgetedCost: wbsItem.budgetedCost.toString(),
-      actualCost: "0",
-      percentComplete: "0",
-      isTopLevel: wbsItem.isTopLevel,
-    };
-
+    const insertData: any = { ...wbsItem };
+    
+    // Handle date conversions
     if (wbsItem.startDate) {
-      insertData.startDate = wbsItem.startDate.toISOString().split('T')[0];
+      insertData.startDate = typeof wbsItem.startDate === 'string' ? wbsItem.startDate : wbsItem.startDate;
     }
     if (wbsItem.endDate) {
-      insertData.endDate = wbsItem.endDate.toISOString().split('T')[0];
-    }
-    if (wbsItem.duration) {
-      insertData.duration = wbsItem.duration;
+      insertData.endDate = typeof wbsItem.endDate === 'string' ? wbsItem.endDate : wbsItem.endDate;
     }
 
     const [newWbsItem] = await db.insert(wbsItems).values(insertData).returning();
 
     return {
       ...newWbsItem,
-      budgetedCost: Number(newWbsItem.budgetedCost),
-      actualCost: Number(newWbsItem.actualCost),
-      percentComplete: Number(newWbsItem.percentComplete),
-      startDate: newWbsItem.startDate ? new Date(newWbsItem.startDate) : null,
-      endDate: newWbsItem.endDate ? new Date(newWbsItem.endDate) : null,
-      actualStartDate: newWbsItem.actualStartDate ? new Date(newWbsItem.actualStartDate) : null,
-      actualEndDate: newWbsItem.actualEndDate ? new Date(newWbsItem.actualEndDate) : null,
+      budgetedCost: newWbsItem.budgetedCost,
+      actualCost: newWbsItem.actualCost,
+      percentComplete: newWbsItem.percentComplete,
+      startDate: newWbsItem.startDate,
+      endDate: newWbsItem.endDate,
+      actualStartDate: newWbsItem.actualStartDate,
+      actualEndDate: newWbsItem.actualEndDate,
     };
   }
 
   async updateWbsItem(id: number, wbsItem: Partial<Omit<WbsItem, "id" | "createdAt">>): Promise<WbsItem | undefined> {
-    const updatedValues: any = { ...wbsItem };
+    const updateData: any = { ...wbsItem };
     
-    if (updatedValues.name !== undefined) updatedValues.name = updatedValues.name;
-    if (updatedValues.description !== undefined) updatedValues.description = updatedValues.description;
-    if (updatedValues.level !== undefined) updatedValues.level = updatedValues.level;
-    if (updatedValues.code !== undefined) updatedValues.code = updatedValues.code;
-    if (updatedValues.type !== undefined) updatedValues.type = updatedValues.type;
-    if (updatedValues.budgetedCost !== undefined) updatedValues.budgetedCost = updatedValues.budgetedCost.toString();
-    if (updatedValues.actualCost !== undefined) updatedValues.actualCost = updatedValues.actualCost.toString();
-    if (updatedValues.percentComplete !== undefined) updatedValues.percentComplete = updatedValues.percentComplete.toString();
-    if (updatedValues.isTopLevel !== undefined) updatedValues.isTopLevel = updatedValues.isTopLevel;
-    if (updatedValues.duration !== undefined) updatedValues.duration = updatedValues.duration;
-
-    if (updatedValues.startDate !== undefined) {
-      updatedValues.startDate = updatedValues.startDate.toISOString().split('T')[0];
+    // Handle date conversions
+    if (updateData.startDate) {
+      updateData.startDate = typeof updateData.startDate === 'string' ? updateData.startDate : updateData.startDate;
     }
-    if (updatedValues.endDate !== undefined) {
-      updatedValues.endDate = updatedValues.endDate.toISOString().split('T')[0];
-    }
-    if (updatedValues.actualStartDate !== undefined) {
-      updatedValues.actualStartDate = updatedValues.actualStartDate.toISOString().split('T')[0];
-    }
-    if (updatedValues.actualEndDate !== undefined) {
-      updatedValues.actualEndDate = updatedValues.actualEndDate.toISOString().split('T')[0];
+    if (updateData.endDate) {
+      updateData.endDate = typeof updateData.endDate === 'string' ? updateData.endDate : updateData.endDate;
     }
 
     const [updatedWbsItem] = await db
       .update(wbsItems)
-      .set(updatedValues)
+      .set(updateData)
       .where(eq(wbsItems.id, id))
       .returning();
 
@@ -284,13 +255,13 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...updatedWbsItem,
-      budgetedCost: Number(updatedWbsItem.budgetedCost),
-      actualCost: Number(updatedWbsItem.actualCost),
-      percentComplete: Number(updatedWbsItem.percentComplete),
-      startDate: updatedWbsItem.startDate ? new Date(updatedWbsItem.startDate) : null,
-      endDate: updatedWbsItem.endDate ? new Date(updatedWbsItem.endDate) : null,
-      actualStartDate: updatedWbsItem.actualStartDate ? new Date(updatedWbsItem.actualStartDate) : null,
-      actualEndDate: updatedWbsItem.actualEndDate ? new Date(updatedWbsItem.actualEndDate) : null,
+      budgetedCost: updatedWbsItem.budgetedCost,
+      actualCost: updatedWbsItem.actualCost,
+      percentComplete: updatedWbsItem.percentComplete,
+      startDate: updatedWbsItem.startDate,
+      endDate: updatedWbsItem.endDate,
+      actualStartDate: updatedWbsItem.actualStartDate,
+      actualEndDate: updatedWbsItem.actualEndDate,
     };
   }
 
@@ -300,53 +271,36 @@ export class DatabaseStorage implements IStorage {
 
   // Dependency methods
   async getDependencies(projectId: number): Promise<Dependency[]> {
-    // First get all WBS items for this project
-    const wbsItems = await this.getWbsItems(projectId);
-    if (!wbsItems.length) return [];
-    
-    // Extract all WBS item IDs
-    const wbsItemIds = wbsItems.map(item => item.id);
-    
-    // Find all dependencies where either predecessor or successor belongs to this project
-    const result = await db
+    const dbDependencies = await db
       .select()
       .from(dependencies)
-      .where(
-        or(
-          inArray(dependencies.predecessorId, wbsItemIds),
-          inArray(dependencies.successorId, wbsItemIds)
-        )
-      );
-      
-    return result;
+      .innerJoin(wbsItems, eq(dependencies.predecessorId, wbsItems.id))
+      .where(eq(wbsItems.projectId, projectId));
+
+    return dbDependencies.map(d => ({
+      id: d.dependencies.id,
+      predecessorId: d.dependencies.predecessorId,
+      successorId: d.dependencies.successorId,
+      type: d.dependencies.type,
+      lag: d.dependencies.lag,
+      createdAt: d.dependencies.createdAt,
+    }));
   }
 
   async getDependency(id: number): Promise<Dependency | undefined> {
-    const result = await db.select().from(dependencies).where(eq(dependencies.id, id));
-    return result[0];
+    const [dependency] = await db.select().from(dependencies).where(eq(dependencies.id, id));
+    return dependency;
   }
 
   async createDependency(dependency: Omit<Dependency, "id" | "createdAt">): Promise<Dependency> {
-    const [newDependency] = await db
-      .insert(dependencies)
-      .values(dependency)
-      .returning();
+    const [newDependency] = await db.insert(dependencies).values(dependency).returning();
     return newDependency;
   }
 
   async updateDependency(id: number, dependency: Partial<Omit<Dependency, "id" | "createdAt">>): Promise<Dependency | undefined> {
-    const updatedValues: any = { ...dependency };
-    
-    if (updatedValues.predecessorId) {
-      updatedValues.predecessorId = updatedValues.predecessorId.toString();
-    }
-    if (updatedValues.successorId) {
-      updatedValues.successorId = updatedValues.successorId.toString();
-    }
-
     const [updatedDependency] = await db
       .update(dependencies)
-      .set(updatedValues)
+      .set(dependency)
       .where(eq(dependencies.id, id))
       .returning();
 
@@ -354,8 +308,8 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...updatedDependency,
-      predecessorId: updatedDependency.predecessorId ? Number(updatedDependency.predecessorId) : undefined,
-      successorId: updatedDependency.successorId ? Number(updatedDependency.successorId) : undefined
+      predecessorId: updatedDependency.predecessorId,
+      successorId: updatedDependency.successorId,
     };
   }
 
@@ -365,50 +319,36 @@ export class DatabaseStorage implements IStorage {
 
   // Cost entry methods
   async getCostEntries(wbsItemId: number): Promise<CostEntry[]> {
-    return await db
-      .select()
-      .from(costEntries)
-      .where(eq(costEntries.wbsItemId, wbsItemId));
+    const dbEntries = await db.select().from(costEntries).where(eq(costEntries.wbsItemId, wbsItemId));
+    return dbEntries.map(entry => ({
+      ...entry,
+      amount: entry.amount,
+      entryDate: entry.entryDate,
+    }));
   }
 
   async getCostEntry(id: number): Promise<CostEntry | undefined> {
-    const result = await db.select().from(costEntries).where(eq(costEntries.id, id));
-    return result[0];
+    const [entry] = await db.select().from(costEntries).where(eq(costEntries.id, id));
+    return entry ? {
+      ...entry,
+      amount: entry.amount,
+      entryDate: entry.entryDate,
+    } : undefined;
   }
 
   async createCostEntry(costEntry: Omit<CostEntry, "id" | "createdAt">): Promise<CostEntry> {
-    const [newCostEntry] = await db
-      .insert(costEntries)
-      .values({
-        ...costEntry,
-        amount: costEntry.amount.toString(),
-        entryDate: new Date(costEntry.entryDate).toISOString()
-      })
-      .returning();
-    
-    // Update the actual cost of the WBS item
-    await this.updateWbsItemCost(costEntry.wbsItemId, Number(costEntry.amount));
-    
+    const [newCostEntry] = await db.insert(costEntries).values(costEntry).returning();
     return {
       ...newCostEntry,
-      amount: Number(newCostEntry.amount),
-      entryDate: new Date(newCostEntry.entryDate)
+      amount: newCostEntry.amount,
+      entryDate: newCostEntry.entryDate,
     };
   }
 
   async updateCostEntry(id: number, costEntry: Partial<Omit<CostEntry, "id" | "createdAt">>): Promise<CostEntry | undefined> {
-    const updatedValues: any = { ...costEntry };
-    
-    if (updatedValues.amount !== undefined) {
-      updatedValues.amount = updatedValues.amount.toString();
-    }
-    if (updatedValues.entryDate) {
-      updatedValues.entryDate = updatedValues.entryDate.toISOString();
-    }
-
     const [updatedCostEntry] = await db
       .update(costEntries)
-      .set(updatedValues)
+      .set(costEntry)
       .where(eq(costEntries.id, id))
       .returning();
 
@@ -416,189 +356,145 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...updatedCostEntry,
-      amount: updatedCostEntry.amount ? Number(updatedCostEntry.amount) : undefined,
-      entryDate: updatedCostEntry.entryDate ? new Date(updatedCostEntry.entryDate) : undefined
+      amount: updatedCostEntry.amount,
+      entryDate: updatedCostEntry.entryDate,
     };
   }
 
   async deleteCostEntry(id: number): Promise<void> {
-    // First get the cost entry to know the amount and WBS item ID
-    const [costEntry] = await db
-      .select()
-      .from(costEntries)
-      .where(eq(costEntries.id, id));
-    
-    if (!costEntry) return;
-    
-    // Delete the cost entry
-    await db
-      .delete(costEntries)
-      .where(eq(costEntries.id, id));
-    
-    // Update the actual cost of the WBS item (subtract the amount)
-    await this.updateWbsItemCost(costEntry.wbsItemId, -Number(costEntry.amount));
+    await db.delete(costEntries).where(eq(costEntries.id, id));
   }
 
-  // Helper method to update WBS item actual cost
+  // Helper method to update WBS item cost
   private async updateWbsItemCost(wbsItemId: number, amountChange: number): Promise<void> {
-    const [wbsItem] = await db
-      .select()
+    const [currentItem] = await db
+      .select({ actualCost: wbsItems.actualCost })
       .from(wbsItems)
       .where(eq(wbsItems.id, wbsItemId));
-    
-    if (wbsItem) {
-      const newActualCost = Number(wbsItem.actualCost) + amountChange;
-      
+
+    if (currentItem) {
+      const newActualCost = parseFloat(currentItem.actualCost || "0") + amountChange;
       await db
         .update(wbsItems)
-        .set({ actualCost: newActualCost.toString() }) // Convert number to string
+        .set({ actualCost: newActualCost.toString() })
         .where(eq(wbsItems.id, wbsItemId));
     }
   }
 
   // Task methods
   async getTasks(): Promise<Task[]> {
-    const result = await db.select().from(tasks);
-    return result;
+    const dbTasks = await db.select().from(tasks);
+    return dbTasks;
   }
 
   async getTask(id: number): Promise<Task | undefined> {
-    const [result] = await db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.id, id))
-      .limit(1);
-    return result;
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task;
   }
 
   async createTask(data: InsertTask): Promise<Task> {
     const [result] = await db.insert(tasks).values(data).returning();
     return result;
-    }
-    
+  }
+
   async updateTask(id: number, data: InsertTask): Promise<Task | undefined> {
-    const [result] = await db
-      .update(tasks)
-      .set(data)
-      .where(eq(tasks.id, id))
-      .returning();
+    const [result] = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
     return result;
-    }
-    
+  }
+
   async deleteTask(id: number): Promise<void> {
     await db.delete(tasks).where(eq(tasks.id, id));
   }
 
   // Activity methods
   async getActivities(): Promise<Activity[]> {
-    return await db.select().from(activities).orderBy(activities.name);
+    const dbActivities = await db.select().from(activities);
+    return dbActivities;
   }
 
   async getActivity(id: number): Promise<Activity | undefined> {
-    const result = await db.select().from(activities).where(eq(activities.id, id)).limit(1);
-    return result[0];
-    }
+    const [activity] = await db.select().from(activities).where(eq(activities.id, id));
+    return activity;
+  }
 
   async createActivity(data: InsertActivity): Promise<Activity> {
-    const [result] = await db.insert(activities).values({
-      ...data,
-      updatedAt: new Date(),
-    }).returning();
-
+    const [result] = await db.insert(activities).values(data).returning();
     return {
       ...result,
-      unitRate: Number(result.unitRate),
+      unitRate: result.unitRate,
     };
   }
 
   async updateActivity(id: number, data: InsertActivity): Promise<Activity | undefined> {
-    const [result] = await db
-      .update(activities)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(activities.id, id))
-      .returning();
-    
-    return result || undefined;
+    const [result] = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
+    return result ? {
+      ...result,
+      unitRate: result.unitRate,
+    } : undefined;
   }
 
   async deleteActivity(id: number): Promise<void> {
-    await db
-      .delete(activities)
-      .where(eq(activities.id, id))
-      .returning();
+    await db.delete(activities).where(eq(activities.id, id));
   }
 
   // Resource methods
   async getResources(): Promise<Resource[]> {
-    return await db.select().from(resources).orderBy(resources.name);
-    }
-    
+    const dbResources = await db.select().from(resources);
+    return dbResources;
+  }
+
   async getResource(id: number): Promise<Resource | undefined> {
-    const result = await db.select().from(resources).where(eq(resources.id, id)).limit(1);
-    return result[0];
-      }
+    const [resource] = await db.select().from(resources).where(eq(resources.id, id));
+    return resource;
+  }
 
   async createResource(data: InsertResource): Promise<Resource> {
-    const [result] = await db.insert(resources).values({
-      ...data,
-      updatedAt: new Date(),
-    }).returning();
-
+    const [result] = await db.insert(resources).values(data).returning();
     return {
       ...result,
-      unitRate: Number(result.unitRate),
-      availability: Number(result.availability),
+      unitRate: result.unitRate,
+      availability: result.availability,
     };
-    }
-    
-  async updateResource(id: number, data: InsertResource): Promise<Resource | undefined> {
-    const [result] = await db
-      .update(resources)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(resources.id, id))
-      .returning();
+  }
 
-    return result || undefined;
+  async updateResource(id: number, data: InsertResource): Promise<Resource | undefined> {
+    const [result] = await db.update(resources).set(data).where(eq(resources.id, id)).returning();
+    return result ? {
+      ...result,
+      unitRate: result.unitRate,
+      availability: result.availability,
+    } : undefined;
   }
 
   async deleteResource(id: number): Promise<void> {
     await db.delete(resources).where(eq(resources.id, id));
-    }
-    
+  }
+
   // Task Resource methods
   async getTaskResources(taskId: number): Promise<TaskResource[]> {
-    return await db.select().from(taskResources).where(eq(taskResources.taskId, taskId));
+    const dbTaskResources = await db.select().from(taskResources).where(eq(taskResources.taskId, taskId));
+    return dbTaskResources;
+  }
+
+  async getTaskResource(id: number): Promise<TaskResource | undefined> {
+    const [taskResource] = await db.select().from(taskResources).where(eq(taskResources.id, id));
+    return taskResource;
   }
 
   async createTaskResource(data: InsertTaskResource): Promise<TaskResource> {
-    const [result] = await db.insert(taskResources).values({
-      ...data,
-      updatedAt: new Date(),
-    }).returning();
-
+    const [result] = await db.insert(taskResources).values(data).returning();
     return {
       ...result,
-      quantity: Number(result.quantity),
+      quantity: result.quantity,
     };
   }
 
   async updateTaskResource(id: number, data: InsertTaskResource): Promise<TaskResource | undefined> {
-    const [result] = await db
-      .update(taskResources)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(taskResources.id, id))
-      .returning();
-    
-    return result || undefined;
+    const [result] = await db.update(taskResources).set(data).where(eq(taskResources.id, id)).returning();
+    return result ? {
+      ...result,
+      quantity: result.quantity,
+    } : undefined;
   }
 
   async deleteTaskResource(id: number): Promise<void> {

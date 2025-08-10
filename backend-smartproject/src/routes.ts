@@ -107,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/projects", async (req: Request, res: Response) => {
     try {
       const projectData = projectSchema.parse(req.body);
-      const project = await storage.createProject(projectData);
+      const project = await storage.createProject(projectData as any);
       
       // Create default top-level WBS items for the project - now all will be Summary type
       const totalBudget = Number(project.budget);
@@ -160,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       for (const wbsItem of topLevelWbsItems) {
-        await storage.createWbsItem(wbsItem);
+        await storage.createWbsItem(wbsItem as any);
       }
 
       res.status(201).json(project);
@@ -478,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const wbsItem = await storage.createWbsItem(wbsItemData);
+      const wbsItem = await storage.createWbsItem(wbsItemData as any);
       res.status(201).json(wbsItem);
     } catch (err) {
       handleError(err, res);
@@ -1645,7 +1645,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endDate: string | null;
           duration: number | null;
           percentComplete: string;
-        }) => storage.createTask(task))
+        }) => storage.createTask({
+          ...task,
+          status: "pending" as const
+        }))
       );
 
       res.status(201).json(createdTasks);
@@ -1686,8 +1689,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Activity not found" });
         }
         
-        // Set project ID to null since tasks are not directly linked to projects
-        taskData.projectId = null;
+        // Set project ID to undefined since tasks are not directly linked to projects
+        taskData.projectId = undefined;
       }
 
       // Create a properly typed object for the update
@@ -1695,7 +1698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...taskData,
         startDate: taskData.startDate ? new Date(taskData.startDate).toISOString() : null,
         endDate: taskData.endDate ? new Date(taskData.endDate).toISOString() : null,
-        duration: taskData.duration || null,
+        duration: taskData.duration,
         percentComplete: taskData.percentComplete !== undefined ? taskData.percentComplete : null
       };
 
@@ -1842,7 +1845,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const resourceData = insertResourceSchema.partial().parse(req.body);
-      const updatedResource = await storage.updateResource(id, resourceData);
+      
+      // Ensure all required fields are present by merging with existing resource
+      const updatedResourceData = {
+        ...resource,
+        ...resourceData
+      };
+      
+      const updatedResource = await storage.updateResource(id, updatedResourceData);
       res.json(updatedResource);
     } catch (err) {
       handleError(err, res);
@@ -1909,7 +1919,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const taskResourceData = insertTaskResourceSchema.partial().parse(req.body);
-      const updatedTaskResource = await storage.updateTaskResource(id, taskResourceData);
+      
+      // Get existing task resource to ensure all required fields are present
+      const existingTaskResource = await storage.getTaskResource(id);
+      if (!existingTaskResource) {
+        return res.status(404).json({ message: "Task resource not found" });
+      }
+      
+      // Merge with existing data to ensure all required fields are present
+      const updatedTaskResourceData = {
+        ...existingTaskResource,
+        ...taskResourceData
+      };
+      
+      const updatedTaskResource = await storage.updateTaskResource(id, updatedTaskResourceData);
       res.json(updatedTaskResource);
     } catch (err) {
       handleError(err, res);
