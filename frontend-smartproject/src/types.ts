@@ -23,4 +23,29 @@ export {
   insertCostEntrySchema,
   insertTaskSchema,
   csvImportSchema
-} from '@shared/schema'; 
+} from '@shared/schema';
+
+// Thread and Message types
+export type ThreadType = 'issue' | 'info' | 'announcement' | 'awards';
+
+export interface Thread {
+  id: string;
+  title: string;
+  type: ThreadType;
+  createdBy: string;
+  createdAt: string;
+  lastMessageAt: string;
+  messageCount: number;
+  isClosed: boolean;
+  projectId?: number;
+}
+
+export interface Message {
+  id: string;
+  threadId: string;
+  content: string;
+  author: string;
+  authorId: string;
+  createdAt: string;
+  isThreadCreator: boolean;
+} 

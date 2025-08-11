@@ -22,6 +22,8 @@ import LessonLearntRegister from "@/pages/lesson-learnt-register";
 import DirectManpowerList from "@/pages/direct-manpower-list";
 import IndirectManpowerList from "@/pages/indirect-manpower-list";
 import PlannedActivityTasks from "@/pages/planned-activity-tasks";
+import CollabPage from "@/pages/collab";
+import ThreadDetailPage from "@/pages/thread-detail";
 
 // Implementing a flatter routing approach without nesting
 function Router() {
@@ -154,6 +156,32 @@ function Router() {
       
       {/* Resource Master */}
       <Route path="/resource-master" component={ResourceMaster} />
+      
+      {/* Collaboration Hub */}
+      <Route path="/collab">
+        <MasterLayout>
+          <CollabPage />
+        </MasterLayout>
+      </Route>
+      <Route path="/collab/thread/:threadId">
+        <MasterLayout>
+          <ThreadDetailPage />
+        </MasterLayout>
+      </Route>
+      <Route path="/projects/:projectId/collab">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <CollabPage />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/collab/thread/:threadId">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ThreadDetailPage />
+          </ProjectLayout>
+        )}
+      </Route>
       
       {/* Global Under Construction Pages */}
       <Route path="/under-construction/:pageName">
