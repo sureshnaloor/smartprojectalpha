@@ -5,7 +5,7 @@ import { ProjectHeader } from "@/components/project/project-header";
 import { SimpleProjectHeader } from "@/components/project/simple-project-header";
 import { useMobile } from "@/hooks/use-mobile";
 import { Toaster } from "sonner";
-import { AlertTriangle, FolderOpen, Calendar, UserCheck, Lightbulb, User, UserPlus, ClipboardList } from "lucide-react";
+import { AlertTriangle, FolderOpen, Calendar, UserCheck, Lightbulb, User, UserPlus, ClipboardList, MessageSquareText } from "lucide-react";
 
 interface ProjectLayoutProps {
   children: React.ReactNode;
@@ -43,7 +43,8 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
                      location.includes('/lesson-learnt-register') ||
                      location.includes('/direct-manpower-list') ||
                      location.includes('/indirect-manpower-list') ||
-                     location.includes('/planned-activity-tasks');
+                     location.includes('/planned-activity-tasks') ||
+                     location.includes('/collab');
 
   const isDocumentPage = location.includes('/under-construction/ProjectDrawings') ||
                          location.includes('/under-construction/ProjectBOQ') ||
@@ -58,6 +59,9 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
 
   // Determine page title and icon
   const getPageInfo = () => {
+    if (location.includes('/collab')) {
+      return { title: 'Collaboration Hub', icon: <MessageSquareText className="h-4 w-4" /> };
+    }
     if (location.includes('/risk-register')) {
       return { title: 'Risk Register', icon: <AlertTriangle className="h-4 w-4" /> };
     }

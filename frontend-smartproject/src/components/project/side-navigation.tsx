@@ -38,7 +38,8 @@ import {
   User,
   UserPlus,
   ClipboardList,
-  MoreHorizontal
+  MoreHorizontal,
+  MessageSquareText as MessageSquareTextIcon
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -92,13 +93,13 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
   return (
     <>
       <aside className={cn(
-        "bg-white border-r border-gray-200 flex-shrink-0 transition-all duration-300 h-[calc(100vh-4rem)] fixed md:relative top-16 md:top-0 z-30",
+        "bg-gray-50 border-r border-gray-300 flex-shrink-0 transition-all duration-300 h-[calc(100vh-4rem)] fixed md:relative top-16 md:top-0 z-30 shadow-lg",
         isOpen ? "w-64 left-0" : "-left-full md:left-0 md:w-0"
       )}>
         <div className="h-full flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-200">
+          <div className="px-4 py-4 border-b border-gray-300 bg-white">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-600">PROJECTS</h2>
+                              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">PROJECTS</h2>
               <button 
                 className="text-primary-600 hover:text-primary-800"
                 onClick={() => setIsAddProjectModalOpen(true)}
@@ -135,8 +136,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                     <li key={project.id}>
                       <Link href={`/projects/${project.id}`}>
                         <a className={cn(
-                          "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                          currentProjectId === project.id && "text-primary-600 font-medium bg-primary-50"
+                          "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                          currentProjectId === project.id && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                         )}>
                           {currentProjectId === project.id ? (
                             <Building2 className="mr-3 h-5 w-5" />
@@ -153,17 +154,28 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                 {/* Project-specific tools, only shown when a project is selected */}
                 {currentProjectId && (
                   <>
-                    <div className="px-4 py-2 border-t border-gray-200">
-                      <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="px-4 py-3 border-t border-gray-300 bg-white">
+                      <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                         Project Tools
                       </h2>
                     </div>
                     <ul className="py-1">
                       <li>
+                        <Link href={`/collab`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            isActive('/collab') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                          )}>
+                            <MessageSquareTextIcon className="mr-3 h-5 w-5" />
+                            <span>Collaboration Hub</span>
+                          </a>
+                        </Link>
+                      </li>
+                      <li>
                         <Link href={`/under-construction/Activities`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                            isActive('/activities') && "text-teal-600 font-medium bg-teal-50"
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            isActive('/activities') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                           )}>
                             <Activity className="mr-3 h-5 w-5" />
                             <span>Activities</span>
@@ -173,8 +185,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       <li>
                         <Link href={`/under-construction/Tasks`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                            isActive('/tasks') && "text-teal-600 font-medium bg-teal-50"
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            isActive('/tasks') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                           )}>
                             <ListTodo className="mr-3 h-5 w-5" />
                             <span>Tasks</span>
@@ -184,8 +196,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       <li>
                         <Link href={`/under-construction/Resources`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                            isActive('/resources') && "text-teal-600 font-medium bg-teal-50"
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            isActive('/resources') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                           )}>
                             <Users className="mr-3 h-5 w-5" />
                             <span>Resources</span>
@@ -198,8 +210,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         <button
                           onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
                           className={cn(
-                            "flex items-center justify-between w-full px-4 py-2 text-gray-600 hover:bg-gray-50",
-                            isActive('/documents') && "text-teal-600 font-medium bg-teal-50"
+                            "flex items-center justify-between w-full px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            isActive('/documents') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                           )}
                         >
                           <div className="flex items-center">
@@ -219,8 +231,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/ProjectDrawings`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
-                                  isActive('/project-drawings') && "text-teal-600 font-medium bg-teal-50"
+                                  "flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 text-sm",
+                                  isActive('/project-drawings') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                                 )}>
                                   <FileImage className="mr-3 h-4 w-4" />
                                   <span>Project Drawings</span>
@@ -449,17 +461,28 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                 )}
 
                 {/* Global tools, always visible */}
-                <div className="px-4 py-2 border-t border-gray-200">
-                  <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <div className="px-4 py-3 border-t border-gray-300 bg-white">
+                  <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Global Tools
                   </h2>
                 </div>
                 <ul className="py-1">
                   <li>
+                    <Link href={`/projects/${currentProjectId}/collab`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/collab') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )}>
+                        <MessageSquareTextIcon className="mr-3 h-5 w-5" />
+                        <span>Collaboration Hub</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
                     <Link href={`/activity-master`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/activity-master') && "text-teal-600 font-medium bg-teal-50"
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/activity-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                       )}>
                         <Activity className="mr-3 h-5 w-5" />
                         <span>Activity Master</span>
@@ -469,8 +492,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/task-master`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/task-master') && "text-teal-600 font-medium bg-teal-50"
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/task-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                       )}>
                         <ListTodo className="mr-3 h-5 w-5" />
                         <span>Task Master</span>
@@ -480,8 +503,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/resource-master`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/resource-master') && "text-teal-600 font-medium bg-teal-50"
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/resource-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                       )}>
                         <Users className="mr-3 h-5 w-5" />
                         <span>Resource Master</span>
@@ -491,8 +514,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                 </ul>
 
                 {/* Reports & Analytics */}
-                <div className="px-4 py-2 border-t border-gray-200">
-                  <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <div className="px-4 py-3 border-t border-gray-300 bg-white">
+                  <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Reports & Analytics
                   </h2>
                 </div>
@@ -500,8 +523,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/under-construction/Charts`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/under-construction/Charts') && "text-teal-600 font-medium bg-teal-50"
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/under-construction/Charts') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                       )}>
                         <PieChart className="mr-3 h-5 w-5" />
                         <span>Charts</span>
@@ -511,8 +534,8 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/under-construction/Reports`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50",
-                        isActive('/under-construction/Reports') && "text-teal-600 font-medium bg-teal-50"
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/under-construction/Reports') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                       )}>
                         <FileText className="mr-3 h-5 w-5" />
                         <span>Reports</span>
@@ -525,16 +548,16 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
           </div>
           
           {currentProject && (
-            <div className="border-t border-gray-200 p-4">
-              <div className="text-sm text-gray-500 mb-2">Current Project:</div>
+            <div className="border-t border-gray-300 bg-gradient-to-r from-teal-50 to-teal-100 p-4 shadow-inner">
+              <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-2">Current Project</div>
               <div className="flex items-center justify-between">
-                <div className="text-sm font-medium truncate">{currentProject.name}</div>
-                <div className="flex space-x-1">
-                  <button className="text-gray-500 hover:text-primary-600" title="Project Settings">
-                    <Settings size={14} />
+                <div className="text-sm font-bold text-teal-800 truncate">{currentProject.name}</div>
+                <div className="flex space-x-2">
+                  <button className="text-teal-600 hover:text-teal-800 transition-colors duration-200" title="Project Settings">
+                    <Settings size={16} />
                   </button>
-                  <button className="text-gray-500 hover:text-green-600" title="Export Data">
-                    <Download size={14} />
+                  <button className="text-teal-600 hover:text-teal-800 transition-colors duration-200" title="Export Data">
+                    <Download size={16} />
                   </button>
                 </div>
               </div>
