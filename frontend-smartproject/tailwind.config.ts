@@ -92,11 +92,22 @@ export default {
             transform: "translateY(0)",
           },
         },
+        "pulse-slow": {
+          "0%, 100%": {
+            opacity: "1",
+            transform: "scale(1)",
+          },
+          "50%": {
+            opacity: "0.95",
+            transform: "scale(1.01)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fadeIn": "fade-in 0.3s ease-out forwards",
+        "pulse-slow": "pulse-slow 3s ease-in-out infinite",
       },
     },
   },

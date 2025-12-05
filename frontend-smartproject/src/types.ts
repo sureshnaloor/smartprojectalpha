@@ -29,11 +29,13 @@ export {
 export type ThreadType = 'issue' | 'info' | 'announcement' | 'awards';
 
 export interface Thread {
-  id: string;
+  id: number;
   title: string;
   type: ThreadType;
-  createdBy: string;
+  createdById: string;
+  createdByName: string;
   createdAt: string;
+  updatedAt: string;
   lastMessageAt: string;
   messageCount: number;
   isClosed: boolean;
@@ -41,11 +43,11 @@ export interface Thread {
 }
 
 export interface Message {
-  id: string;
-  threadId: string;
+  id: number;
+  threadId: number;
   content: string;
-  author: string;
   authorId: string;
+  authorName: string;
   createdAt: string;
-  isThreadCreator: boolean;
+  isThreadCreator?: boolean;
 } 
