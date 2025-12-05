@@ -1,148 +1,25 @@
 import { useState, useEffect, useRef } from "react";
-import { useRoute } from "wouter";
-import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
+import { useRoute, Link } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  ArrowLeft, 
-  Send, 
-  AlertTriangle, 
-  Info, 
-  Megaphone, 
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowLeft,
+  Send,
+  Loader2,
+  AlertTriangle,
+  Info,
+  Megaphone,
   Award,
-  Clock,
   User,
+  Clock,
   MessageSquare,
   Lock
 } from "lucide-react";
-import { Thread, Message, ThreadType } from "@/types";
+import { Thread, Message } from "@/types";
 import { cn } from "@/lib/utils";
-
-// Mock data for demonstration
-const mockThreads: Thread[] = [
-  {
-    id: "1",
-    title: "Critical safety issue on site - immediate attention required",
-    type: "issue",
-    createdBy: "John Smith",
-    createdAt: "2024-01-15T10:30:00Z",
-    lastMessageAt: "2024-01-15T16:45:00Z",
-    messageCount: 8,
-    isClosed: false,
-    projectId: 1
-  },
-  {
-    id: "2",
-    title: "New equipment delivery schedule update",
-    type: "info",
-    createdBy: "Sarah Johnson",
-    createdAt: "2024-01-14T14:20:00Z",
-    lastMessageAt: "2024-01-15T09:15:00Z",
-    messageCount: 3,
-    isClosed: false,
-    projectId: 1
-  },
-  {
-    id: "3",
-    title: "Team meeting rescheduled for tomorrow",
-    type: "announcement",
-    createdBy: "Mike Wilson",
-    createdAt: "2024-01-15T08:00:00Z",
-    lastMessageAt: "2024-01-15T08:00:00Z",
-    messageCount: 1,
-    isClosed: false,
-    projectId: 1
-  },
-  {
-    id: "4",
-    title: "Congratulations to the safety team for 100 days without incidents",
-    type: "awards",
-    createdBy: "Lisa Brown",
-    createdAt: "2024-01-13T16:00:00Z",
-    lastMessageAt: "2024-01-15T11:30:00Z",
-    messageCount: 12,
-    isClosed: false,
-    projectId: 1
-  }
-];
-
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    threadId: "1",
-    content: "We've identified a critical safety issue on the north side of the construction site. There's a structural concern with the scaffolding that needs immediate attention. All work in that area should be halted until further notice.",
-    author: "John Smith",
-    authorId: "js1",
-    createdAt: "2024-01-15T10:30:00Z",
-    isThreadCreator: true
-  },
-  {
-    id: "2",
-    threadId: "1",
-    content: "I can see the issue from my position. The scaffolding appears to be leaning slightly. I've already evacuated the area and notified the safety team.",
-    author: "Sarah Johnson",
-    authorId: "sj1",
-    createdAt: "2024-01-15T10:35:00Z",
-    isThreadCreator: false
-  },
-  {
-    id: "3",
-    threadId: "1",
-    content: "Safety team is on the way. We should have an assessment within 30 minutes. Please keep everyone clear of the area.",
-    author: "Mike Wilson",
-    authorId: "mw1",
-    createdAt: "2024-01-15T10:40:00Z",
-    isThreadCreator: false
-  },
-  {
-    id: "4",
-    threadId: "1",
-    content: "I've contacted the scaffolding contractor. They'll be here within the hour to assess and fix the issue.",
-    author: "John Smith",
-    authorId: "js1",
-    createdAt: "2024-01-15T10:45:00Z",
-    isThreadCreator: true
-  },
-  {
-    id: "5",
-    threadId: "1",
-    content: "Good response time. I've also notified the project manager about this situation.",
-    author: "David Lee",
-    authorId: "dl1",
-    createdAt: "2024-01-15T10:50:00Z",
-    isThreadCreator: false
-  },
-  {
-    id: "6",
-    threadId: "1",
-    content: "Safety assessment complete. The scaffolding is indeed compromised. We need to dismantle and rebuild that section. Work will be delayed by approximately 4 hours.",
-    author: "Mike Wilson",
-    authorId: "mw1",
-    createdAt: "2024-01-15T11:15:00Z",
-    isThreadCreator: false
-  },
-  {
-    id: "7",
-    threadId: "1",
-    content: "Understood. I'll update the project schedule accordingly. Thanks for the quick response everyone.",
-    author: "John Smith",
-    authorId: "js1",
-    createdAt: "2024-01-15T11:20:00Z",
-    isThreadCreator: true
-  },
-  {
-    id: "8",
-    threadId: "1",
-    content: "Scaffolding has been safely dismantled. New scaffolding will be erected tomorrow morning. All safety protocols followed.",
-    author: "Sarah Johnson",
-    authorId: "sj1",
-    createdAt: "2024-01-15T16:45:00Z",
-    isThreadCreator: false
-  }
-];
+import { useToast } from "@/hooks/use-toast";
 
 const threadTypeConfig = {
   issue: {
@@ -171,218 +48,324 @@ const threadTypeConfig = {
   }
 };
 
-export default function ThreadDetailPage() {
-  const [, params] = useRoute<{ projectId: string; threadId: string }>("/projects/:projectId/collab/thread/:threadId");
-  const [newMessage, setNewMessage] = useState('');
+export default function ThreadDetail() {
+  const [, projectParams] = useRoute<{ projectId: string; threadId: string }>("/projects/:projectId/collab/thread/:threadId");
+  const [, globalParams] = useRoute<{ threadId: string }>("/collab/thread/:threadId");
+
+  const projectId = projectParams?.projectId;
+  const threadId = projectParams?.threadId || globalParams?.threadId;
+
+  const [thread, setThread] = useState<Thread | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newMessage, setNewMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const projectId = params?.projectId;
-  const threadId = params?.threadId;
-  const thread = mockThreads.find(t => t.id === threadId);
-  const messages = mockMessages.filter(m => m.threadId === threadId);
+  const backUrl = projectId ? `/projects/${projectId}/collab` : '/collab';
 
-  // Mock current user (in real app, this would come from auth context)
-  const currentUser = {
-    id: "js1",
-    name: "John Smith"
-  };
-
+  // Fetch thread and messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!threadId) return;
+    fetchThreadData();
+  }, [threadId, projectId]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
   }, [messages]);
 
-  if (!thread) {
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const fetchThreadData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log('Fetching thread data for threadId:', threadId, 'projectId:', projectId);
+
+      // Fetch messages
+      const messagesEndpoint = projectId
+        ? `/api/projects/${projectId}/collaboration/threads/${threadId}/messages`
+        : `/api/collaboration/threads/${threadId}/messages`;
+
+      console.log('Messages endpoint:', messagesEndpoint);
+
+      const messagesResponse = await fetch(messagesEndpoint);
+      if (!messagesResponse.ok) {
+        throw new Error('Failed to fetch messages');
+      }
+
+      const messagesData = await messagesResponse.json();
+      console.log('Messages data:', messagesData);
+      setMessages(messagesData);
+
+      // Fetch thread details from the list
+      const threadsEndpoint = projectId
+        ? `/api/projects/${projectId}/collaboration/threads`
+        : '/api/collaboration/threads';
+
+      console.log('Threads endpoint:', threadsEndpoint);
+
+      const threadsResponse = await fetch(threadsEndpoint);
+      if (threadsResponse.ok) {
+        const threadsData = await threadsResponse.json();
+        console.log('Threads data:', threadsData);
+        const currentThread = threadsData.find((t: Thread) => t.id === parseInt(threadId!));
+        console.log('Current thread:', currentThread);
+        if (currentThread) {
+          setThread(currentThread);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching thread data:', err);
+      setError('Failed to load thread. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to load thread data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmitMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newMessage.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a message.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (thread?.isClosed) {
+      toast({
+        title: "Thread Closed",
+        description: "Cannot add messages to a closed thread.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const messageEndpoint = projectId
+        ? `/api/projects/${projectId}/collaboration/threads/${threadId}/messages`
+        : `/api/collaboration/threads/${threadId}/messages`;
+
+      console.log('Posting message to:', messageEndpoint);
+
+      const response = await fetch(messageEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: newMessage,
+          authorId: `user_${Date.now()}`,
+          authorName: 'Anonymous User',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to post message');
+      }
+
+      const newMsg = await response.json();
+      console.log('New message posted:', newMsg);
+      setMessages([...messages, newMsg]);
+      setNewMessage("");
+
+      toast({
+        title: "Success",
+        description: "Message posted successfully!",
+      });
+    } catch (err) {
+      console.error('Error posting message:', err);
+      toast({
+        title: "Error",
+        description: "Failed to post message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatTimestamp = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+    return date.toLocaleDateString();
+  };
+
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <div className="text-center py-12">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Thread not found</h3>
-          <p className="text-gray-600 mb-4">The thread you're looking for doesn't exist.</p>
-          <Link href={`/projects/${projectId}/collab`}>
-            <Button>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Collaboration Hub
-            </Button>
-          </Link>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
       </div>
     );
   }
 
-  const config = threadTypeConfig[thread.type];
-  const Icon = config.icon;
+  if (error || !thread) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Thread Not Found</h2>
+              <p className="text-gray-600 mb-4">{error || "The thread you're looking for doesn't exist."}</p>
+              <Link href={backUrl}>
+                <Button>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Threads
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || thread.isClosed) return;
-
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // In a real app, you would send this to the backend
-    console.log('Sending message:', newMessage);
-    
-    setNewMessage('');
-    setIsSubmitting(false);
-  };
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
+  const TypeIcon = threadTypeConfig[thread.type].icon;
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="container mx-auto px-4 py-6 max-w-5xl">
       {/* Header */}
       <div className="mb-6">
-        <Link href={`/projects/${projectId}/collab`}>
+        <Link href={backUrl}>
           <Button variant="ghost" className="mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Collaboration Hub
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Threads
           </Button>
         </Link>
-        
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-gray-900 flex-1 mr-3">{thread.title}</h1>
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                <Badge className={cn("border", config.color)}>
-                  <Icon className={cn("w-3 h-3 mr-1", config.iconColor)} />
-                  {config.label}
-                </Badge>
-                {thread.isClosed && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Lock className="w-3 h-3 mr-1" />
-                    Closed
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <TypeIcon className={cn("h-6 w-6", threadTypeConfig[thread.type].iconColor)} />
+                  <CardTitle className="text-2xl">{thread.title}</CardTitle>
+                  {thread.isClosed && (
+                    <Badge variant="secondary" className="bg-gray-200">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Closed
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <Badge className={cn("border", threadTypeConfig[thread.type].color)}>
+                    {threadTypeConfig[thread.type].label}
                   </Badge>
-                )}
+                  <div className="flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    <span>{thread.createdByName}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatTimestamp(thread.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    <span>{messages.length} message{messages.length !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
-              <div className="flex items-center space-x-1">
-                <User className="w-4 h-4" />
-                <span>Started by {thread.createdBy}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Clock className="w-4 h-4" />
-                <span className="text-xs text-gray-400 italic">{formatDate(thread.createdAt)}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <MessageSquare className="w-4 h-4" />
-                <span>{messages.length} messages</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          </CardHeader>
+        </Card>
       </div>
 
       {/* Messages */}
       <Card className="mb-6">
-        <CardContent className="p-0">
-          <div className="max-h-96 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => {
-              const isCurrentUser = message.authorId === currentUser.id;
-              const isThreadCreator = message.isThreadCreator;
-
-              return (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex",
-                    isCurrentUser ? "justify-end" : "justify-start"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex max-w-xs lg:max-w-md",
-                      isCurrentUser ? "flex-row-reverse" : "flex-row"
-                    )}
-                  >
-                    <Avatar className={cn("w-8 h-8", isCurrentUser ? "ml-2" : "mr-2")}>
-                      <AvatarFallback className="text-xs">
-                        {getInitials(message.author)}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className={cn(
-                      "flex flex-col",
-                      isCurrentUser ? "items-end" : "items-start"
-                    )}>
-                      <div className={cn(
-                        "rounded-lg px-3 py-2",
-                        isCurrentUser 
-                          ? "bg-blue-600 text-white" 
-                          : "bg-gray-100 text-gray-900"
-                      )}>
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      </div>
-                      
-                      <div className={cn(
-                        "flex items-center space-x-2 mt-1 text-xs text-gray-500",
-                        isCurrentUser ? "flex-row-reverse" : "flex-row"
-                      )}>
-                        <span className="font-medium">{message.author}</span>
-                        {isThreadCreator && (
-                          <Badge variant="outline" className="text-xs">Creator</Badge>
-                        )}
-                        <span className="text-xs text-gray-400 italic">{formatTime(message.createdAt)}</span>
-                      </div>
+        <CardContent className="p-6">
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+            {messages.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No messages yet. Be the first to comment!</p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div key={message.id} className="flex gap-3 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary-600" />
                     </div>
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-gray-900">{message.authorName}</span>
+                      <span className="text-xs text-gray-500">{formatTimestamp(message.createdAt)}</span>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-wrap break-words">{message.content}</p>
+                  </div>
                 </div>
-              );
-            })}
+              ))
+            )}
             <div ref={messagesEndRef} />
           </div>
         </CardContent>
       </Card>
 
       {/* Message Input */}
-      {!thread.isClosed ? (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex space-x-2">
+      <Card>
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmitMessage} className="space-y-4">
+            <div>
               <Textarea
-                placeholder="Type your message..."
+                id="message"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                className="flex-1 min-h-[80px] resize-none"
-                disabled={isSubmitting}
+                placeholder={thread.isClosed ? "This thread is closed" : "Type your message..."}
+                rows={4}
+                disabled={thread.isClosed || isSubmitting}
+                required
               />
+            </div>
+            <div className="flex justify-end">
               <Button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isSubmitting}
-                className="self-end"
+                type="submit"
+                disabled={thread.isClosed || isSubmitting || !newMessage.trim()}
               >
-                <Send className="w-4 h-4" />
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Post Message
+                  </>
+                )}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Lock className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-600">This thread is closed. No new messages can be added.</p>
-          </CardContent>
-        </Card>
-      )}
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}
