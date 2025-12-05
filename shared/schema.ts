@@ -106,6 +106,53 @@ export const taskResources = pgTable("task_resources", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Collaboration Threads Table
+export const collaborationThreads = pgTable("collaboration_threads", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // issue, info, announcement, awards
+  projectId: integer("project_id").references(() => projects.id, { onDelete: "cascade" }), // null for global threads
+  createdById: text("created_by_id").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  isClosed: boolean("is_closed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Collaboration Messages Table
+export const collaborationMessages = pgTable("collaboration_messages", {
+  id: serial("id").primaryKey(),
+  threadId: integer("thread_id").notNull().references(() => collaborationThreads.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  authorId: text("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Project Collaboration Threads Table (project-specific)
+export const projectCollaborationThreads = pgTable("project_collaboration_threads", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // issue, info, announcement, awards
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }), // required for project threads
+  createdById: text("created_by_id").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  isClosed: boolean("is_closed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Project Collaboration Messages Table (project-specific)
+export const projectCollaborationMessages = pgTable("project_collaboration_messages", {
+  id: serial("id").primaryKey(),
+  threadId: integer("thread_id").notNull().references(() => projectCollaborationThreads.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  authorId: text("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+
 // Insert Schemas
 export const insertProjectSchema = createInsertSchema(projects)
   .omit({ id: true, createdAt: true })
@@ -185,9 +232,9 @@ export const insertWbsItemSchema = baseWbsSchema
       // Activity types must have startDate, endDate and duration
       if (data.type === "Activity") {
         return (
-          data.startDate !== undefined && 
-          data.endDate !== undefined && 
-          data.duration !== undefined && 
+          data.startDate !== undefined &&
+          data.endDate !== undefined &&
+          data.duration !== undefined &&
           data.duration > 0
         );
       }
@@ -252,6 +299,31 @@ export const insertResourceSchema = createInsertSchema(resources)
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
   });
 
+// Collaboration Thread schema
+export const insertCollaborationThreadSchema = createInsertSchema(collaborationThreads)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    type: z.enum(["issue", "info", "announcement", "awards"]),
+    isClosed: z.boolean().default(false),
+  });
+
+// Collaboration Message schema
+export const insertCollaborationMessageSchema = createInsertSchema(collaborationMessages)
+  .omit({ id: true, createdAt: true });
+
+// Project Collaboration Thread schema
+export const insertProjectCollaborationThreadSchema = createInsertSchema(projectCollaborationThreads)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    type: z.enum(["issue", "info", "announcement", "awards"]),
+    isClosed: z.boolean().default(false),
+  });
+
+// Project Collaboration Message schema
+export const insertProjectCollaborationMessageSchema = createInsertSchema(projectCollaborationMessages)
+  .omit({ id: true, createdAt: true });
+
+
 // Types
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -274,6 +346,12 @@ export type InsertTaskResource = z.infer<typeof insertTaskResourceSchema>;
 export type Resource = typeof resources.$inferSelect;
 export type InsertResource = z.infer<typeof insertResourceSchema>;
 
+export type CollaborationThread = typeof collaborationThreads.$inferSelect;
+export type InsertCollaborationThread = z.infer<typeof insertCollaborationThreadSchema>;
+
+export type CollaborationMessage = typeof collaborationMessages.$inferSelect;
+export type InsertCollaborationMessage = z.infer<typeof insertCollaborationMessageSchema>;
+
 // Extended schemas for client-side validation
 export const extendedInsertProjectSchema = insertProjectSchema.extend({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -290,41 +368,41 @@ export const extendedInsertWbsItemSchema = baseWbsSchema.extend({
   name: z.string().min(3, "WBS item name must be at least 3 characters"),
   duration: z.string().or(z.number()).pipe(z.coerce.number().nonnegative()).optional(),
 })
-.refine(
-  (data) => {
-    // Activity types must have startDate, endDate and duration
-    if (data.type === "Activity") {
-      return (
-        data.startDate !== undefined && 
-        data.endDate !== undefined && 
-        data.duration !== undefined && 
-        data.duration > 0
-      );
+  .refine(
+    (data) => {
+      // Activity types must have startDate, endDate and duration
+      if (data.type === "Activity") {
+        return (
+          data.startDate !== undefined &&
+          data.endDate !== undefined &&
+          data.duration !== undefined &&
+          data.duration > 0
+        );
+      }
+      return true;
+    },
+    {
+      message: "Activity types must have start date, end date, and duration",
+      path: ["startDate"],
     }
-    return true;
-  },
-  {
-    message: "Activity types must have start date, end date, and duration",
-    path: ["startDate"],
-  }
-)
-.refine(
-  (data) => {
-    // Summary and WorkPackage should not have dates
-    if (data.type === "Summary" || data.type === "WorkPackage") {
-      return (
-        data.startDate === undefined && 
-        data.endDate === undefined && 
-        data.duration === undefined
-      );
+  )
+  .refine(
+    (data) => {
+      // Summary and WorkPackage should not have dates
+      if (data.type === "Summary" || data.type === "WorkPackage") {
+        return (
+          data.startDate === undefined &&
+          data.endDate === undefined &&
+          data.duration === undefined
+        );
+      }
+      return true;
+    },
+    {
+      message: "Summary and WorkPackage types cannot have dates",
+      path: ["startDate"],
     }
-    return true;
-  },
-  {
-    message: "Summary and WorkPackage types cannot have dates",
-    path: ["startDate"],
-  }
-);
+  );
 
 export const updateWbsProgressSchema = z.object({
   id: z.number(),
