@@ -61,9 +61,8 @@ export const activities = pgTable("activities", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  unitOfMeasure: text("unit_of_measure"),
-  unitRate: numeric("unit_rate", { precision: 10, scale: 2 }),
-  currency: text("currency").default("USD").notNull(),
+  unitOfMeasure: text("unit_of_measure").notNull(),
+  unitRate: numeric("unit_rate", { precision: 12, scale: 2 }).notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -87,7 +86,7 @@ export const resources = pgTable("resources", {
 // Tasks Table
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
-  activityId: integer("activity_id").notNull().references(() => activities.id, { onDelete: "cascade" }),
+  activityId: integer("activity_id").references(() => activities.id, { onDelete: "cascade" }), // Made nullable
   name: text("name").notNull(),
   description: text("description"),
   duration: integer("duration").notNull(), // Duration in minutes
@@ -102,6 +101,21 @@ export const taskResources = pgTable("task_resources", {
   taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
   resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
   quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Project Activities Table
+export const projectActivities = pgTable("project_activities", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  globalActivityId: integer("global_activity_id").references(() => activities.id, { onDelete: "set null" }), // nullable for project-specific activities
+  name: text("name").notNull(),
+  description: text("description"),
+  unitOfMeasure: text("unit_of_measure").notNull(),
+  unitRate: numeric("unit_rate", { precision: 12, scale: 2 }).notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -155,7 +169,7 @@ export const projectCollaborationMessages = pgTable("project_collaboration_messa
 
 // Insert Schemas
 export const insertProjectSchema = createInsertSchema(projects)
-  .omit({ id: true, createdAt: true })
+  .omit({ id: true, createdAt: true } as any)
   .extend({
     budget: z.string().or(z.number()).transform(val => val.toString()),
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
@@ -175,7 +189,7 @@ export const insertProjectSchema = createInsertSchema(projects)
 
 // Base WBS schema - a simpler version without all the refinements
 const baseWbsSchema = createInsertSchema(wbsItems)
-  .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true, actualStartDate: true, actualEndDate: true })
+  .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true, actualStartDate: true, actualEndDate: true } as any)
   .extend({
     budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
     type: z.enum(["Summary", "WorkPackage", "Activity"]),
@@ -259,9 +273,9 @@ export const insertWbsItemSchema = baseWbsSchema
     }
   );
 
-export const insertDependencySchema = createInsertSchema(dependencies).omit({ id: true, createdAt: true });
+export const insertDependencySchema = createInsertSchema(dependencies).omit({ id: true, createdAt: true } as any);
 export const insertCostEntrySchema = createInsertSchema(costEntries)
-  .omit({ id: true, createdAt: true })
+  .omit({ id: true, createdAt: true } as any)
   .extend({
     amount: z.string().or(z.number()).transform(val => val.toString()),
     entryDate: z.date().or(z.string()).transform(val => {
@@ -274,7 +288,7 @@ export const insertCostEntrySchema = createInsertSchema(costEntries)
 
 // Task schema
 export const insertTaskSchema = createInsertSchema(tasks)
-  .omit({ id: true, createdAt: true, updatedAt: true })
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
     duration: z.string().or(z.number()).transform(val => {
       return typeof val === 'string' ? parseInt(val) : val;
@@ -282,16 +296,9 @@ export const insertTaskSchema = createInsertSchema(tasks)
     status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
   });
 
-// Task Resource schema
-export const insertTaskResourceSchema = createInsertSchema(taskResources)
-  .omit({ id: true, createdAt: true, updatedAt: true })
-  .extend({
-    quantity: z.string().or(z.number()).transform(val => val.toString()),
-  });
-
 // Resource schema
 export const insertResourceSchema = createInsertSchema(resources)
-  .omit({ id: true, createdAt: true, updatedAt: true })
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
     unitRate: z.string().or(z.number()).transform(val => val.toString()),
     availability: z.string().or(z.number()).transform(val => val.toString()).default("100"),
@@ -299,9 +306,31 @@ export const insertResourceSchema = createInsertSchema(resources)
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
   });
 
+// Task Resource schema
+export const insertTaskResourceSchema = createInsertSchema(taskResources)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    quantity: z.string().or(z.number()).transform(val => val.toString()),
+  });
+
+// Activity schema
+export const insertActivitySchema = createInsertSchema(activities)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    unitRate: z.string().or(z.number()).transform(val => val.toString()),
+  });
+
+// Project Activity schema
+export const insertProjectActivitySchema = createInsertSchema(projectActivities)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    unitRate: z.string().or(z.number()).transform(val => val.toString()),
+    quantity: z.string().or(z.number()).transform(val => val.toString()),
+  });
+
 // Collaboration Thread schema
 export const insertCollaborationThreadSchema = createInsertSchema(collaborationThreads)
-  .omit({ id: true, createdAt: true, updatedAt: true })
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
     type: z.enum(["issue", "info", "announcement", "awards"]),
     isClosed: z.boolean().default(false),
@@ -309,11 +338,11 @@ export const insertCollaborationThreadSchema = createInsertSchema(collaborationT
 
 // Collaboration Message schema
 export const insertCollaborationMessageSchema = createInsertSchema(collaborationMessages)
-  .omit({ id: true, createdAt: true });
+  .omit({ id: true, createdAt: true } as any);
 
 // Project Collaboration Thread schema
 export const insertProjectCollaborationThreadSchema = createInsertSchema(projectCollaborationThreads)
-  .omit({ id: true, createdAt: true, updatedAt: true })
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
     type: z.enum(["issue", "info", "announcement", "awards"]),
     isClosed: z.boolean().default(false),
@@ -321,7 +350,7 @@ export const insertProjectCollaborationThreadSchema = createInsertSchema(project
 
 // Project Collaboration Message schema
 export const insertProjectCollaborationMessageSchema = createInsertSchema(projectCollaborationMessages)
-  .omit({ id: true, createdAt: true });
+  .omit({ id: true, createdAt: true } as any);
 
 
 // Types
@@ -340,11 +369,17 @@ export type InsertCostEntry = z.infer<typeof insertCostEntrySchema>;
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 
-export type TaskResource = typeof taskResources.$inferSelect;
-export type InsertTaskResource = z.infer<typeof insertTaskResourceSchema>;
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = z.infer<typeof insertActivitySchema>;
 
 export type Resource = typeof resources.$inferSelect;
 export type InsertResource = z.infer<typeof insertResourceSchema>;
+
+export type TaskResource = typeof taskResources.$inferSelect;
+export type InsertTaskResource = z.infer<typeof insertTaskResourceSchema>;
+
+export type ProjectActivity = typeof projectActivities.$inferSelect;
+export type InsertProjectActivity = z.infer<typeof insertProjectActivitySchema>;
 
 export type CollaborationThread = typeof collaborationThreads.$inferSelect;
 export type InsertCollaborationThread = z.infer<typeof insertCollaborationThreadSchema>;
@@ -352,21 +387,30 @@ export type InsertCollaborationThread = z.infer<typeof insertCollaborationThread
 export type CollaborationMessage = typeof collaborationMessages.$inferSelect;
 export type InsertCollaborationMessage = z.infer<typeof insertCollaborationMessageSchema>;
 
+export type ProjectCollaborationThread = typeof projectCollaborationThreads.$inferSelect;
+export type InsertProjectCollaborationThread = z.infer<typeof insertProjectCollaborationThreadSchema>;
+
+export type ProjectCollaborationMessage = typeof projectCollaborationMessages.$inferSelect;
+export type InsertProjectCollaborationMessage = z.infer<typeof insertProjectCollaborationMessageSchema>;
+
+
+
 // Extended schemas for client-side validation
 export const extendedInsertProjectSchema = insertProjectSchema.extend({
   name: z.string().min(3, "Project name must be at least 3 characters"),
-  budget: z.string().or(z.number()).pipe(
-    z.coerce.number().positive("Budget must be a positive number")
-  ),
-  startDate: z.date(),
-  endDate: z.date(),
+  budget: z.string().or(z.number()).transform(val => val.toString()),
+  startDate: z.coerce.date().transform(val => val.toISOString().split('T')[0]),
+  endDate: z.coerce.date().transform(val => val.toISOString().split('T')[0]),
   currency: z.enum(["USD", "EUR", "SAR"]).default("USD").describe("Project currency"),
 });
 
 // Extended validation for WBS Items - use the base schema for extension
 export const extendedInsertWbsItemSchema = baseWbsSchema.extend({
   name: z.string().min(3, "WBS item name must be at least 3 characters"),
-  duration: z.string().or(z.number()).pipe(z.coerce.number().nonnegative()).optional(),
+  duration: z.string().or(z.number()).transform(val => {
+    if (val === undefined || val === null) return undefined;
+    return typeof val === 'string' ? parseInt(val) : val;
+  }).optional(),
 })
   .refine(
     (data) => {
@@ -406,18 +450,14 @@ export const extendedInsertWbsItemSchema = baseWbsSchema.extend({
 
 export const updateWbsProgressSchema = z.object({
   id: z.number(),
-  percentComplete: z.string().or(z.number()).pipe(
-    z.coerce.number().min(0, "Progress must be at least 0%").max(100, "Progress cannot exceed 100%")
-  ),
+  percentComplete: z.string().or(z.number()).transform(val => val.toString()),
   actualStartDate: z.date().optional(),
   actualEndDate: z.date().optional(),
 });
 
 export const importCostsSchema = z.object({
   wbsItemId: z.number(),
-  amount: z.string().or(z.number()).pipe(
-    z.coerce.number().positive("Amount must be a positive number")
-  ),
+  amount: z.string().or(z.number()).transform(val => val.toString()),
   description: z.string().optional(),
   entryDate: z.date(),
 });
@@ -429,22 +469,60 @@ export type ImportCosts = z.infer<typeof importCostsSchema>;
 export const csvImportSchema = z.array(
   z.object({
     wbsCode: z.string().min(1, "WBS code is required"),
-    amount: z.string().or(z.number()).pipe(
-      z.coerce.number().positive("Amount must be a positive number")
-    ),
+    amount: z.string().or(z.number()).transform(val => val.toString()),
     description: z.string().optional(),
-    entryDate: z.string().transform((val) => new Date(val)),
+    entryDate: z.string().transform((val) => new Date(val).toISOString().split('T')[0]),
   })
 );
 
 export type CsvImportData = z.infer<typeof csvImportSchema>;
 
-export const insertActivitySchema = createInsertSchema(activities)
-  .omit({ id: true, createdAt: true, updatedAt: true })
+// Project Tasks Table
+export const projectTasks = pgTable("project_tasks", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  globalTaskId: integer("global_task_id").references(() => tasks.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  duration: integer("duration"), // Duration in minutes
+  status: text("status").default("pending").notNull(), // pending, in_progress, completed
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Zod Schemas
+export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+} as any);
+
+export type ProjectTask = typeof projectTasks.$inferSelect;
+export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
+
+// Project Resources Table
+export const projectResources = pgTable("project_resources", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  globalResourceId: integer("global_resource_id").references(() => resources.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // manpower, equipment, material
+  unitOfMeasure: text("unit_of_measure").notNull(),
+  unitRate: numeric("unit_rate", { precision: 12, scale: 2 }).notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProjectResourceSchema = createInsertSchema(projectResources)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
     unitRate: z.string().or(z.number()).transform(val => val.toString()),
-    currency: z.enum(["USD", "EUR", "GBP", "SAR"]).default("USD"),
+    quantity: z.string().or(z.number()).transform(val => val.toString()),
   });
 
-export type Activity = typeof activities.$inferSelect;
-export type InsertActivity = z.infer<typeof insertActivitySchema>;
+export type ProjectResource = typeof projectResources.$inferSelect;
+export type InsertProjectResource = z.infer<typeof insertProjectResourceSchema>;

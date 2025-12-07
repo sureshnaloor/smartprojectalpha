@@ -24,13 +24,16 @@ import IndirectManpowerList from "@/pages/indirect-manpower-list";
 import PlannedActivityTasks from "@/pages/planned-activity-tasks";
 import CollabPage from "@/pages/collab";
 import ThreadDetailPage from "@/pages/thread-detail";
+import ProjectActivities from "@/pages/project-activities";
+import ProjectTasks from "@/pages/project-tasks";
+import ProjectResources from "@/pages/project-resources";
 
 // Implementing a flatter routing approach without nesting
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      
+
       {/* Project Dashboard */}
       <Route path="/projects/:projectId">
         {params => (
@@ -39,7 +42,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* WBS Structure */}
       <Route path="/projects/:projectId/wbs">
         {params => (
@@ -48,7 +51,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Schedule */}
       <Route path="/projects/:projectId/schedule">
         {params => (
@@ -57,7 +60,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Cost Control */}
       <Route path="/projects/:projectId/costs">
         {params => (
@@ -66,7 +69,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Reports */}
       <Route path="/projects/:projectId/reports">
         {params => (
@@ -75,7 +78,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Project-specific Under Construction Pages */}
       <Route path="/projects/:projectId/under-construction/:pageName">
         {params => (
@@ -84,7 +87,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Risk Register */}
       <Route path="/projects/:projectId/risk-register">
         {params => (
@@ -93,7 +96,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Project Daily Progress */}
       <Route path="/projects/:projectId/project-daily-progress">
         {params => (
@@ -102,7 +105,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Resource Plan */}
       <Route path="/projects/:projectId/resource-plan">
         {params => (
@@ -111,7 +114,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Lesson Learnt Register */}
       <Route path="/projects/:projectId/lesson-learnt-register">
         {params => (
@@ -120,7 +123,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Direct Manpower List */}
       <Route path="/projects/:projectId/direct-manpower-list">
         {params => (
@@ -129,7 +132,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Indirect Manpower List */}
       <Route path="/projects/:projectId/indirect-manpower-list">
         {params => (
@@ -138,7 +141,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Planned Activity/Tasks */}
       <Route path="/projects/:projectId/planned-activity-tasks">
         {params => (
@@ -148,15 +151,42 @@ function Router() {
         )}
       </Route>
 
+      {/* Project Activities */}
+      <Route path="/projects/:projectId/activities">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectActivities />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      {/* Project Tasks */}
+      <Route path="/projects/:projectId/tasks">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectTasks />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      {/* Project Resources */}
+      <Route path="/projects/:projectId/resources">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResources />
+          </ProjectLayout>
+        )}
+      </Route>
+
       {/* Activity Master */}
       <Route path="/activity-master" component={ActivityMaster} />
-      
+
       {/* Task Master */}
       <Route path="/task-master" component={TaskMaster} />
-      
+
       {/* Resource Master */}
       <Route path="/resource-master" component={ResourceMaster} />
-      
+
       {/* Collaboration Hub */}
       <Route path="/collab">
         <MasterLayout>
@@ -182,7 +212,7 @@ function Router() {
           </ProjectLayout>
         )}
       </Route>
-      
+
       {/* Global Under Construction Pages */}
       <Route path="/under-construction/:pageName">
         {params => (
@@ -191,7 +221,7 @@ function Router() {
           </MasterLayout>
         )}
       </Route>
-      
+
       {/* 404 for anything else */}
       <Route component={NotFound} />
     </Switch>

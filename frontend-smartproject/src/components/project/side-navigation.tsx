@@ -172,7 +172,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
-                        <Link href={`/under-construction/Activities`}>
+                        <Link href={`/projects/${currentProjectId}/activities`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
                             isActive('/activities') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
@@ -183,7 +183,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
-                        <Link href={`/under-construction/Tasks`}>
+                        <Link href={`/projects/${currentProjectId}/tasks`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
                             isActive('/tasks') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
@@ -194,7 +194,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
-                        <Link href={`/under-construction/Resources`}>
+                        <Link href={`/projects/${currentProjectId}/resources`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
                             isActive('/resources') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"

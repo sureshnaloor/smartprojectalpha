@@ -14,11 +14,17 @@ import {
   type Resource,
   type InsertResource,
   type TaskResource,
-  type InsertTaskResource
+  type InsertTaskResource,
+  type ProjectActivity,
+  type InsertProjectActivity,
+  type ProjectTask,
+  type InsertProjectTask,
+  type ProjectResource,
+  type InsertProjectResource
 } from "./schema";
 import { db } from "./db";
 import { and, eq, or, inArray, sql } from "drizzle-orm";
-import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources } from "./schema";
+import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources } from "./schema";
 
 // Storage interface
 export interface IStorage {
@@ -49,7 +55,7 @@ export interface IStorage {
   createCostEntry(costEntry: Omit<CostEntry, "id" | "createdAt">): Promise<CostEntry>;
   updateCostEntry(id: number, costEntry: Partial<Omit<CostEntry, "id" | "createdAt">>): Promise<CostEntry | undefined>;
   deleteCostEntry(id: number): Promise<void>;
-  
+
   // Task methods
   getTasks(): Promise<Task[]>;
   getTask(id: number): Promise<Task | undefined>;
@@ -77,6 +83,27 @@ export interface IStorage {
   createTaskResource(data: InsertTaskResource): Promise<TaskResource>;
   updateTaskResource(id: number, data: InsertTaskResource): Promise<TaskResource | undefined>;
   deleteTaskResource(id: number): Promise<void>;
+
+  // Project Activity methods
+  getProjectActivities(projectId: number): Promise<ProjectActivity[]>;
+  getProjectActivity(id: number): Promise<ProjectActivity | undefined>;
+  createProjectActivity(data: InsertProjectActivity): Promise<ProjectActivity>;
+  updateProjectActivity(id: number, data: InsertProjectActivity): Promise<ProjectActivity | undefined>;
+  deleteProjectActivity(id: number): Promise<void>;
+
+  // Project Task methods
+  getProjectTasks(projectId: number): Promise<ProjectTask[]>;
+  getProjectTask(id: number): Promise<ProjectTask | undefined>;
+  createProjectTask(data: InsertProjectTask): Promise<ProjectTask>;
+  updateProjectTask(id: number, data: InsertProjectTask): Promise<ProjectTask | undefined>;
+  deleteProjectTask(id: number): Promise<void>;
+
+  // Project Resource methods
+  getProjectResources(projectId: number): Promise<ProjectResource[]>;
+  getProjectResource(id: number): Promise<ProjectResource | undefined>;
+  createProjectResource(data: InsertProjectResource): Promise<ProjectResource>;
+  updateProjectResource(id: number, data: InsertProjectResource): Promise<ProjectResource | undefined>;
+  deleteProjectResource(id: number): Promise<void>;
 }
 
 // Database storage implementation using Drizzle ORM
@@ -114,7 +141,7 @@ export class DatabaseStorage implements IStorage {
     // Handle both string and Date types for dates
     const startDate = typeof project.startDate === 'string' ? project.startDate : project.startDate;
     const endDate = typeof project.endDate === 'string' ? project.endDate : project.endDate;
-    
+
     const [newProject] = await db.insert(projects).values({
       ...project,
       budget: project.budget.toString(),
@@ -133,18 +160,18 @@ export class DatabaseStorage implements IStorage {
 
   async updateProject(id: number, project: Partial<Omit<Project, "id" | "createdAt">>): Promise<Project | undefined> {
     const updatedValues: any = { ...project };
-    
+
     if (updatedValues.budget !== undefined) {
       updatedValues.budget = updatedValues.budget.toString();
     }
     if (updatedValues.startDate) {
-      updatedValues.startDate = typeof updatedValues.startDate === 'string' 
-        ? updatedValues.startDate 
+      updatedValues.startDate = typeof updatedValues.startDate === 'string'
+        ? updatedValues.startDate
         : updatedValues.startDate;
     }
     if (updatedValues.endDate) {
-      updatedValues.endDate = typeof updatedValues.endDate === 'string' 
-        ? updatedValues.endDate 
+      updatedValues.endDate = typeof updatedValues.endDate === 'string'
+        ? updatedValues.endDate
         : updatedValues.endDate;
     }
 
@@ -211,7 +238,7 @@ export class DatabaseStorage implements IStorage {
 
   async createWbsItem(wbsItem: Omit<WbsItem, "id" | "createdAt">): Promise<WbsItem> {
     const insertData: any = { ...wbsItem };
-    
+
     // Handle date conversions
     if (wbsItem.startDate) {
       insertData.startDate = typeof wbsItem.startDate === 'string' ? wbsItem.startDate : wbsItem.startDate;
@@ -236,7 +263,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateWbsItem(id: number, wbsItem: Partial<Omit<WbsItem, "id" | "createdAt">>): Promise<WbsItem | undefined> {
     const updateData: any = { ...wbsItem };
-    
+
     // Handle date conversions
     if (updateData.startDate) {
       updateData.startDate = typeof updateData.startDate === 'string' ? updateData.startDate : updateData.startDate;
@@ -499,6 +526,81 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTaskResource(id: number): Promise<void> {
     await db.delete(taskResources).where(eq(taskResources.id, id));
+  }
+
+  // Project Activity methods
+  async getProjectActivities(projectId: number): Promise<ProjectActivity[]> {
+    const dbActivities = await db.select().from(projectActivities).where(eq(projectActivities.projectId, projectId));
+    return dbActivities;
+  }
+
+  async getProjectActivity(id: number): Promise<ProjectActivity | undefined> {
+    const [activity] = await db.select().from(projectActivities).where(eq(projectActivities.id, id));
+    return activity;
+  }
+
+  async createProjectActivity(data: InsertProjectActivity): Promise<ProjectActivity> {
+    const [result] = await db.insert(projectActivities).values(data).returning();
+    return result;
+  }
+
+  async updateProjectActivity(id: number, data: InsertProjectActivity): Promise<ProjectActivity | undefined> {
+    const [result] = await db.update(projectActivities).set(data).where(eq(projectActivities.id, id)).returning();
+    return result;
+  }
+
+  async deleteProjectActivity(id: number): Promise<void> {
+    await db.delete(projectActivities).where(eq(projectActivities.id, id));
+  }
+
+  // Project Task methods
+  async getProjectTasks(projectId: number): Promise<ProjectTask[]> {
+    const dbTasks = await db.select().from(projectTasks).where(eq(projectTasks.projectId, projectId));
+    return dbTasks;
+  }
+
+  async getProjectTask(id: number): Promise<ProjectTask | undefined> {
+    const [task] = await db.select().from(projectTasks).where(eq(projectTasks.id, id));
+    return task;
+  }
+
+  async createProjectTask(data: InsertProjectTask): Promise<ProjectTask> {
+    const [result] = await db.insert(projectTasks).values(data).returning();
+    return result;
+  }
+
+  async updateProjectTask(id: number, data: InsertProjectTask): Promise<ProjectTask | undefined> {
+    const [result] = await db.update(projectTasks).set(data).where(eq(projectTasks.id, id)).returning();
+    return result;
+  }
+
+  async deleteProjectTask(id: number): Promise<void> {
+    await db.delete(projectTasks).where(eq(projectTasks.id, id));
+  }
+
+  // Project Resource methods
+  async getProjectResources(projectId: number): Promise<ProjectResource[]> {
+    const dbResources = await db.select().from(projectResources).where(eq(projectResources.projectId, projectId));
+    return dbResources;
+  }
+
+  async getProjectResource(id: number): Promise<ProjectResource | undefined> {
+    const [resource] = await db.select().from(projectResources).where(eq(projectResources.id, id));
+    return resource;
+  }
+
+  async createProjectResource(data: InsertProjectResource): Promise<ProjectResource> {
+    const [result] = await db.insert(projectResources).values(data).returning();
+    return result;
+  }
+
+  async updateProjectResource(id: number, data: InsertProjectResource): Promise<ProjectResource | undefined> {
+    const [result] = await db.update(projectResources).set(data).where(eq(projectResources.id, id)).returning();
+    return result;
+  }
+
+  async deleteProjectResource(id: number): Promise<void> {
+    await db.delete(projectResources).where(eq(projectResources.id, id));
   }
 }
 

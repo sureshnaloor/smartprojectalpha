@@ -10,8 +10,11 @@ import {
   insertCostEntrySchema as costEntrySchema,
   insertTaskSchema as taskSchema,
   insertActivitySchema,
+  insertProjectActivitySchema,
+  insertProjectTaskSchema,
   insertResourceSchema,
   insertTaskResourceSchema,
+  insertProjectResourceSchema,
   insertCollaborationThreadSchema,
   insertCollaborationMessageSchema,
   insertProjectCollaborationThreadSchema,
@@ -348,6 +351,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteActivity(id);
       res.json({ message: "Activity deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Project Activity routes
+  app.get("/api/projects/:projectId/activities", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const activities = await storage.getProjectActivities(projectId);
+      res.json(activities);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/activities", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const activityData = insertProjectActivitySchema.parse({
+        ...req.body,
+        projectId
+      });
+
+      const activity = await storage.createProjectActivity(activityData);
+      res.status(201).json(activity);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/activities/:activityId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const activityId = parseInt(req.params.activityId);
+
+      if (isNaN(projectId) || isNaN(activityId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const activity = await storage.getProjectActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+
+      if (activity.projectId !== projectId) {
+        return res.status(400).json({ message: "Activity does not belong to this project" });
+      }
+
+      const activityData = insertProjectActivitySchema.parse({
+        ...req.body,
+        projectId // Ensure projectId is preserved
+      });
+
+      const updatedActivity = await storage.updateProjectActivity(activityId, activityData);
+      res.json(updatedActivity);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/activities/:activityId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const activityId = parseInt(req.params.activityId);
+
+      if (isNaN(projectId) || isNaN(activityId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const activity = await storage.getProjectActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+
+      if (activity.projectId !== projectId) {
+        return res.status(400).json({ message: "Activity does not belong to this project" });
+      }
+
+      await storage.deleteProjectActivity(activityId);
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Project Task routes
+  app.get("/api/projects/:projectId/tasks", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const tasks = await storage.getProjectTasks(projectId);
+      res.json(tasks);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/tasks", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const taskData = insertProjectTaskSchema.parse({
+        ...req.body,
+        projectId
+      });
+
+      const task = await storage.createProjectTask(taskData);
+      res.status(201).json(task);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/tasks/:taskId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const taskId = parseInt(req.params.taskId);
+
+      if (isNaN(projectId) || isNaN(taskId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const task = await storage.getProjectTask(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      if (task.projectId !== projectId) {
+        return res.status(400).json({ message: "Task does not belong to this project" });
+      }
+
+      const taskData = insertProjectTaskSchema.parse({
+        ...req.body,
+        projectId // Ensure projectId is preserved
+      });
+
+      const updatedTask = await storage.updateProjectTask(taskId, taskData);
+      res.json(updatedTask);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/tasks/:taskId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const taskId = parseInt(req.params.taskId);
+
+      if (isNaN(projectId) || isNaN(taskId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const task = await storage.getProjectTask(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      if (task.projectId !== projectId) {
+        return res.status(400).json({ message: "Task does not belong to this project" });
+      }
+
+      await storage.deleteProjectTask(taskId);
+      res.status(204).end();
     } catch (err) {
       handleError(err, res);
     }
@@ -2452,6 +2673,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .delete(projectCollaborationMessages)
         .where(eq(projectCollaborationMessages.id, id));
 
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Project Resource routes
+  app.get("/api/projects/:projectId/resources", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const resources = await storage.getProjectResources(projectId);
+      res.json(resources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/resources", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const resourceData = insertProjectResourceSchema.parse({
+        ...req.body,
+        projectId
+      });
+
+      const resource = await storage.createProjectResource(resourceData);
+      res.status(201).json(resource);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/resources/:resourceId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const resourceId = parseInt(req.params.resourceId);
+
+      if (isNaN(projectId) || isNaN(resourceId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const resource = await storage.getProjectResource(resourceId);
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+
+      if (resource.projectId !== projectId) {
+        return res.status(400).json({ message: "Resource does not belong to this project" });
+      }
+
+      const resourceData = insertProjectResourceSchema.parse({
+        ...req.body,
+        projectId // Ensure projectId is preserved
+      });
+
+      const updatedResource = await storage.updateProjectResource(resourceId, resourceData);
+      res.json(updatedResource);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/resources/:resourceId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const resourceId = parseInt(req.params.resourceId);
+
+      if (isNaN(projectId) || isNaN(resourceId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const resource = await storage.getProjectResource(resourceId);
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+
+      if (resource.projectId !== projectId) {
+        return res.status(400).json({ message: "Resource does not belong to this project" });
+      }
+
+      await storage.deleteProjectResource(resourceId);
       res.status(204).end();
     } catch (err) {
       handleError(err, res);
