@@ -27,6 +27,16 @@ import ThreadDetailPage from "@/pages/thread-detail";
 import ProjectActivities from "@/pages/project-activities";
 import ProjectTasks from "@/pages/project-tasks";
 import ProjectResources from "@/pages/project-resources";
+import ProjectDrawings from "@/pages/project-drawings";
+import ProjectBoq from "@/pages/project-boq";
+import ProjectScope from "@/pages/project-scope";
+import ProjectCorrespondence from "@/pages/project-correspondence";
+import ProjectSupplierCorrespondence from "@/pages/project-supplier-correspondence";
+import ProjectSubcontractCorrespondence from "@/pages/project-subcontract-correspondence";
+import ProjectRequestForInspection from "@/pages/project-request-for-inspection";
+import ProjectItpAndReports from "@/pages/project-itp-and-reports";
+import ProjectOtherDocuments from "@/pages/project-other-documents";
+import ProjectEquipmentCatalogue from "@/pages/project-equipment-catalogue";
 
 // Implementing a flatter routing approach without nesting
 function Router() {
@@ -75,6 +85,78 @@ function Router() {
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <Reports />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      {/* Project Drawings - Specific Route */}
+      <Route path="/projects/:projectId/under-construction/ProjectDrawings">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectDrawings />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/ProjectBOQ">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectBoq />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/ProjectScope">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectScope />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/ClientCorrespondence">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectCorrespondence />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/SupplierCorrespondence">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectSupplierCorrespondence />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/SubcontractCorrespondence">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectSubcontractCorrespondence />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/RequestForInspection">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectRequestForInspection />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/ITPAndReports">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectItpAndReports />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/OtherDocuments">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectOtherDocuments />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/under-construction/EquipmentCatalogue">
+        {(params) => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectEquipmentCatalogue />
           </ProjectLayout>
         )}
       </Route>

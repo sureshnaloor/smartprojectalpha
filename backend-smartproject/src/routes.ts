@@ -2788,6 +2788,950 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Project Drawings routes
+  app.post("/api/projects/:projectId/drawings/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as fileUpload.UploadedFile;
+      const fileName = `projects/${projectId}/drawings/${Date.now()}_${file.name}`;
+
+      // Extract metadata from body
+      const drawingName = req.body.drawingName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User"; // In a real app, get from req.user
+
+      // Import dynamically to avoid top-level await issues if any
+      const { uploadFile } = await import("./b2");
+      const fs = await import("fs");
+
+      let fileData: Buffer;
+      if (file.tempFilePath) {
+        fileData = fs.readFileSync(file.tempFilePath);
+      } else {
+        fileData = file.data;
+      }
+
+      // B2 metadata keys must be alphanumeric. We'll prefix them.
+      // Actually B2 allows custom headers X-Bz-Info-*, keys in the info object.
+      const fileInfo = {
+        drawingName: drawingName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/drawings", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "File deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/drawings", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/drawings/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/drawings/:fileName/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileName = req.params.fileName;
+      // Reconstruct full path
+      // Note: The fileName param might not contain the full path if it has slashes. 
+      // However, listFiles returns full names like "projects/8/drawings/123_foo.pdf".
+      // We should probably pass the full path or ID. 
+      // Let's assume the frontend passes the full path encoded or we just use the ID if B2 supports it easily.
+      // Actually, B2 listFiles returns fileId and fileName. 
+      // Let's change this route to accept fileId or full path via query param?
+      // Or just use the full path constructed:
+
+      // Better approach: The frontend will likely have the full fileName from the list.
+      // But passing slashes in URL params can be tricky.
+      // Let's use a query parameter for the file name or ID.
+
+      const fullFileName = req.query.fileName as string;
+
+      if (!fullFileName) {
+        return res.status(400).json({ message: "File name is required" });
+      }
+
+      const { getDownloadUrl } = await import("./b2");
+      const url = await getDownloadUrl(fullFileName);
+
+      res.json({ url });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Project BOQ routes
+  app.post("/api/projects/:projectId/boq/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as fileUpload.UploadedFile;
+      const fileName = `projects/${projectId}/boq/${Date.now()}_${file.name}`;
+
+      // Extract metadata from body
+      const boqName = req.body.boqName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User";
+
+      // Import dynamically
+      const { uploadFile } = await import("./b2");
+      const fs = await import("fs");
+
+      let fileData: Buffer;
+      if (file.tempFilePath) {
+        fileData = fs.readFileSync(file.tempFilePath);
+      } else {
+        fileData = file.data;
+      }
+
+      const fileInfo = {
+        boqName: boqName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/boq", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/boq/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/boq", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "File deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/boq/:fileName/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fullFileName = req.query.fileName as string;
+
+      if (!fullFileName) {
+        return res.status(400).json({ message: "File name is required" });
+      }
+
+      const { getDownloadUrl } = await import("./b2");
+      const url = await getDownloadUrl(fullFileName);
+
+      res.json({ url });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Project Scope routes
+  app.post("/api/projects/:projectId/scope/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as fileUpload.UploadedFile;
+      const fileName = `projects/${projectId}/scope/${Date.now()}_${file.name}`;
+
+      // Extract metadata from body
+      const scopeName = req.body.scopeName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User";
+
+      // Import dynamically
+      const { uploadFile } = await import("./b2");
+      const fs = await import("fs");
+
+      let fileData: Buffer;
+      if (file.tempFilePath) {
+        fileData = fs.readFileSync(file.tempFilePath);
+      } else {
+        fileData = file.data;
+      }
+
+      const fileInfo = {
+        scopeName: scopeName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/scope", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/scope/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/scope", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "File deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/scope/:fileName/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fullFileName = req.query.fileName as string;
+
+      if (!fullFileName) {
+        return res.status(400).json({ message: "File name is required" });
+      }
+
+      const { getDownloadUrl } = await import("./b2");
+      const url = await getDownloadUrl(fullFileName);
+
+      res.json({ url });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Client Correspondence routes
+  app.post("/api/projects/:projectId/correspondence/create", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { name, link, description, uploadedBy } = req.body;
+
+      if (!name || !link) {
+        return res.status(400).json({ message: "Name and Link are required." });
+      }
+
+      // Create a dummy file content containing the link
+      const fileContent = JSON.stringify({ link, description, name, createdAt: new Date() });
+      const fileName = `projects/${projectId}/correspondence/${Date.now()}_link.json`;
+
+      // Import dynamically
+      const { uploadFile } = await import("./b2");
+
+      const fileInfo = {
+        correspondenceName: name,
+        description: description || "",
+        linkUrl: link,
+        uploadedBy: uploadedBy || "Unknown User"
+      };
+
+      const result = await uploadFile(fileName, Buffer.from(fileContent), "application/json", fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/correspondence", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/correspondence/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/correspondence", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "Correspondence deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Supplier Correspondence routes
+  app.post("/api/projects/:projectId/supplier-correspondence/create", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { name, link, description, uploadedBy } = req.body;
+
+      if (!name || !link) {
+        return res.status(400).json({ message: "Name and Link are required." });
+      }
+
+      // Create a dummy file content containing the link
+      const fileContent = JSON.stringify({ link, description, name, createdAt: new Date() });
+      const fileName = `projects/${projectId}/supplier-correspondence/${Date.now()}_link.json`;
+
+      // Import dynamically
+      const { uploadFile } = await import("./b2");
+
+      const fileInfo = {
+        correspondenceName: name,
+        description: description || "",
+        linkUrl: link,
+        uploadedBy: uploadedBy || "Unknown User"
+      };
+
+      const result = await uploadFile(fileName, Buffer.from(fileContent), "application/json", fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/supplier-correspondence", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/supplier-correspondence/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/supplier-correspondence", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "Correspondence deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Subcontract Correspondence routes
+  app.post("/api/projects/:projectId/subcontract-correspondence/create", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { name, link, description, uploadedBy } = req.body;
+
+      if (!name || !link) {
+        return res.status(400).json({ message: "Name and Link are required." });
+      }
+
+      // Create a dummy file content containing the link
+      const fileContent = JSON.stringify({ link, description, name, createdAt: new Date() });
+      const fileName = `projects/${projectId}/subcontract-correspondence/${Date.now()}_link.json`;
+
+      // Import dynamically
+      const { uploadFile } = await import("./b2");
+
+      const fileInfo = {
+        correspondenceName: name,
+        description: description || "",
+        linkUrl: link,
+        uploadedBy: uploadedBy || "Unknown User"
+      };
+
+      const result = await uploadFile(fileName, Buffer.from(fileContent), "application/json", fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/subcontract-correspondence", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/subcontract-correspondence/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/subcontract-correspondence", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "Correspondence deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Request For Inspection routes
+  app.post("/api/projects/:projectId/request-for-inspection/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as any;
+      const fileName = `projects/${projectId}/request-for-inspection/${Date.now()}_${file.name}`;
+
+      const rfiName = req.body.rfiName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User";
+
+      const { uploadFile } = await import("./b2");
+
+      const fileData = file.data;
+
+      const fileInfo = {
+        rfiName: rfiName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/request-for-inspection", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/request-for-inspection/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/request-for-inspection", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "RFI deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/request-for-inspection/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const fileId = req.query.fileId as string;
+
+      if (isNaN(projectId) || !fileId) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const { downloadFile } = await import("./b2");
+      const { data, info } = await downloadFile(fileId);
+
+      res.setHeader("Content-Type", info.contentType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${info.fileName}"`);
+      res.send(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ITP & Reports routes
+  app.post("/api/projects/:projectId/itp-and-reports/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as any;
+      const fileName = `projects/${projectId}/itp-and-reports/${Date.now()}_${file.name}`;
+
+      const docName = req.body.docName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User";
+
+      const { uploadFile } = await import("./b2");
+
+      const fileData = file.data;
+
+      const fileInfo = {
+        docName: docName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/itp-and-reports", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/itp-and-reports/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/itp-and-reports", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "Document deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/itp-and-reports/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const fileId = req.query.fileId as string;
+
+      if (isNaN(projectId) || !fileId) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const { downloadFile } = await import("./b2");
+      const { data, info } = await downloadFile(fileId);
+
+      res.setHeader("Content-Type", info.contentType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${info.fileName}"`);
+      res.send(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Other Documents routes
+  app.post("/api/projects/:projectId/other-documents/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as any;
+      const fileName = `projects/${projectId}/other-documents/${Date.now()}_${file.name}`;
+
+      const docName = req.body.docName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User";
+
+      const { uploadFile } = await import("./b2");
+
+      const fileData = file.data;
+
+      const fileInfo = {
+        docName: docName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/other-documents", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/other-documents/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/other-documents", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "Document deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/other-documents/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const fileId = req.query.fileId as string;
+
+      if (isNaN(projectId) || !fileId) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const { downloadFile } = await import("./b2");
+      const { data, info } = await downloadFile(fileId);
+
+      res.setHeader("Content-Type", info.contentType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${info.fileName}"`);
+      res.send(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Equipment Catalogue routes
+  app.post("/api/projects/:projectId/equipment-catalogue/upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ message: "No files were uploaded." });
+      }
+
+      const file = req.files.file as any;
+      const fileName = `projects/${projectId}/equipment-catalogue/${Date.now()}_${file.name}`;
+
+      const docName = req.body.docName || file.name;
+      const description = req.body.description || "";
+      const uploadedBy = req.body.uploadedBy || "Unknown User";
+
+      const { uploadFile } = await import("./b2");
+
+      const fileData = file.data;
+
+      const fileInfo = {
+        docName: docName,
+        description: description,
+        uploadedBy: uploadedBy
+      };
+
+      const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/equipment-catalogue", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { listFiles } = await import("./b2");
+      const prefix = `projects/${projectId}/equipment-catalogue/`;
+      const files = await listFiles(prefix);
+
+      res.json(files);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/equipment-catalogue", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const fileId = req.query.fileId as string;
+      const fileName = req.query.fileName as string;
+
+      if (!fileId || !fileName) {
+        return res.status(400).json({ message: "fileId and fileName are required" });
+      }
+
+      const { deleteFile } = await import("./b2");
+      await deleteFile(fileId, fileName);
+
+      res.status(200).json({ message: "Document deleted successfully" });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/equipment-catalogue/download", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const fileId = req.query.fileId as string;
+
+      if (isNaN(projectId) || !fileId) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const { downloadFile } = await import("./b2");
+      const { data, info } = await downloadFile(fileId);
+
+      res.setHeader("Content-Type", info.contentType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${info.fileName}"`);
+      res.send(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   return httpServer;
 }
 

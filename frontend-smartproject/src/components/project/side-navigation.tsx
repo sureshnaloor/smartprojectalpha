@@ -263,13 +263,15 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                               </Link>
                             </li>
                             <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/EquipmentDrawings`}>
+                              <Link href={`/projects/${currentProjectId}/under-construction/EquipmentCatalogue`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
-                                  isActive('/equipment-drawings') && "text-teal-600 font-medium bg-teal-50"
+                                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all hover:text-primary",
+                                  location.includes('/under-construction/EquipmentCatalogue')
+                                    ? "bg-muted text-primary"
+                                    : "text-muted-foreground"
                                 )}>
-                                  <HardDrive className="mr-3 h-4 w-4" />
-                                  <span>Equipment Drawings</span>
+                                  <FolderOpen className="h-4 w-4" />
+                                  <span>Equipment Catalogue</span>
                                 </a>
                               </Link>
                             </li>
