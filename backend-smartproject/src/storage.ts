@@ -20,11 +20,31 @@ import {
   type ProjectTask,
   type InsertProjectTask,
   type ProjectResource,
-  type InsertProjectResource
+  type InsertProjectResource,
+  type DailyProgress,
+  type InsertDailyProgress,
+  type ResourcePlan,
+  type InsertResourcePlan,
+  type RiskRegister,
+  type InsertRiskRegister,
+  type LessonLearntRegister,
+  type InsertLessonLearntRegister,
+  type DirectManpowerPosition,
+  type InsertDirectManpowerPosition,
+  type DirectManpowerEntry,
+  type InsertDirectManpowerEntry,
+  type IndirectManpowerPosition,
+  type InsertIndirectManpowerPosition,
+  type IndirectManpowerEntry,
+  type InsertIndirectManpowerEntry,
+  type PlannedActivity,
+  type InsertPlannedActivity,
+  type PlannedActivityTask,
+  type InsertPlannedActivityTask
 } from "./schema";
 import { db } from "./db";
-import { and, eq, or, inArray, sql } from "drizzle-orm";
-import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources } from "./schema";
+import { and, eq, or, inArray, sql, gte, lte } from "drizzle-orm";
+import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources, dailyProgress, resourcePlans, riskRegister, lessonLearntRegister, directManpowerPositions, directManpowerEntries, indirectManpowerPositions, indirectManpowerEntries, plannedActivities, plannedActivityTasks } from "./schema";
 
 // Storage interface
 export interface IStorage {
@@ -98,12 +118,86 @@ export interface IStorage {
   updateProjectTask(id: number, data: InsertProjectTask): Promise<ProjectTask | undefined>;
   deleteProjectTask(id: number): Promise<void>;
 
+  // Resource Plan methods
+  getResourcePlans(projectId: number): Promise<ResourcePlan[]>;
+  getResourcePlan(id: number): Promise<ResourcePlan | undefined>;
+  createResourcePlan(data: InsertResourcePlan): Promise<ResourcePlan>;
+  createResourcePlanBulk(data: InsertResourcePlan[]): Promise<ResourcePlan[]>;
+  updateResourcePlan(id: number, data: Partial<InsertResourcePlan>): Promise<ResourcePlan | undefined>;
+  deleteResourcePlan(id: number): Promise<void>;
+
   // Project Resource methods
   getProjectResources(projectId: number): Promise<ProjectResource[]>;
   getProjectResource(id: number): Promise<ProjectResource | undefined>;
   createProjectResource(data: InsertProjectResource): Promise<ProjectResource>;
   updateProjectResource(id: number, data: InsertProjectResource): Promise<ProjectResource | undefined>;
   deleteProjectResource(id: number): Promise<void>;
+
+  // Daily Progress methods
+  getDailyProgress(projectId: number): Promise<DailyProgress[]>;
+  getDailyProgressEntry(id: number): Promise<DailyProgress | undefined>;
+  createDailyProgress(data: InsertDailyProgress): Promise<DailyProgress>;
+  createDailyProgressBulk(data: InsertDailyProgress[]): Promise<DailyProgress[]>;
+  updateDailyProgress(id: number, data: Partial<InsertDailyProgress>): Promise<DailyProgress | undefined>;
+  deleteDailyProgress(id: number): Promise<void>;
+
+  // Risk Register methods
+  getRiskRegisters(projectId: number): Promise<RiskRegister[]>;
+  getRiskRegister(id: number): Promise<RiskRegister | undefined>;
+  createRiskRegister(data: InsertRiskRegister): Promise<RiskRegister>;
+  updateRiskRegister(id: number, data: Partial<InsertRiskRegister>): Promise<RiskRegister | undefined>;
+  deleteRiskRegister(id: number): Promise<void>;
+
+  // Lesson Learnt Register methods
+  getLessonLearntRegisters(projectId: number): Promise<LessonLearntRegister[]>;
+  getLessonLearntRegister(id: number): Promise<LessonLearntRegister | undefined>;
+  createLessonLearntRegister(data: InsertLessonLearntRegister): Promise<LessonLearntRegister>;
+  updateLessonLearntRegister(id: number, data: Partial<InsertLessonLearntRegister>): Promise<LessonLearntRegister | undefined>;
+  deleteLessonLearntRegister(id: number): Promise<void>;
+
+  // Direct Manpower Position methods
+  getDirectManpowerPositions(projectId: number): Promise<DirectManpowerPosition[]>;
+  getDirectManpowerPosition(id: number): Promise<DirectManpowerPosition | undefined>;
+  createDirectManpowerPosition(data: InsertDirectManpowerPosition): Promise<DirectManpowerPosition>;
+  updateDirectManpowerPosition(id: number, data: Partial<InsertDirectManpowerPosition>): Promise<DirectManpowerPosition | undefined>;
+  deleteDirectManpowerPosition(id: number): Promise<void>;
+  updateDirectManpowerPositions(projectId: number, positions: InsertDirectManpowerPosition[]): Promise<DirectManpowerPosition[]>;
+
+  // Direct Manpower Entry methods
+  getDirectManpowerEntries(projectId: number): Promise<DirectManpowerEntry[]>;
+  getDirectManpowerEntry(id: number): Promise<DirectManpowerEntry | undefined>;
+  createDirectManpowerEntry(data: InsertDirectManpowerEntry): Promise<DirectManpowerEntry>;
+  updateDirectManpowerEntry(id: number, data: Partial<InsertDirectManpowerEntry>): Promise<DirectManpowerEntry | undefined>;
+  deleteDirectManpowerEntry(id: number): Promise<void>;
+
+  // Indirect Manpower Position methods
+  getIndirectManpowerPositions(projectId: number): Promise<IndirectManpowerPosition[]>;
+  getIndirectManpowerPosition(id: number): Promise<IndirectManpowerPosition | undefined>;
+  createIndirectManpowerPosition(data: InsertIndirectManpowerPosition): Promise<IndirectManpowerPosition>;
+  updateIndirectManpowerPosition(id: number, data: Partial<InsertIndirectManpowerPosition>): Promise<IndirectManpowerPosition | undefined>;
+  deleteIndirectManpowerPosition(id: number): Promise<void>;
+  updateIndirectManpowerPositions(projectId: number, positions: InsertIndirectManpowerPosition[]): Promise<IndirectManpowerPosition[]>;
+
+  // Indirect Manpower Entry methods
+  getIndirectManpowerEntries(projectId: number): Promise<IndirectManpowerEntry[]>;
+  getIndirectManpowerEntry(id: number): Promise<IndirectManpowerEntry | undefined>;
+  createIndirectManpowerEntry(data: InsertIndirectManpowerEntry): Promise<IndirectManpowerEntry>;
+  updateIndirectManpowerEntry(id: number, data: Partial<InsertIndirectManpowerEntry>): Promise<IndirectManpowerEntry | undefined>;
+  deleteIndirectManpowerEntry(id: number): Promise<void>;
+
+  // Planned Activity methods
+  getPlannedActivities(projectId: number, startDate?: string, endDate?: string): Promise<PlannedActivity[]>;
+  getPlannedActivity(id: number): Promise<PlannedActivity | undefined>;
+  createPlannedActivity(data: InsertPlannedActivity): Promise<PlannedActivity>;
+  updatePlannedActivity(id: number, data: Partial<InsertPlannedActivity>): Promise<PlannedActivity | undefined>;
+  deletePlannedActivity(id: number): Promise<void>;
+
+  // Planned Activity Task methods
+  getPlannedActivityTasks(activityId: number): Promise<PlannedActivityTask[]>;
+  getPlannedActivityTask(id: number): Promise<PlannedActivityTask | undefined>;
+  createPlannedActivityTask(data: InsertPlannedActivityTask): Promise<PlannedActivityTask>;
+  updatePlannedActivityTask(id: number, data: Partial<InsertPlannedActivityTask>): Promise<PlannedActivityTask | undefined>;
+  deletePlannedActivityTask(id: number): Promise<void>;
 }
 
 // Database storage implementation using Drizzle ORM
@@ -601,6 +695,389 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectResource(id: number): Promise<void> {
     await db.delete(projectResources).where(eq(projectResources.id, id));
+  }
+
+  // Daily Progress methods
+  async getDailyProgress(projectId: number): Promise<DailyProgress[]> {
+    const entries = await db
+      .select()
+      .from(dailyProgress)
+      .where(eq(dailyProgress.projectId, projectId))
+      .orderBy(dailyProgress.date);
+    return entries;
+  }
+
+  async getDailyProgressEntry(id: number): Promise<DailyProgress | undefined> {
+    const [entry] = await db.select().from(dailyProgress).where(eq(dailyProgress.id, id));
+    return entry;
+  }
+
+  async createDailyProgress(data: InsertDailyProgress): Promise<DailyProgress> {
+    const [entry] = await db.insert(dailyProgress).values(data).returning();
+    return entry;
+  }
+
+  async createDailyProgressBulk(data: InsertDailyProgress[]): Promise<DailyProgress[]> {
+    const entries = await db.insert(dailyProgress).values(data).returning();
+    return entries;
+  }
+
+  async updateDailyProgress(id: number, data: Partial<InsertDailyProgress>): Promise<DailyProgress | undefined> {
+    const [entry] = await db
+      .update(dailyProgress)
+      .set(data)
+      .where(eq(dailyProgress.id, id))
+      .returning();
+    return entry;
+  }
+
+  async deleteDailyProgress(id: number): Promise<void> {
+    await db.delete(dailyProgress).where(eq(dailyProgress.id, id));
+  }
+
+  // Resource Plan methods
+  async getResourcePlans(projectId: number): Promise<ResourcePlan[]> {
+    const entries = await db
+      .select()
+      .from(resourcePlans)
+      .where(eq(resourcePlans.projectId, projectId))
+      .orderBy(resourcePlans.startDate);
+    return entries;
+  }
+
+  async getResourcePlan(id: number): Promise<ResourcePlan | undefined> {
+    const [entry] = await db.select().from(resourcePlans).where(eq(resourcePlans.id, id));
+    return entry;
+  }
+
+  async createResourcePlan(data: InsertResourcePlan): Promise<ResourcePlan> {
+    const [entry] = await db.insert(resourcePlans).values(data).returning();
+    return entry;
+  }
+
+  async createResourcePlanBulk(data: InsertResourcePlan[]): Promise<ResourcePlan[]> {
+    const entries = await db.insert(resourcePlans).values(data).returning();
+    return entries;
+  }
+
+  async updateResourcePlan(id: number, data: Partial<InsertResourcePlan>): Promise<ResourcePlan | undefined> {
+    const [entry] = await db
+      .update(resourcePlans)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(resourcePlans.id, id))
+      .returning();
+    return entry;
+  }
+
+  async deleteResourcePlan(id: number): Promise<void> {
+    await db.delete(resourcePlans).where(eq(resourcePlans.id, id));
+  }
+
+  // Risk Register methods
+  async getRiskRegisters(projectId: number): Promise<RiskRegister[]> {
+    const entries = await db
+      .select()
+      .from(riskRegister)
+      .where(eq(riskRegister.projectId, projectId))
+      .orderBy(riskRegister.dateLogged);
+    return entries;
+  }
+
+  async getRiskRegister(id: number): Promise<RiskRegister | undefined> {
+    const [entry] = await db.select().from(riskRegister).where(eq(riskRegister.id, id));
+    return entry;
+  }
+
+  async createRiskRegister(data: InsertRiskRegister): Promise<RiskRegister> {
+    const [entry] = await db.insert(riskRegister).values(data).returning();
+    return entry;
+  }
+
+  async updateRiskRegister(id: number, data: Partial<InsertRiskRegister>): Promise<RiskRegister | undefined> {
+    const [entry] = await db
+      .update(riskRegister)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(riskRegister.id, id))
+      .returning();
+    return entry;
+  }
+
+  async deleteRiskRegister(id: number): Promise<void> {
+    await db.delete(riskRegister).where(eq(riskRegister.id, id));
+  }
+
+  // Lesson Learnt Register methods
+  async getLessonLearntRegisters(projectId: number): Promise<LessonLearntRegister[]> {
+    const entries = await db
+      .select()
+      .from(lessonLearntRegister)
+      .where(eq(lessonLearntRegister.projectId, projectId))
+      .orderBy(lessonLearntRegister.dateLogged);
+    return entries;
+  }
+
+  async getLessonLearntRegister(id: number): Promise<LessonLearntRegister | undefined> {
+    const [entry] = await db.select().from(lessonLearntRegister).where(eq(lessonLearntRegister.id, id));
+    return entry;
+  }
+
+  async createLessonLearntRegister(data: InsertLessonLearntRegister): Promise<LessonLearntRegister> {
+    const [entry] = await db.insert(lessonLearntRegister).values(data).returning();
+    return entry;
+  }
+
+  async updateLessonLearntRegister(id: number, data: Partial<InsertLessonLearntRegister>): Promise<LessonLearntRegister | undefined> {
+    const [entry] = await db
+      .update(lessonLearntRegister)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(lessonLearntRegister.id, id))
+      .returning();
+    return entry;
+  }
+
+  async deleteLessonLearntRegister(id: number): Promise<void> {
+    await db.delete(lessonLearntRegister).where(eq(lessonLearntRegister.id, id));
+  }
+
+  // Direct Manpower Position methods
+  async getDirectManpowerPositions(projectId: number): Promise<DirectManpowerPosition[]> {
+    const positions = await db
+      .select()
+      .from(directManpowerPositions)
+      .where(eq(directManpowerPositions.projectId, projectId))
+      .orderBy(directManpowerPositions.order);
+    return positions;
+  }
+
+  async getDirectManpowerPosition(id: number): Promise<DirectManpowerPosition | undefined> {
+    const [position] = await db.select().from(directManpowerPositions).where(eq(directManpowerPositions.id, id));
+    return position;
+  }
+
+  async createDirectManpowerPosition(data: InsertDirectManpowerPosition): Promise<DirectManpowerPosition> {
+    const [position] = await db.insert(directManpowerPositions).values(data).returning();
+    return position;
+  }
+
+  async updateDirectManpowerPosition(id: number, data: Partial<InsertDirectManpowerPosition>): Promise<DirectManpowerPosition | undefined> {
+    const [position] = await db
+      .update(directManpowerPositions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(directManpowerPositions.id, id))
+      .returning();
+    return position;
+  }
+
+  async deleteDirectManpowerPosition(id: number): Promise<void> {
+    await db.delete(directManpowerPositions).where(eq(directManpowerPositions.id, id));
+  }
+
+  async updateDirectManpowerPositions(projectId: number, positions: InsertDirectManpowerPosition[]): Promise<DirectManpowerPosition[]> {
+    // Delete existing positions for this project
+    await db.delete(directManpowerPositions).where(eq(directManpowerPositions.projectId, projectId));
+    
+    // Insert new positions
+    if (positions.length > 0) {
+      const newPositions = await db.insert(directManpowerPositions).values(positions).returning();
+      return newPositions;
+    }
+    return [];
+  }
+
+  // Direct Manpower Entry methods
+  async getDirectManpowerEntries(projectId: number): Promise<DirectManpowerEntry[]> {
+    const entries = await db
+      .select()
+      .from(directManpowerEntries)
+      .where(eq(directManpowerEntries.projectId, projectId))
+      .orderBy(directManpowerEntries.date);
+    return entries;
+  }
+
+  async getDirectManpowerEntry(id: number): Promise<DirectManpowerEntry | undefined> {
+    const [entry] = await db.select().from(directManpowerEntries).where(eq(directManpowerEntries.id, id));
+    return entry;
+  }
+
+  async createDirectManpowerEntry(data: InsertDirectManpowerEntry): Promise<DirectManpowerEntry> {
+    const [entry] = await db.insert(directManpowerEntries).values(data).returning();
+    return entry;
+  }
+
+  async updateDirectManpowerEntry(id: number, data: Partial<InsertDirectManpowerEntry>): Promise<DirectManpowerEntry | undefined> {
+    const [entry] = await db
+      .update(directManpowerEntries)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(directManpowerEntries.id, id))
+      .returning();
+    return entry;
+  }
+
+  async deleteDirectManpowerEntry(id: number): Promise<void> {
+    await db.delete(directManpowerEntries).where(eq(directManpowerEntries.id, id));
+  }
+
+  // Indirect Manpower Position methods
+  async getIndirectManpowerPositions(projectId: number): Promise<IndirectManpowerPosition[]> {
+    const positions = await db
+      .select()
+      .from(indirectManpowerPositions)
+      .where(eq(indirectManpowerPositions.projectId, projectId))
+      .orderBy(indirectManpowerPositions.order);
+    return positions;
+  }
+
+  async getIndirectManpowerPosition(id: number): Promise<IndirectManpowerPosition | undefined> {
+    const [position] = await db.select().from(indirectManpowerPositions).where(eq(indirectManpowerPositions.id, id));
+    return position;
+  }
+
+  async createIndirectManpowerPosition(data: InsertIndirectManpowerPosition): Promise<IndirectManpowerPosition> {
+    const [position] = await db.insert(indirectManpowerPositions).values(data).returning();
+    return position;
+  }
+
+  async updateIndirectManpowerPosition(id: number, data: Partial<InsertIndirectManpowerPosition>): Promise<IndirectManpowerPosition | undefined> {
+    const [position] = await db
+      .update(indirectManpowerPositions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(indirectManpowerPositions.id, id))
+      .returning();
+    return position;
+  }
+
+  async deleteIndirectManpowerPosition(id: number): Promise<void> {
+    await db.delete(indirectManpowerPositions).where(eq(indirectManpowerPositions.id, id));
+  }
+
+  async updateIndirectManpowerPositions(projectId: number, positions: InsertIndirectManpowerPosition[]): Promise<IndirectManpowerPosition[]> {
+    // Delete existing positions for this project
+    await db.delete(indirectManpowerPositions).where(eq(indirectManpowerPositions.projectId, projectId));
+    
+    // Insert new positions
+    if (positions.length > 0) {
+      const newPositions = await db.insert(indirectManpowerPositions).values(positions).returning();
+      return newPositions;
+    }
+    return [];
+  }
+
+  // Indirect Manpower Entry methods
+  async getIndirectManpowerEntries(projectId: number): Promise<IndirectManpowerEntry[]> {
+    const entries = await db
+      .select()
+      .from(indirectManpowerEntries)
+      .where(eq(indirectManpowerEntries.projectId, projectId))
+      .orderBy(indirectManpowerEntries.date);
+    return entries;
+  }
+
+  async getIndirectManpowerEntry(id: number): Promise<IndirectManpowerEntry | undefined> {
+    const [entry] = await db.select().from(indirectManpowerEntries).where(eq(indirectManpowerEntries.id, id));
+    return entry;
+  }
+
+  async createIndirectManpowerEntry(data: InsertIndirectManpowerEntry): Promise<IndirectManpowerEntry> {
+    const [entry] = await db.insert(indirectManpowerEntries).values(data).returning();
+    return entry;
+  }
+
+  async updateIndirectManpowerEntry(id: number, data: Partial<InsertIndirectManpowerEntry>): Promise<IndirectManpowerEntry | undefined> {
+    const [entry] = await db
+      .update(indirectManpowerEntries)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(indirectManpowerEntries.id, id))
+      .returning();
+    return entry;
+  }
+
+  async deleteIndirectManpowerEntry(id: number): Promise<void> {
+    await db.delete(indirectManpowerEntries).where(eq(indirectManpowerEntries.id, id));
+  }
+
+  // Planned Activity methods
+  async getPlannedActivities(projectId: number, startDate?: string, endDate?: string): Promise<PlannedActivity[]> {
+    // Filter by date range if provided (2-week rolling window)
+    if (startDate && endDate) {
+      const activities = await db
+        .select()
+        .from(plannedActivities)
+        .where(
+          and(
+            eq(plannedActivities.projectId, projectId),
+            or(
+              and(gte(plannedActivities.startDate, startDate), lte(plannedActivities.startDate, endDate)),
+              and(gte(plannedActivities.endDate, startDate), lte(plannedActivities.endDate, endDate)),
+              and(lte(plannedActivities.startDate, startDate), gte(plannedActivities.endDate, endDate))
+            )
+          )
+        )
+        .orderBy(plannedActivities.startDate);
+      return activities;
+    }
+
+    const activities = await db
+      .select()
+      .from(plannedActivities)
+      .where(eq(plannedActivities.projectId, projectId))
+      .orderBy(plannedActivities.startDate);
+    return activities;
+  }
+
+  async getPlannedActivity(id: number): Promise<PlannedActivity | undefined> {
+    const [activity] = await db.select().from(plannedActivities).where(eq(plannedActivities.id, id));
+    return activity;
+  }
+
+  async createPlannedActivity(data: InsertPlannedActivity): Promise<PlannedActivity> {
+    const [activity] = await db.insert(plannedActivities).values(data).returning();
+    return activity;
+  }
+
+  async updatePlannedActivity(id: number, data: Partial<InsertPlannedActivity>): Promise<PlannedActivity | undefined> {
+    const [activity] = await db
+      .update(plannedActivities)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(plannedActivities.id, id))
+      .returning();
+    return activity;
+  }
+
+  async deletePlannedActivity(id: number): Promise<void> {
+    await db.delete(plannedActivities).where(eq(plannedActivities.id, id));
+  }
+
+  // Planned Activity Task methods
+  async getPlannedActivityTasks(activityId: number): Promise<PlannedActivityTask[]> {
+    const tasks = await db
+      .select()
+      .from(plannedActivityTasks)
+      .where(eq(plannedActivityTasks.activityId, activityId))
+      .orderBy(plannedActivityTasks.startDate);
+    return tasks;
+  }
+
+  async getPlannedActivityTask(id: number): Promise<PlannedActivityTask | undefined> {
+    const [task] = await db.select().from(plannedActivityTasks).where(eq(plannedActivityTasks.id, id));
+    return task;
+  }
+
+  async createPlannedActivityTask(data: InsertPlannedActivityTask): Promise<PlannedActivityTask> {
+    const [task] = await db.insert(plannedActivityTasks).values(data).returning();
+    return task;
+  }
+
+  async updatePlannedActivityTask(id: number, data: Partial<InsertPlannedActivityTask>): Promise<PlannedActivityTask | undefined> {
+    const [task] = await db
+      .update(plannedActivityTasks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(plannedActivityTasks.id, id))
+      .returning();
+    return task;
+  }
+
+  async deletePlannedActivityTask(id: number): Promise<void> {
+    await db.delete(plannedActivityTasks).where(eq(plannedActivityTasks.id, id));
   }
 }
 

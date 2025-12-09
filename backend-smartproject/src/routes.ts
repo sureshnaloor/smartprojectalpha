@@ -32,7 +32,17 @@ import {
   projectCollaborationThreads,
   projectCollaborationMessages,
   projects,
-  tasks
+  tasks,
+  insertDailyProgressSchema,
+  insertResourcePlanSchema,
+  insertRiskRegisterSchema,
+  insertLessonLearntRegisterSchema,
+  insertDirectManpowerPositionSchema,
+  insertDirectManpowerEntrySchema,
+  insertIndirectManpowerPositionSchema,
+  insertIndirectManpowerEntrySchema,
+  insertPlannedActivitySchema,
+  insertPlannedActivityTaskSchema
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -3727,6 +3737,724 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader("Content-Type", info.contentType || "application/octet-stream");
       res.setHeader("Content-Disposition", `attachment; filename="${info.fileName}"`);
       res.send(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Daily Progress routes
+  app.get("/api/projects/:projectId/daily-progress", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getDailyProgress(projectId);
+      res.json(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/daily-progress", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      // Inject projectId into body for validation
+      const bodyWithId = { ...req.body, projectId };
+      const entryData = insertDailyProgressSchema.parse(bodyWithId);
+      const entry = await storage.createDailyProgress(entryData);
+      res.json(entry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/daily-progress/bulk", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      if (!Array.isArray(req.body)) {
+        return res.status(400).json({ message: "Body must be an array of entries" });
+      }
+
+      // Inject projectId into each entry
+      const bodiesWithId = req.body.map((item: any) => ({ ...item, projectId }));
+
+      const entriesData = z.array(insertDailyProgressSchema).parse(bodiesWithId);
+      const entries = await storage.createDailyProgressBulk(entriesData);
+      res.json(entries);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/daily-progress/:entryId", async (req: Request, res: Response) => {
+    try {
+      const entryId = parseInt(req.params.entryId);
+      if (isNaN(entryId)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+
+      const updateData = insertDailyProgressSchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateDailyProgress(entryId, updateData);
+
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Entry not found" });
+      }
+
+      res.json(updatedEntry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/daily-progress/:entryId", async (req: Request, res: Response) => {
+    try {
+      const entryId = parseInt(req.params.entryId);
+      if (isNaN(entryId)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+
+      await storage.deleteDailyProgress(entryId);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Resource Plan routes
+  app.get("/api/projects/:projectId/resource-plans", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getResourcePlans(projectId);
+      res.json(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/resource-plans", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      // Inject projectId into body for validation
+      const bodyWithId = { ...req.body, projectId };
+      const entryData = insertResourcePlanSchema.parse(bodyWithId);
+      const entry = await storage.createResourcePlan(entryData);
+      res.json(entry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/resource-plans/bulk", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      if (!Array.isArray(req.body)) {
+        return res.status(400).json({ message: "Body must be an array of entries" });
+      }
+
+      // Inject projectId into each entry
+      const bodiesWithId = req.body.map((item: any) => ({ ...item, projectId }));
+
+      const entriesData = z.array(insertResourcePlanSchema).parse(bodiesWithId);
+      const entries = await storage.createResourcePlanBulk(entriesData);
+      res.json(entries);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/resource-plans/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+
+      const updateData = insertResourcePlanSchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateResourcePlan(id, updateData);
+
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Entry not found" });
+      }
+
+      res.json(updatedEntry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/resource-plans/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+
+      await storage.deleteResourcePlan(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Risk Register routes
+  app.get("/api/projects/:projectId/risk-register", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getRiskRegisters(projectId);
+      res.json(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/risk-register", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      // Inject projectId into body for validation
+      const bodyWithId = { ...req.body, projectId };
+      const entryData = insertRiskRegisterSchema.parse(bodyWithId);
+      const entry = await storage.createRiskRegister(entryData);
+      res.json(entry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/risk-register/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const id = parseInt(req.params.id);
+      if (isNaN(projectId) || isNaN(id)) {
+        return res.status(400).json({ message: "Invalid project ID or risk register ID" });
+      }
+      const updateData = insertRiskRegisterSchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateRiskRegister(id, updateData);
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Risk register entry not found" });
+      }
+      res.json(updatedEntry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/risk-register/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid risk register ID" });
+      }
+      await storage.deleteRiskRegister(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Lesson Learnt Register routes
+  app.get("/api/projects/:projectId/lesson-learnt-register", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getLessonLearntRegisters(projectId);
+      res.json(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/lesson-learnt-register", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      // Inject projectId into body for validation
+      const bodyWithId = { ...req.body, projectId };
+      const entryData = insertLessonLearntRegisterSchema.parse(bodyWithId);
+      const entry = await storage.createLessonLearntRegister(entryData);
+      res.json(entry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/lesson-learnt-register/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const id = parseInt(req.params.id);
+      if (isNaN(projectId) || isNaN(id)) {
+        return res.status(400).json({ message: "Invalid project ID or lesson learnt register ID" });
+      }
+      const updateData = insertLessonLearntRegisterSchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateLessonLearntRegister(id, updateData);
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Lesson learnt register entry not found" });
+      }
+      res.json(updatedEntry);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/lesson-learnt-register/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid lesson learnt register ID" });
+      }
+      await storage.deleteLessonLearntRegister(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Direct Manpower Position routes
+  app.get("/api/projects/:projectId/direct-manpower-positions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getDirectManpowerPositions(projectId);
+      res.json(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/direct-manpower-positions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const bodyWithId = { ...req.body, projectId };
+      const positionData = insertDirectManpowerPositionSchema.parse(bodyWithId);
+      const position = await storage.createDirectManpowerPosition(positionData);
+      res.json(position);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/direct-manpower-positions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const positionsData = z.array(insertDirectManpowerPositionSchema).parse(
+        req.body.map((p: any) => ({ ...p, projectId }))
+      );
+      const positions = await storage.updateDirectManpowerPositions(projectId, positionsData);
+      res.json(positions);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/direct-manpower-positions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid position ID" });
+      }
+      const updateData = insertDirectManpowerPositionSchema.partial().parse(req.body);
+      const updatedPosition = await storage.updateDirectManpowerPosition(id, updateData);
+      if (!updatedPosition) {
+        return res.status(404).json({ message: "Position not found" });
+      }
+      res.json(updatedPosition);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/direct-manpower-positions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid position ID" });
+      }
+      await storage.deleteDirectManpowerPosition(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Direct Manpower Entry routes
+  app.get("/api/projects/:projectId/direct-manpower-entries", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getDirectManpowerEntries(projectId);
+      // Parse JSON positions field
+      const entries = data.map(entry => ({
+        ...entry,
+        positions: JSON.parse(entry.positions)
+      }));
+      res.json(entries);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/direct-manpower-entries", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const bodyWithId = { ...req.body, projectId };
+      const entryData = insertDirectManpowerEntrySchema.parse(bodyWithId);
+      const entry = await storage.createDirectManpowerEntry(entryData);
+      res.json({
+        ...entry,
+        positions: JSON.parse(entry.positions)
+      });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/direct-manpower-entries/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const id = parseInt(req.params.id);
+      if (isNaN(projectId) || isNaN(id)) {
+        return res.status(400).json({ message: "Invalid project ID or entry ID" });
+      }
+      const updateData = insertDirectManpowerEntrySchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateDirectManpowerEntry(id, updateData);
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Manpower entry not found" });
+      }
+      res.json({
+        ...updatedEntry,
+        positions: JSON.parse(updatedEntry.positions)
+      });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/direct-manpower-entries/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+      await storage.deleteDirectManpowerEntry(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Indirect Manpower Position routes
+  app.get("/api/projects/:projectId/indirect-manpower-positions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getIndirectManpowerPositions(projectId);
+      res.json(data);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/indirect-manpower-positions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const bodyWithId = { ...req.body, projectId };
+      const positionData = insertIndirectManpowerPositionSchema.parse(bodyWithId);
+      const position = await storage.createIndirectManpowerPosition(positionData);
+      res.json(position);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/indirect-manpower-positions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const positionsData = z.array(insertIndirectManpowerPositionSchema).parse(
+        req.body.map((p: any) => ({ ...p, projectId }))
+      );
+      const positions = await storage.updateIndirectManpowerPositions(projectId, positionsData);
+      res.json(positions);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/indirect-manpower-positions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid position ID" });
+      }
+      const updateData = insertIndirectManpowerPositionSchema.partial().parse(req.body);
+      const updatedPosition = await storage.updateIndirectManpowerPosition(id, updateData);
+      if (!updatedPosition) {
+        return res.status(404).json({ message: "Position not found" });
+      }
+      res.json(updatedPosition);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/indirect-manpower-positions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid position ID" });
+      }
+      await storage.deleteIndirectManpowerPosition(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Indirect Manpower Entry routes
+  app.get("/api/projects/:projectId/indirect-manpower-entries", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const data = await storage.getIndirectManpowerEntries(projectId);
+      // Parse JSON positions field
+      const entries = data.map(entry => ({
+        ...entry,
+        positions: JSON.parse(entry.positions),
+        totalOverhead: parseFloat(entry.totalOverhead)
+      }));
+      res.json(entries);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/indirect-manpower-entries", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const bodyWithId = { ...req.body, projectId };
+      const entryData = insertIndirectManpowerEntrySchema.parse(bodyWithId);
+      const entry = await storage.createIndirectManpowerEntry(entryData);
+      res.json({
+        ...entry,
+        positions: JSON.parse(entry.positions),
+        totalOverhead: parseFloat(entry.totalOverhead)
+      });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/indirect-manpower-entries/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const id = parseInt(req.params.id);
+      if (isNaN(projectId) || isNaN(id)) {
+        return res.status(400).json({ message: "Invalid project ID or entry ID" });
+      }
+      const updateData = insertIndirectManpowerEntrySchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateIndirectManpowerEntry(id, updateData);
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Manpower entry not found" });
+      }
+      res.json({
+        ...updatedEntry,
+        positions: JSON.parse(updatedEntry.positions),
+        totalOverhead: parseFloat(updatedEntry.totalOverhead)
+      });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/indirect-manpower-entries/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+      await storage.deleteIndirectManpowerEntry(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Planned Activity routes
+  app.get("/api/projects/:projectId/planned-activities", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const activities = await storage.getPlannedActivities(projectId, startDate, endDate);
+      
+      // Fetch tasks for each activity
+      const activitiesWithTasks = await Promise.all(
+        activities.map(async (activity) => {
+          const tasks = await storage.getPlannedActivityTasks(activity.id);
+          return { ...activity, tasks };
+        })
+      );
+      
+      res.json(activitiesWithTasks);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/planned-activities", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const bodyWithId = { ...req.body, projectId };
+      const activityData = insertPlannedActivitySchema.parse(bodyWithId);
+      const activity = await storage.createPlannedActivity(activityData);
+      res.json({ ...activity, tasks: [] });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/planned-activities/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const id = parseInt(req.params.id);
+      if (isNaN(projectId) || isNaN(id)) {
+        return res.status(400).json({ message: "Invalid project ID or activity ID" });
+      }
+      const updateData = insertPlannedActivitySchema.partial().parse(req.body);
+      const updatedActivity = await storage.updatePlannedActivity(id, updateData);
+      if (!updatedActivity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+      const tasks = await storage.getPlannedActivityTasks(id);
+      res.json({ ...updatedActivity, tasks });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/planned-activities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid activity ID" });
+      }
+      await storage.deletePlannedActivity(id);
+      res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Planned Activity Task routes
+  app.get("/api/projects/:projectId/planned-activities/:activityId/tasks", async (req: Request, res: Response) => {
+    try {
+      const activityId = parseInt(req.params.activityId);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "Invalid activity ID" });
+      }
+      const tasks = await storage.getPlannedActivityTasks(activityId);
+      res.json(tasks);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/planned-activities/:activityId/tasks", async (req: Request, res: Response) => {
+    try {
+      const activityId = parseInt(req.params.activityId);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "Invalid activity ID" });
+      }
+      const bodyWithId = { ...req.body, activityId };
+      const taskData = insertPlannedActivityTaskSchema.parse(bodyWithId);
+      const task = await storage.createPlannedActivityTask(taskData);
+      res.json(task);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.put("/api/projects/:projectId/planned-activities/:activityId/tasks/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
+      const updateData = insertPlannedActivityTaskSchema.partial().parse(req.body);
+      const updatedTask = await storage.updatePlannedActivityTask(id, updateData);
+      if (!updatedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      res.json(updatedTask);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/planned-activities/:activityId/tasks/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
+      await storage.deletePlannedActivityTask(id);
+      res.sendStatus(204);
     } catch (err) {
       handleError(err, res);
     }

@@ -112,6 +112,26 @@ export async function getDownloadUrl(fileName: string) {
     return downloadUrl;
 }
 
+export async function downloadFile(fileId: string) {
+    await authorize();
+    const response = await b2.downloadFileById({
+        fileId,
+        responseType: 'arraybuffer'
+    });
+
+    // Extract info from headers
+    const info = {
+        contentType: response.headers['content-type'],
+        fileName: response.headers['x-bz-file-name'] ? decodeURIComponent(response.headers['x-bz-file-name']) : 'download',
+        ...response.headers // include all headers just in case
+    };
+
+    return {
+        data: Buffer.from(response.data),
+        info
+    };
+}
+
 export async function getFile(fileId: string) {
     await authorize();
     const response = await b2.getFileInfo({ fileId });
