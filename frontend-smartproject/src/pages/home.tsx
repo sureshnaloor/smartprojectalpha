@@ -43,6 +43,7 @@ import { Footer } from "@/components/ui/footer";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
+import { UserProfile } from "@/components/user-profile";
 
 export default function Home() {
   const [location, setLocation] = useLocation();
@@ -110,10 +111,7 @@ export default function Home() {
             </button>
             <div className="relative">
               <button className="flex items-center focus:outline-none group">
-                <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white transition-transform duration-300 group-hover:scale-110">
-                  <span className="text-sm">JD</span>
-                </div>
-                <span className="ml-2 text-sm font-medium hidden md:block group-hover:text-teal-700 transition-colors duration-200">John Doe</span>
+                <UserProfile />
               </button>
             </div>
           </div>

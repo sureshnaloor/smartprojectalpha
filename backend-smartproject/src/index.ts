@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import { corsMiddleware } from "./cors-middleware";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import session from "express-session";
+import passport from "./auth/passport";
+import authRoutes from "./auth/routes";
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -13,9 +16,32 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
+
+// Session configuration
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    },
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use(corsMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Auth routes (must be before registerRoutes)
+app.use("/api/auth", authRoutes);
 
 // Health check endpoint
 app.get('/api/hello', (req, res) => {

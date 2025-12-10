@@ -60,6 +60,7 @@
     "tailwind-merge": "^2.5.4",
     "vaul": "^1.1.0",
     "wouter": "^3.3.5",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.4"
   },
   "devDependencies": {

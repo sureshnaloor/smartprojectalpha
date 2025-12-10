@@ -6,6 +6,7 @@ import { SimpleProjectHeader } from "@/components/project/simple-project-header"
 import { useMobile } from "@/hooks/use-mobile";
 import { Toaster } from "sonner";
 import { AlertTriangle, FolderOpen, Calendar, UserCheck, Lightbulb, User, UserPlus, ClipboardList, MessageSquareText } from "lucide-react";
+import { UserProfile } from "@/components/user-profile";
 
 interface ProjectLayoutProps {
   children: React.ReactNode;
@@ -180,10 +181,7 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
               </button>
               <div className="relative">
                 <button className="flex items-center focus:outline-none">
-                  <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white">
-                    <span className="text-sm">JD</span>
-                  </div>
-                  <span className="ml-2 text-sm font-medium hidden md:block">John Doe</span>
+                  <UserProfile />
                 </button>
               </div>
             </div>

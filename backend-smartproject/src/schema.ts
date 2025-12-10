@@ -2,6 +2,18 @@ import { pgTable, text, serial, integer, numeric, date, timestamp, boolean, prim
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users Table
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  picture: text("picture"), // Profile picture URL
+  provider: text("provider").notNull(), // 'google', 'linkedin', 'email'
+  providerId: text("provider_id").notNull(), // OAuth provider ID or email for email auth
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Projects Table
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -395,6 +407,12 @@ export const insertProjectCollaborationThreadSchema = createInsertSchema(project
 export const insertProjectCollaborationMessageSchema = createInsertSchema(projectCollaborationMessages)
   .omit({ id: true, createdAt: true } as any);
 
+// User schema
+export const insertUserSchema = createInsertSchema(users)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    provider: z.enum(["google", "linkedin", "email"]),
+  });
 
 // Types
 export type Project = typeof projects.$inferSelect;
@@ -868,3 +886,6 @@ export type InsertPlannedActivity = z.infer<typeof insertPlannedActivitySchema>;
 
 export type PlannedActivityTask = typeof plannedActivityTasks.$inferSelect;
 export type InsertPlannedActivityTask = z.infer<typeof insertPlannedActivityTaskSchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;

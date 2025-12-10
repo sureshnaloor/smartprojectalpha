@@ -22,6 +22,7 @@ export const apiRequest = async (method: string, endpoint: string, data?: any) =
   
   const options: RequestInit = {
     method,
+    credentials: 'include', // Include cookies for session management
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

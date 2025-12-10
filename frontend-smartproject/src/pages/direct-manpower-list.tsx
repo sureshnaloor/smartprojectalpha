@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import { 
   Plus, 
   Search, 
@@ -63,176 +67,255 @@ import {
 } from "@/components/ui/popover";
 
 interface ManpowerPosition {
-  id: string;
+  id: number;
+  projectId: number;
+  positionId: string;
   name: string;
   order: number;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ManpowerEntry {
-  id: string;
+  id: number;
+  projectId: number;
   date: string;
   positions: { [positionId: string]: number };
   totalManpower: number;
-  remarks: string;
+  remarks: string | null;
   createdBy: string;
   createdAt: string;
-  lastUpdated: string;
+  updatedAt: string;
 }
 
-// Available positions from resource master
-const availablePositions: ManpowerPosition[] = [
-  { id: "mason", name: "Mason", order: 1, isActive: true },
-  { id: "carpenter", name: "Carpenter", order: 2, isActive: true },
-  { id: "helper", name: "Helper", order: 3, isActive: true },
-  { id: "electrical_technician", name: "Electrical Technician", order: 4, isActive: true },
-  { id: "instrument_technician", name: "Instrument Technician", order: 5, isActive: true },
-  { id: "hvac_technician", name: "HVAC Technician", order: 6, isActive: true },
-  { id: "plumber", name: "Plumber", order: 7, isActive: true },
-  { id: "welder", name: "Welder", order: 8, isActive: true },
-  { id: "painter", name: "Painter", order: 9, isActive: true },
-  { id: "operator", name: "Equipment Operator", order: 10, isActive: true },
-  { id: "supervisor", name: "Supervisor", order: 11, isActive: true },
-  { id: "foreman", name: "Foreman", order: 12, isActive: true },
-  { id: "engineer", name: "Engineer", order: 13, isActive: false },
-  { id: "architect", name: "Architect", order: 14, isActive: false },
-  { id: "surveyor", name: "Surveyor", order: 15, isActive: false },
-  { id: "safety_officer", name: "Safety Officer", order: 16, isActive: false },
-  { id: "quality_controller", name: "Quality Controller", order: 17, isActive: false },
-];
-
-// Dummy data
-const dummyManpowerData: ManpowerEntry[] = [
-  {
-    id: "1",
-    date: "2024-01-15",
-    positions: {
-      "mason": 5,
-      "carpenter": 3,
-      "helper": 20,
-      "electrical_technician": 2,
-      "instrument_technician": 3,
-      "hvac_technician": 1,
-      "plumber": 2,
-      "welder": 4,
-      "painter": 3,
-      "operator": 2,
-      "supervisor": 1,
-      "foreman": 2
-    },
-    totalManpower: 48,
-    remarks: "Foundation work in progress, additional helpers required for material handling",
-    createdBy: "John Smith",
-    createdAt: "2024-01-14",
-    lastUpdated: "2024-01-15"
-  },
-  {
-    id: "2",
-    date: "2024-01-16",
-    positions: {
-      "mason": 6,
-      "carpenter": 4,
-      "helper": 25,
-      "electrical_technician": 3,
-      "instrument_technician": 4,
-      "hvac_technician": 2,
-      "plumber": 3,
-      "welder": 5,
-      "painter": 4,
-      "operator": 3,
-      "supervisor": 2,
-      "foreman": 3
-    },
-    totalManpower: 61,
-    remarks: "Increased manpower for structural work and electrical installations",
-    createdBy: "Sarah Johnson",
-    createdAt: "2024-01-15",
-    lastUpdated: "2024-01-16"
-  },
-  {
-    id: "3",
-    date: "2024-01-17",
-    positions: {
-      "mason": 4,
-      "carpenter": 5,
-      "helper": 18,
-      "electrical_technician": 4,
-      "instrument_technician": 5,
-      "hvac_technician": 3,
-      "plumber": 4,
-      "welder": 3,
-      "painter": 5,
-      "operator": 2,
-      "supervisor": 1,
-      "foreman": 2
-    },
-    totalManpower: 60,
-    remarks: "Focus on finishing work and installations",
-    createdBy: "Mike Wilson",
-    createdAt: "2024-01-16",
-    lastUpdated: "2024-01-17"
-  },
-  {
-    id: "4",
-    date: "2024-01-18",
-    positions: {
-      "mason": 3,
-      "carpenter": 3,
-      "helper": 15,
-      "electrical_technician": 5,
-      "instrument_technician": 6,
-      "hvac_technician": 4,
-      "plumber": 5,
-      "welder": 2,
-      "painter": 6,
-      "operator": 1,
-      "supervisor": 1,
-      "foreman": 1
-    },
-    totalManpower: 51,
-    remarks: "Electrical and instrumentation work priority",
-    createdBy: "Lisa Chen",
-    createdAt: "2024-01-17",
-    lastUpdated: "2024-01-18"
-  },
-  {
-    id: "5",
-    date: "2024-01-19",
-    positions: {
-      "mason": 2,
-      "carpenter": 2,
-      "helper": 12,
-      "electrical_technician": 6,
-      "instrument_technician": 7,
-      "hvac_technician": 5,
-      "plumber": 6,
-      "welder": 1,
-      "painter": 7,
-      "operator": 1,
-      "supervisor": 1,
-      "foreman": 1
-    },
-    totalManpower: 49,
-    remarks: "Final installation and commissioning phase",
-    createdBy: "David Brown",
-    createdAt: "2024-01-18",
-    lastUpdated: "2024-01-19"
-  }
+// Default positions to initialize if none exist
+const defaultPositions = [
+  { positionId: "mason", name: "Mason", order: 1, isActive: true },
+  { positionId: "carpenter", name: "Carpenter", order: 2, isActive: true },
+  { positionId: "helper", name: "Helper", order: 3, isActive: true },
+  { positionId: "electrical_technician", name: "Electrical Technician", order: 4, isActive: true },
+  { positionId: "instrument_technician", name: "Instrument Technician", order: 5, isActive: true },
+  { positionId: "hvac_technician", name: "HVAC Technician", order: 6, isActive: true },
+  { positionId: "plumber", name: "Plumber", order: 7, isActive: true },
+  { positionId: "welder", name: "Welder", order: 8, isActive: true },
+  { positionId: "painter", name: "Painter", order: 9, isActive: true },
+  { positionId: "operator", name: "Equipment Operator", order: 10, isActive: true },
+  { positionId: "supervisor", name: "Supervisor", order: 11, isActive: true },
+  { positionId: "foreman", name: "Foreman", order: 12, isActive: true },
+  { positionId: "engineer", name: "Engineer", order: 13, isActive: false },
+  { positionId: "architect", name: "Architect", order: 14, isActive: false },
+  { positionId: "surveyor", name: "Surveyor", order: 15, isActive: false },
+  { positionId: "safety_officer", name: "Safety Officer", order: 16, isActive: false },
+  { positionId: "quality_controller", name: "Quality Controller", order: 17, isActive: false },
 ];
 
 export default function DirectManpowerList() {
   const params = useParams();
   const projectId = params.projectId;
-  
-  const [manpowerEntries, setManpowerEntries] = useState<ManpowerEntry[]>(dummyManpowerData);
-  const [positions, setPositions] = useState<ManpowerPosition[]>(availablePositions);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch positions
+  const { data: positionsData = [], isLoading: positionsLoading } = useQuery<ManpowerPosition[]>({
+    queryKey: [`/api/projects/${projectId}/direct-manpower-positions`],
+  });
+
+  // Fetch entries
+  const { data: manpowerEntries = [], isLoading: entriesLoading } = useQuery<ManpowerEntry[]>({
+    queryKey: [`/api/projects/${projectId}/direct-manpower-entries`],
+  });
+
+
+  const [positions, setPositions] = useState<ManpowerPosition[]>(positionsData);
+  useEffect(() => {
+    setPositions(positionsData);
+  }, [positionsData]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<ManpowerEntry | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    createdBy: "",
+    remarks: "",
+    positions: {} as { [positionId: string]: number },
+  });
+
+  // Entry Mutations
+  const createEntryMutation = useMutation({
+    mutationFn: async (data: Omit<ManpowerEntry, "id" | "projectId" | "createdAt" | "updatedAt">) => {
+      const response = await apiRequest("POST", `/api/projects/${projectId}/direct-manpower-entries`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/direct-manpower-entries`] });
+      toast({
+        title: "Success",
+        description: "Manpower entry created successfully",
+      });
+      resetForm();
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create manpower entry. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEntryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Omit<ManpowerEntry, "id" | "projectId" | "createdAt" | "updatedAt">> }) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/direct-manpower-entries/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/direct-manpower-entries`] });
+      toast({
+        title: "Success",
+        description: "Manpower entry updated successfully",
+      });
+      resetForm();
+      setIsEditDialogOpen(false);
+      setSelectedEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update manpower entry. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}/direct-manpower-entries/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/direct-manpower-entries`] });
+      toast({
+        title: "Success",
+        description: "Manpower entry deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete manpower entry. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePositionsMutation = useMutation({
+    mutationFn: async (positionsData: Omit<ManpowerPosition, "id" | "projectId" | "createdAt" | "updatedAt">[]) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/direct-manpower-positions`, positionsData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/direct-manpower-positions`] });
+      toast({
+        title: "Success",
+        description: "Position settings saved successfully",
+      });
+      setIsColumnSettingsOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save position settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Initialize positions if empty (after mutation is defined)
+  useEffect(() => {
+    if (!positionsLoading && positionsData.length === 0 && projectId) {
+      const initPositions = defaultPositions.map(p => ({
+        ...p,
+        projectId: parseInt(projectId),
+      }));
+      updatePositionsMutation.mutate(initPositions);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionsData.length, positionsLoading, projectId]);
+
+  const resetForm = () => {
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      createdBy: "",
+      remarks: "",
+      positions: {},
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.createdBy.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Created by is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calculate total manpower
+    const totalManpower = Object.values(formData.positions).reduce((sum, count) => sum + (count || 0), 0);
+
+    const entryData = {
+      date: formData.date,
+      positions: formData.positions,
+      totalManpower: totalManpower,
+      remarks: formData.remarks || null,
+      createdBy: formData.createdBy,
+    };
+
+    if (selectedEntry) {
+      updateEntryMutation.mutate({ id: selectedEntry.id, data: entryData });
+    } else {
+      createEntryMutation.mutate(entryData);
+    }
+  };
+
+  const handleEdit = (entry: ManpowerEntry) => {
+    setSelectedEntry(entry);
+    setFormData({
+      date: entry.date,
+      createdBy: entry.createdBy,
+      remarks: entry.remarks || "",
+      positions: entry.positions || {},
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this manpower entry?")) {
+      deleteEntryMutation.mutate(id);
+    }
+  };
+
+  const handleSavePositions = () => {
+    const positionsData = positions.map(p => ({
+      positionId: p.positionId,
+      name: p.name,
+      order: p.order,
+      isActive: p.isActive,
+    }));
+    updatePositionsMutation.mutate(positionsData);
+  };
 
   // Get active positions sorted by order
   const activePositions = positions.filter(p => p.isActive).sort((a, b) => a.order - b.order);
@@ -246,7 +329,7 @@ export default function DirectManpowerList() {
 
   // Calculate totals for each position
   const getPositionTotal = (positionId: string) => {
-    return manpowerEntries.reduce((total, entry) => total + (entry.positions[positionId] || 0), 0);
+    return manpowerEntries.reduce((total, entry) => total + (entry.positions?.[positionId] || 0), 0);
   };
 
   // Calculate overall total
@@ -279,15 +362,15 @@ export default function DirectManpowerList() {
       return;
     }
 
-    const draggedPos = positions.find(p => p.id === draggedColumn);
-    const targetPos = positions.find(p => p.id === targetPositionId);
+    const draggedPos = positions.find(p => p.positionId === draggedColumn);
+    const targetPos = positions.find(p => p.positionId === targetPositionId);
     
     if (draggedPos && targetPos) {
       // Create new positions array with updated order
       const newPositions = positions.map(p => {
-        if (p.id === draggedColumn) {
+        if (p.positionId === draggedColumn) {
           return { ...p, order: targetPos.order };
-        } else if (p.id === targetPositionId) {
+        } else if (p.positionId === targetPositionId) {
           return { ...p, order: draggedPos.order };
         }
         return p;
@@ -313,7 +396,7 @@ export default function DirectManpowerList() {
 
   const togglePositionVisibility = (positionId: string) => {
     setPositions(prev => prev.map(p => 
-      p.id === positionId ? { ...p, isActive: !p.isActive } : p
+      p.positionId === positionId ? { ...p, isActive: !p.isActive } : p
     ));
   };
 
@@ -436,6 +519,11 @@ export default function DirectManpowerList() {
           <CardTitle>Daily Manpower Allocation</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          {(positionsLoading || entriesLoading) ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
           <div className="w-full overflow-x-auto" style={{ maxWidth: 'calc(100vw - 300px)' }}>
             <div className="min-w-max" style={{ minWidth: `${(activePositions.length + 5) * 112 + 96}px` }}>
               <div className="overflow-hidden border rounded-lg">
@@ -449,15 +537,15 @@ export default function DirectManpowerList() {
                         <TableHead 
                           key={position.id}
                           className={`w-28 cursor-move border-r ${
-                            draggedColumn === position.id ? 'bg-blue-100' : ''
+                              draggedColumn === position.positionId ? 'bg-blue-100' : ''
                           } ${
-                            dragOverColumn === position.id ? 'bg-green-100' : ''
+                              dragOverColumn === position.positionId ? 'bg-green-100' : ''
                           }`}
                           draggable
-                          onDragStart={(e) => handleColumnDragStart(e, position.id)}
-                          onDragOver={(e) => handleColumnDragOver(e, position.id)}
+                            onDragStart={(e) => handleColumnDragStart(e, position.positionId)}
+                            onDragOver={(e) => handleColumnDragOver(e, position.positionId)}
                           onDragLeave={handleColumnDragLeave}
-                          onDrop={(e) => handleColumnDrop(e, position.id)}
+                            onDrop={(e) => handleColumnDrop(e, position.positionId)}
                         >
                           <div className="flex items-center justify-between p-1">
                             <span className="text-xs font-medium leading-tight break-words min-w-0 flex-1">
@@ -492,7 +580,7 @@ export default function DirectManpowerList() {
                         {activePositions.map((position) => (
                           <TableCell key={position.id} className="text-center border-r w-28">
                             <div className="text-xs font-medium">
-                              {entry.positions[position.id] || 0}
+                              {entry.positions?.[position.positionId] || 0}
                             </div>
                           </TableCell>
                         ))}
@@ -504,7 +592,7 @@ export default function DirectManpowerList() {
                         <TableCell className="border-r w-32">
                           <div className="max-w-32">
                             <p className="text-xs text-gray-600 truncate">
-                              {entry.remarks}
+                              {entry.remarks || "-"}
                             </p>
                           </div>
                         </TableCell>
@@ -524,10 +612,21 @@ export default function DirectManpowerList() {
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEdit(entry)}
+                            >
                               <Edit className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleDelete(entry.id)}
+                              disabled={deleteEntryMutation.isPending}
+                            >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
@@ -542,7 +641,7 @@ export default function DirectManpowerList() {
                       {activePositions.map((position) => (
                         <TableCell key={position.id} className="text-center border-r w-28">
                           <div className="text-xs font-bold text-green-600">
-                            {getPositionTotal(position.id)}
+                            {getPositionTotal(position.positionId)}
                           </div>
                         </TableCell>
                       ))}
@@ -558,33 +657,46 @@ export default function DirectManpowerList() {
               </div>
             </div>
           </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Add Manpower Entry Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-6xl">
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) {
+          resetForm();
+          setSelectedEntry(null);
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Manpower Entry</DialogTitle>
             <DialogDescription>
               Add daily manpower allocation for all positions.
             </DialogDescription>
           </DialogHeader>
+          <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">Date *</Label>
               <Input
                 id="date"
                 type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
               />
             </div>
             
             <div>
-              <Label htmlFor="createdBy">Created By</Label>
+                <Label htmlFor="createdBy">Created By *</Label>
               <Input
                 id="createdBy"
+                  value={formData.createdBy}
+                  onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
                 placeholder="Enter your name"
+                  required
               />
             </div>
 
@@ -592,6 +704,8 @@ export default function DirectManpowerList() {
               <Label htmlFor="remarks">Remarks</Label>
               <Textarea
                 id="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 placeholder="Enter any remarks or notes..."
                 rows={2}
               />
@@ -603,29 +717,165 @@ export default function DirectManpowerList() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
                 {activePositions.map((position) => (
                   <div key={position.id}>
-                    <Label htmlFor={position.id} className="text-xs">
+                      <Label htmlFor={`pos-${position.positionId}`} className="text-xs">
                       {position.name}
                     </Label>
                     <Input
-                      id={position.id}
+                        id={`pos-${position.positionId}`}
                       type="number"
                       min="0"
+                        value={formData.positions[position.positionId] || ""}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          positions: {
+                            ...formData.positions,
+                            [position.positionId]: parseInt(e.target.value) || 0
+                          }
+                        })}
                       placeholder="0"
                       className="text-xs"
                     />
                   </div>
                 ))}
               </div>
+                <div className="mt-2 text-sm font-semibold text-blue-600">
+                  Total: {Object.values(formData.positions).reduce((sum, count) => sum + (count || 0), 0)}
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={createEntryMutation.isPending}
+              >
               Cancel
             </Button>
-            <Button onClick={() => setIsAddDialogOpen(false)}>
-              Add Entry
+              <Button 
+                type="submit"
+                disabled={createEntryMutation.isPending}
+              >
+                {createEntryMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Entry"
+                )}
             </Button>
           </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Manpower Entry Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          resetForm();
+          setSelectedEntry(null);
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Manpower Entry</DialogTitle>
+            <DialogDescription>
+              Update daily manpower allocation.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-date">Date *</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-createdBy">Created By *</Label>
+                <Input
+                  id="edit-createdBy"
+                  value={formData.createdBy}
+                  onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
+                  placeholder="Enter your name"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-remarks">Remarks</Label>
+                <Textarea
+                  id="edit-remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  placeholder="Enter any remarks or notes..."
+                  rows={2}
+                />
+              </div>
+
+              {/* Position inputs */}
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium">Manpower Allocation</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                  {activePositions.map((position) => (
+                    <div key={position.id}>
+                      <Label htmlFor={`edit-pos-${position.positionId}`} className="text-xs">
+                        {position.name}
+                      </Label>
+                      <Input
+                        id={`edit-pos-${position.positionId}`}
+                        type="number"
+                        min="0"
+                        value={formData.positions[position.positionId] || ""}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          positions: {
+                            ...formData.positions,
+                            [position.positionId]: parseInt(e.target.value) || 0
+                          }
+                        })}
+                        placeholder="0"
+                        className="text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-sm font-semibold text-blue-600">
+                  Total: {Object.values(formData.positions).reduce((sum, count) => sum + (count || 0), 0)}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={updateEntryMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={updateEntryMutation.isPending}
+              >
+                {updateEntryMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Entry"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -655,7 +905,7 @@ export default function DirectManpowerList() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
-                  <p className="text-sm">{formatDate(selectedEntry.lastUpdated)}</p>
+                  <p className="text-sm">{formatDate(selectedEntry.updatedAt)}</p>
                 </div>
               </div>
 
@@ -666,7 +916,7 @@ export default function DirectManpowerList() {
                     <div key={position.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm font-medium">{position.name}</span>
                       <span className="text-sm font-bold text-blue-600">
-                        {selectedEntry.positions[position.id] || 0}
+                        {selectedEntry.positions?.[position.positionId] || 0}
                       </span>
                     </div>
                   ))}
@@ -683,7 +933,12 @@ export default function DirectManpowerList() {
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
-            <Button>
+            <Button onClick={() => {
+              if (selectedEntry) {
+                handleEdit(selectedEntry);
+                setIsViewDialogOpen(false);
+              }
+            }}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
@@ -708,7 +963,7 @@ export default function DirectManpowerList() {
                     <input
                       type="checkbox"
                       checked={position.isActive}
-                      onChange={() => togglePositionVisibility(position.id)}
+                      onChange={() => togglePositionVisibility(position.positionId)}
                       className="rounded"
                     />
                     <span className="text-sm font-medium">{position.name}</span>
@@ -731,12 +986,28 @@ export default function DirectManpowerList() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsColumnSettingsOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsColumnSettingsOpen(false)}
+              disabled={updatePositionsMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button onClick={() => setIsColumnSettingsOpen(false)}>
+            <Button 
+              onClick={handleSavePositions}
+              disabled={updatePositionsMutation.isPending}
+            >
+              {updatePositionsMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
               <Save className="h-4 w-4 mr-2" />
               Save Settings
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

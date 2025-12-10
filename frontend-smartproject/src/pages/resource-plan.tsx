@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useParams } from "wouter";
-import { 
-  Plus, 
-  Search, 
-  Download, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Download,
+  Edit,
+  Trash2,
   Calendar,
   Users,
   TrendingUp,
@@ -22,14 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -47,9 +47,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Upload } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 interface ResourcePlanEntry {
-  id: string;
+  id: number;
+  projectId: number;
   resourceName: string;
   resourceType: 'Manpower' | 'Equipment' | 'Material';
   startDate: string;
@@ -62,98 +68,24 @@ interface ResourcePlanEntry {
   remarks: string;
   createdBy: string;
   createdAt: string;
-  lastUpdated: string;
+  updatedAt: string;
 }
-
-// Dummy data
-const dummyResourcePlanData: ResourcePlanEntry[] = [
-  {
-    id: "1",
-    resourceName: "Civil Engineer",
-    resourceType: "Manpower",
-    startDate: "2024-01-15",
-    endDate: "2024-03-15",
-    quantity: 2,
-    unit: "Persons",
-    costPerUnit: 5000,
-    totalCost: 10000,
-    status: "Allocated",
-    remarks: "Senior civil engineers for foundation and structural work",
-    createdBy: "John Smith",
-    createdAt: "2024-01-10",
-    lastUpdated: "2024-01-12"
-  },
-  {
-    id: "2",
-    resourceName: "Excavator",
-    resourceType: "Equipment",
-    startDate: "2024-01-20",
-    endDate: "2024-01-25",
-    quantity: 1,
-    unit: "Units",
-    costPerUnit: 8000,
-    totalCost: 8000,
-    status: "In Use",
-    remarks: "For foundation excavation work",
-    createdBy: "Sarah Johnson",
-    createdAt: "2024-01-15",
-    lastUpdated: "2024-01-18"
-  },
-  {
-    id: "3",
-    resourceName: "Steel Reinforcement",
-    resourceType: "Material",
-    startDate: "2024-02-01",
-    endDate: "2024-02-01",
-    quantity: 50,
-    unit: "Tons",
-    costPerUnit: 1200,
-    totalCost: 60000,
-    status: "Planned",
-    remarks: "For structural reinforcement",
-    createdBy: "Mike Wilson",
-    createdAt: "2024-01-20",
-    lastUpdated: "2024-01-20"
-  },
-  {
-    id: "4",
-    resourceName: "Electrician",
-    resourceType: "Manpower",
-    startDate: "2024-02-15",
-    endDate: "2024-04-15",
-    quantity: 3,
-    unit: "Persons",
-    costPerUnit: 4500,
-    totalCost: 13500,
-    status: "Planned",
-    remarks: "For electrical installation work",
-    createdBy: "Lisa Chen",
-    createdAt: "2024-01-25",
-    lastUpdated: "2024-01-25"
-  },
-  {
-    id: "5",
-    resourceName: "Crane",
-    resourceType: "Equipment",
-    startDate: "2024-03-01",
-    endDate: "2024-03-10",
-    quantity: 1,
-    unit: "Units",
-    costPerUnit: 15000,
-    totalCost: 15000,
-    status: "Planned",
-    remarks: "For heavy lifting during construction",
-    createdBy: "David Brown",
-    createdAt: "2024-01-30",
-    lastUpdated: "2024-01-30"
-  }
-];
 
 export default function ResourcePlan() {
   const params = useParams();
   const projectId = params.projectId;
-  
-  const [resourcePlans, setResourcePlans] = useState<ResourcePlanEntry[]>(dummyResourcePlanData);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: resourcePlans = [], isLoading } = useQuery<ResourcePlanEntry[]>({
+    queryKey: [`/api/projects/${projectId}/resource-plans`],
+    select: (data: any[]) => data.map(item => ({
+      ...item,
+      quantity: parseFloat(item.quantity) || 0,
+      costPerUnit: parseFloat(item.costPerUnit) || 0,
+      totalCost: parseFloat(item.totalCost) || 0
+    }))
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -161,14 +93,27 @@ export default function ResourcePlan() {
   const [selectedEntry, setSelectedEntry] = useState<ResourcePlanEntry | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+  
+  // Form state for Add Resource Plan modal
+  const [formData, setFormData] = useState({
+    resourceName: "",
+    resourceType: "" as "" | "Manpower" | "Equipment" | "Material",
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    quantity: "",
+    unit: "",
+    costPerUnit: "",
+    status: "Planned" as "Planned" | "Allocated" | "In Use" | "Completed",
+    remarks: "",
+  });
 
   // Filter entries based on search and filters
   const filteredEntries = resourcePlans.filter(entry => {
     const matchesSearch = entry.resourceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.createdBy.toLowerCase().includes(searchTerm.toLowerCase());
+      entry.createdBy.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === "all" || entry.resourceType === filterType;
     const matchesStatus = filterStatus === "all" || entry.status === filterStatus;
-    
+
     return matchesSearch && matchesType && matchesStatus;
   });
 
@@ -208,6 +153,130 @@ export default function ResourcePlan() {
     }).format(amount);
   };
 
+  // Calculate total cost
+  const calculateTotalCost = () => {
+    const quantity = parseFloat(formData.quantity) || 0;
+    const costPerUnit = parseFloat(formData.costPerUnit) || 0;
+    return quantity * costPerUnit;
+  };
+
+  // Create resource plan mutation
+  const createResourcePlanMutation = useMutation({
+    mutationFn: async (data: Omit<ResourcePlanEntry, "id" | "createdAt" | "updatedAt">) => {
+      const response = await apiRequest("POST", `/api/projects/${projectId}/resource-plans`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/resource-plans`] });
+      toast({
+        title: "Success",
+        description: "Resource plan created successfully",
+      });
+      // Reset form
+      setFormData({
+        resourceName: "",
+        resourceType: "" as "" | "Manpower" | "Equipment" | "Material",
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        quantity: "",
+        unit: "",
+        costPerUnit: "",
+        status: "Planned" as "Planned" | "Allocated" | "In Use" | "Completed",
+        remarks: "",
+      });
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create resource plan. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.resourceName) {
+      toast({
+        title: "Validation Error",
+        description: "Resource name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.resourceType) {
+      toast({
+        title: "Validation Error",
+        description: "Resource type is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Valid quantity is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.unit) {
+      toast({
+        title: "Validation Error",
+        description: "Unit is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.costPerUnit || parseFloat(formData.costPerUnit) < 0) {
+      toast({
+        title: "Validation Error",
+        description: "Valid cost per unit is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.startDate || !formData.endDate) {
+      toast({
+        title: "Validation Error",
+        description: "Start date and end date are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (new Date(formData.startDate) > new Date(formData.endDate)) {
+      toast({
+        title: "Validation Error",
+        description: "End date must be after start date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalCost = calculateTotalCost();
+    
+    const resourcePlanData = {
+      projectId: parseInt(projectId!),
+      resourceName: formData.resourceName,
+      resourceType: formData.resourceType,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      quantity: parseFloat(formData.quantity),
+      unit: formData.unit,
+      costPerUnit: parseFloat(formData.costPerUnit),
+      totalCost: totalCost,
+      status: formData.status,
+      remarks: formData.remarks || null,
+      createdBy: "System", // TODO: Get from auth context
+    };
+
+    createResourcePlanMutation.mutate(resourcePlanData);
+  };
+
   return (
     <div className="flex-1 p-6">
       {/* Header */}
@@ -217,8 +286,8 @@ export default function ResourcePlan() {
           <p className="text-gray-600">Plan and manage project resources with timelines</p>
         </div>
         <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => setViewMode(viewMode === 'cards' ? 'table' : 'cards')}
           >
@@ -256,7 +325,7 @@ export default function ResourcePlan() {
                 />
               </div>
             </div>
-            
+
             <div>
               <Label htmlFor="type">Resource Type</Label>
               <Select value={filterType} onValueChange={setFilterType}>
@@ -289,8 +358,8 @@ export default function ResourcePlan() {
             </div>
 
             <div className="flex items-end">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setSearchTerm("");
                   setFilterType("all");
@@ -317,7 +386,7 @@ export default function ResourcePlan() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center">
@@ -329,7 +398,7 @@ export default function ResourcePlan() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center">
@@ -341,7 +410,7 @@ export default function ResourcePlan() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center">
@@ -511,7 +580,23 @@ export default function ResourcePlan() {
       )}
 
       {/* Add Resource Plan Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) {
+          // Reset form when dialog closes
+          setFormData({
+            resourceName: "",
+            resourceType: "" as "" | "Manpower" | "Equipment" | "Material",
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date().toISOString().split('T')[0],
+            quantity: "",
+            unit: "",
+            costPerUnit: "",
+            status: "Planned" as "Planned" | "Allocated" | "In Use" | "Completed",
+            remarks: "",
+          });
+        }
+      }}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Add New Resource Plan</DialogTitle>
@@ -519,126 +604,178 @@ export default function ResourcePlan() {
               Plan resources with start and end dates for the project.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="resourceName">Resource Name</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select resource" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Civil Engineer">Civil Engineer</SelectItem>
-                  <SelectItem value="Electrician">Electrician</SelectItem>
-                  <SelectItem value="Mechanical Engineer">Mechanical Engineer</SelectItem>
-                  <SelectItem value="Excavator">Excavator</SelectItem>
-                  <SelectItem value="Crane">Crane</SelectItem>
-                  <SelectItem value="Steel Reinforcement">Steel Reinforcement</SelectItem>
-                  <SelectItem value="Cement">Cement</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="resourceType">Resource Type</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Manpower">Manpower</SelectItem>
-                  <SelectItem value="Equipment">Equipment</SelectItem>
-                  <SelectItem value="Material">Material</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="resourceName">Resource Name *</Label>
+                <Input
+                  id="resourceName"
+                  value={formData.resourceName}
+                  onChange={(e) => setFormData({ ...formData, resourceName: e.target.value })}
+                  placeholder="Enter resource name"
+                  required
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-              />
-            </div>
+              <div>
+                <Label htmlFor="resourceType">Resource Type *</Label>
+                <Select
+                  value={formData.resourceType}
+                  onValueChange={(value: "Manpower" | "Equipment" | "Material") => 
+                    setFormData({ ...formData, resourceType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Manpower">Manpower</SelectItem>
+                    <SelectItem value="Equipment">Equipment</SelectItem>
+                    <SelectItem value="Material">Material</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label htmlFor="endDate">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-              />
-            </div>
+              <div>
+                <Label htmlFor="startDate">Start Date *</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  required
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                placeholder="Enter quantity"
-              />
-            </div>
+              <div>
+                <Label htmlFor="endDate">End Date *</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  min={formData.startDate}
+                  required
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="unit">Unit</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Persons">Persons</SelectItem>
-                  <SelectItem value="Units">Units</SelectItem>
-                  <SelectItem value="Tons">Tons</SelectItem>
-                  <SelectItem value="Cubic Meters">Cubic Meters</SelectItem>
-                  <SelectItem value="Square Meters">Square Meters</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <Label htmlFor="quantity">Quantity *</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={formData.quantity}
+                  onChange={(e) => {
+                    setFormData({ ...formData, quantity: e.target.value });
+                  }}
+                  placeholder="Enter quantity"
+                  required
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="costPerUnit">Cost Per Unit</Label>
-              <Input
-                id="costPerUnit"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-              />
-            </div>
+              <div>
+                <Label htmlFor="unit">Unit *</Label>
+                <Select
+                  value={formData.unit}
+                  onValueChange={(value) => setFormData({ ...formData, unit: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Persons">Persons</SelectItem>
+                    <SelectItem value="Units">Units</SelectItem>
+                    <SelectItem value="Tons">Tons</SelectItem>
+                    <SelectItem value="Cubic Meters">Cubic Meters</SelectItem>
+                    <SelectItem value="Square Meters">Square Meters</SelectItem>
+                    <SelectItem value="Hours">Hours</SelectItem>
+                    <SelectItem value="Days">Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Planned">Planned</SelectItem>
-                  <SelectItem value="Allocated">Allocated</SelectItem>
-                  <SelectItem value="In Use">In Use</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <Label htmlFor="costPerUnit">Cost Per Unit *</Label>
+                <Input
+                  id="costPerUnit"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.costPerUnit}
+                  onChange={(e) => {
+                    setFormData({ ...formData, costPerUnit: e.target.value });
+                  }}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
 
-            <div className="md:col-span-2">
-              <Label htmlFor="remarks">Remarks</Label>
-              <Textarea
-                id="remarks"
-                placeholder="Enter any remarks or notes..."
-                rows={3}
-              />
+              <div>
+                <Label htmlFor="status">Status *</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: "Planned" | "Allocated" | "In Use" | "Completed") => 
+                    setFormData({ ...formData, status: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Planned">Planned</SelectItem>
+                    <SelectItem value="Allocated">Allocated</SelectItem>
+                    <SelectItem value="In Use">In Use</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="remarks">Remarks</Label>
+                <Textarea
+                  id="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  placeholder="Enter any remarks or notes..."
+                  rows={3}
+                />
+              </div>
+
+              {(formData.quantity && formData.costPerUnit) && (
+                <div className="md:col-span-2">
+                  <Label>Total Cost</Label>
+                  <div className="text-lg font-semibold text-green-600">
+                    {formatCurrency(calculateTotalCost())}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(false)}>
-              Add Resource Plan
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={createResourcePlanMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={createResourcePlanMutation.isPending}
+              >
+                {createResourcePlanMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Resource Plan"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -700,10 +837,10 @@ export default function ResourcePlan() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
-                  <p className="text-sm">{new Date(selectedEntry.lastUpdated).toLocaleDateString()}</p>
+                  <p className="text-sm">{new Date(selectedEntry.updatedAt).toLocaleDateString()}</p>
                 </div>
               </div>
-              
+
               <div>
                 <Label className="text-sm font-medium text-gray-500">Remarks</Label>
                 <p className="text-sm mt-1">{selectedEntry.remarks}</p>

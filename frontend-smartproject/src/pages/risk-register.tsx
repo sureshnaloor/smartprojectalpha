@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { useParams } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import { 
   Plus, 
   Search, 
@@ -47,7 +51,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 interface RiskEntry {
-  id: string;
+  id: number;
+  projectId: number;
   dateLogged: string;
   risk: string;
   riskType: 'Risk' | 'Opportunity';
@@ -55,93 +60,44 @@ interface RiskEntry {
   impact: 'High' | 'Moderate' | 'Low';
   userLogged: string;
   actionTaken: string;
-  remarks: string;
+  remarks: string | null;
   status: 'Open' | 'In Progress' | 'Closed';
-  lastUpdated: string;
+  createdAt: string;
+  updatedAt: string;
 }
-
-// Dummy data
-const dummyRiskData: RiskEntry[] = [
-  {
-    id: "1",
-    dateLogged: "2024-01-15",
-    risk: "Delay in material delivery due to supplier issues",
-    riskType: "Risk",
-    probability: "High",
-    impact: "High",
-    userLogged: "John Smith",
-    actionTaken: "Contacted alternative suppliers and expedited shipping",
-    remarks: "Critical path activity affected. Monitoring daily progress.",
-    status: "In Progress",
-    lastUpdated: "2024-01-20"
-  },
-  {
-    id: "2",
-    dateLogged: "2024-01-10",
-    risk: "Opportunity to use new construction technology",
-    riskType: "Opportunity",
-    probability: "Moderate",
-    impact: "High",
-    userLogged: "Sarah Johnson",
-    actionTaken: "Researching technology feasibility and cost-benefit analysis",
-    remarks: "Could reduce construction time by 15% if implemented.",
-    status: "Open",
-    lastUpdated: "2024-01-18"
-  },
-  {
-    id: "3",
-    dateLogged: "2024-01-08",
-    risk: "Weather conditions affecting outdoor work",
-    riskType: "Risk",
-    probability: "Low",
-    impact: "Moderate",
-    userLogged: "Mike Wilson",
-    actionTaken: "Rescheduled outdoor activities and added weather monitoring",
-    remarks: "Contingency plan in place for rain delays.",
-    status: "Closed",
-    lastUpdated: "2024-01-12"
-  },
-  {
-    id: "4",
-    dateLogged: "2024-01-05",
-    risk: "Skilled labor shortage in the region",
-    riskType: "Risk",
-    probability: "High",
-    impact: "High",
-    userLogged: "Lisa Chen",
-    actionTaken: "Started recruitment process and training programs",
-    remarks: "Working with local training institutes to develop skilled workforce.",
-    status: "In Progress",
-    lastUpdated: "2024-01-19"
-  },
-  {
-    id: "5",
-    dateLogged: "2024-01-03",
-    risk: "Opportunity for bulk material purchase discount",
-    riskType: "Opportunity",
-    probability: "Moderate",
-    impact: "Moderate",
-    userLogged: "David Brown",
-    actionTaken: "Negotiating with suppliers for volume discounts",
-    remarks: "Potential 10% cost savings on major materials.",
-    status: "Open",
-    lastUpdated: "2024-01-16"
-  }
-];
 
 export default function RiskRegister() {
   const params = useParams();
   const projectId = params.projectId;
-  
-  const [risks, setRisks] = useState<RiskEntry[]>(dummyRiskData);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: risks = [], isLoading } = useQuery<RiskEntry[]>({
+    queryKey: [`/api/projects/${projectId}/risk-register`],
+  });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterProbability, setFilterProbability] = useState<string>("all");
   const [filterImpact, setFilterImpact] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedRisk, setSelectedRisk] = useState<RiskEntry | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+
+  // Form state for Add/Edit Risk modal
+  const [formData, setFormData] = useState({
+    dateLogged: new Date().toISOString().split('T')[0],
+    risk: "",
+    riskType: "" as "" | "Risk" | "Opportunity",
+    probability: "" as "" | "High" | "Moderate" | "Low",
+    impact: "" as "" | "High" | "Moderate" | "Low",
+    userLogged: "",
+    actionTaken: "",
+    remarks: "",
+    status: "Open" as "Open" | "In Progress" | "Closed",
+  });
 
   // Filter risks based on search and filters
   const filteredRisks = risks.filter(risk => {
@@ -184,6 +140,185 @@ export default function RiskRegister() {
 
   const getRiskTypeColor = (type: string) => {
     return type === 'Risk' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+  };
+
+  // Create risk mutation
+  const createRiskMutation = useMutation({
+    mutationFn: async (data: Omit<RiskEntry, "id" | "projectId" | "createdAt" | "updatedAt">) => {
+      const response = await apiRequest("POST", `/api/projects/${projectId}/risk-register`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/risk-register`] });
+      toast({
+        title: "Success",
+        description: "Risk/Opportunity created successfully",
+      });
+      resetForm();
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create risk/opportunity. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update risk mutation
+  const updateRiskMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Omit<RiskEntry, "id" | "projectId" | "createdAt" | "updatedAt">> }) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/risk-register/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/risk-register`] });
+      toast({
+        title: "Success",
+        description: "Risk/Opportunity updated successfully",
+      });
+      resetForm();
+      setIsEditDialogOpen(false);
+      setSelectedRisk(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update risk/opportunity. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete risk mutation
+  const deleteRiskMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}/risk-register/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/risk-register`] });
+      toast({
+        title: "Success",
+        description: "Risk/Opportunity deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete risk/opportunity. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      dateLogged: new Date().toISOString().split('T')[0],
+      risk: "",
+      riskType: "" as "" | "Risk" | "Opportunity",
+      probability: "" as "" | "High" | "Moderate" | "Low",
+      impact: "" as "" | "High" | "Moderate" | "Low",
+      userLogged: "",
+      actionTaken: "",
+      remarks: "",
+      status: "Open" as "Open" | "In Progress" | "Closed",
+    });
+  };
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.risk.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Risk/Opportunity description is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.riskType) {
+      toast({
+        title: "Validation Error",
+        description: "Type is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.probability) {
+      toast({
+        title: "Validation Error",
+        description: "Probability is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.impact) {
+      toast({
+        title: "Validation Error",
+        description: "Impact is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.userLogged.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "User logged is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.actionTaken.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Action taken is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const riskData = {
+      dateLogged: formData.dateLogged,
+      risk: formData.risk,
+      riskType: formData.riskType,
+      probability: formData.probability,
+      impact: formData.impact,
+      userLogged: formData.userLogged,
+      actionTaken: formData.actionTaken,
+      remarks: formData.remarks || null,
+      status: formData.status,
+    };
+
+    if (selectedRisk) {
+      updateRiskMutation.mutate({ id: selectedRisk.id, data: riskData });
+    } else {
+      createRiskMutation.mutate(riskData);
+    }
+  };
+
+  const handleEdit = (risk: RiskEntry) => {
+    setSelectedRisk(risk);
+    setFormData({
+      dateLogged: risk.dateLogged,
+      risk: risk.risk,
+      riskType: risk.riskType,
+      probability: risk.probability,
+      impact: risk.impact,
+      userLogged: risk.userLogged,
+      actionTaken: risk.actionTaken,
+      remarks: risk.remarks || "",
+      status: risk.status,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this risk/opportunity?")) {
+      deleteRiskMutation.mutate(id);
+    }
   };
 
   return (
@@ -361,88 +496,117 @@ export default function RiskRegister() {
           <CardTitle>Risk Register Entries</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date Logged</TableHead>
-                  <TableHead>Risk/Opportunity</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Probability</TableHead>
-                  <TableHead>Impact</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRisks.map((risk) => (
-                  <TableRow key={risk.id}>
-                    <TableCell className="font-medium">
-                      {new Date(risk.dateLogged).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-xs">
-                        <p className="font-medium truncate">{risk.risk}</p>
-                        <p className="text-sm text-gray-500 truncate">{risk.actionTaken}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getRiskTypeColor(risk.riskType)}>
-                        {risk.riskType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getProbabilityColor(risk.probability)}>
-                        {risk.probability}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getImpactColor(risk.impact)}>
-                        {risk.impact}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <User className="h-4 w-4 mr-1 text-gray-400" />
-                        {risk.userLogged}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(risk.status)}>
-                        {risk.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedRisk(risk);
-                            setIsViewDialogOpen(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date Logged</TableHead>
+                    <TableHead>Risk/Opportunity</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Probability</TableHead>
+                    <TableHead>Impact</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredRisks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        No risks/opportunities found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredRisks.map((risk) => (
+                      <TableRow key={risk.id}>
+                        <TableCell className="font-medium">
+                          {new Date(risk.dateLogged).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-xs">
+                            <p className="font-medium truncate">{risk.risk}</p>
+                            <p className="text-sm text-gray-500 truncate">{risk.actionTaken}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getRiskTypeColor(risk.riskType)}>
+                            {risk.riskType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getProbabilityColor(risk.probability)}>
+                            {risk.probability}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getImpactColor(risk.impact)}>
+                            {risk.impact}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-1 text-gray-400" />
+                            {risk.userLogged}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(risk.status)}>
+                            {risk.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedRisk(risk);
+                                setIsViewDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleEdit(risk)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDelete(risk.id)}
+                              disabled={deleteRiskMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Add Risk Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) {
+          resetForm();
+          setSelectedRisk(null);
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Risk/Opportunity</DialogTitle>
@@ -450,114 +614,340 @@ export default function RiskRegister() {
               Log a new risk or opportunity for the project.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="dateLogged">Date Logged</Label>
-              <Input
-                id="dateLogged"
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="riskType">Type</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Risk">Risk</SelectItem>
-                  <SelectItem value="Opportunity">Opportunity</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="dateLogged">Date Logged *</Label>
+                <Input
+                  id="dateLogged"
+                  type="date"
+                  value={formData.dateLogged}
+                  onChange={(e) => setFormData({ ...formData, dateLogged: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="riskType">Type *</Label>
+                <Select
+                  value={formData.riskType}
+                  onValueChange={(value: "Risk" | "Opportunity") => 
+                    setFormData({ ...formData, riskType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Risk">Risk</SelectItem>
+                    <SelectItem value="Opportunity">Opportunity</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="md:col-span-2">
-              <Label htmlFor="risk">Risk/Opportunity Description</Label>
-              <Textarea
-                id="risk"
-                placeholder="Describe the risk or opportunity..."
-                rows={3}
-              />
-            </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="risk">Risk/Opportunity Description *</Label>
+                <Textarea
+                  id="risk"
+                  value={formData.risk}
+                  onChange={(e) => setFormData({ ...formData, risk: e.target.value })}
+                  placeholder="Describe the risk or opportunity..."
+                  rows={3}
+                  required
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="probability">Probability</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select probability" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Moderate">Moderate</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <Label htmlFor="probability">Probability *</Label>
+                <Select
+                  value={formData.probability}
+                  onValueChange={(value: "High" | "Moderate" | "Low") => 
+                    setFormData({ ...formData, probability: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select probability" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Moderate">Moderate</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label htmlFor="impact">Impact</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select impact" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Moderate">Moderate</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <Label htmlFor="impact">Impact *</Label>
+                <Select
+                  value={formData.impact}
+                  onValueChange={(value: "High" | "Moderate" | "Low") => 
+                    setFormData({ ...formData, impact: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select impact" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Moderate">Moderate</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label htmlFor="userLogged">User Logged</Label>
-              <Input
-                id="userLogged"
-                placeholder="Enter user name"
-              />
-            </div>
+              <div>
+                <Label htmlFor="userLogged">User Logged *</Label>
+                <Input
+                  id="userLogged"
+                  value={formData.userLogged}
+                  onChange={(e) => setFormData({ ...formData, userLogged: e.target.value })}
+                  placeholder="Enter user name"
+                  required
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Open">Open</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div>
+                <Label htmlFor="status">Status *</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: "Open" | "In Progress" | "Closed") => 
+                    setFormData({ ...formData, status: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Open">Open</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="md:col-span-2">
-              <Label htmlFor="actionTaken">Action Taken</Label>
-              <Textarea
-                id="actionTaken"
-                placeholder="Describe actions taken or planned..."
-                rows={3}
-              />
-            </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="actionTaken">Action Taken *</Label>
+                <Textarea
+                  id="actionTaken"
+                  value={formData.actionTaken}
+                  onChange={(e) => setFormData({ ...formData, actionTaken: e.target.value })}
+                  placeholder="Describe actions taken or planned..."
+                  rows={3}
+                  required
+                />
+              </div>
 
-            <div className="md:col-span-2">
-              <Label htmlFor="remarks">Remarks</Label>
-              <Textarea
-                id="remarks"
-                placeholder="Additional remarks or notes..."
-                rows={3}
-              />
+              <div className="md:col-span-2">
+                <Label htmlFor="remarks">Remarks</Label>
+                <Textarea
+                  id="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  placeholder="Additional remarks or notes..."
+                  rows={3}
+                />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(false)}>
-              Add Risk/Opportunity
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={createRiskMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={createRiskMutation.isPending}
+              >
+                {createRiskMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Risk/Opportunity"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Risk Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          resetForm();
+          setSelectedRisk(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Risk/Opportunity</DialogTitle>
+            <DialogDescription>
+              Update risk or opportunity information.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-dateLogged">Date Logged *</Label>
+                <Input
+                  id="edit-dateLogged"
+                  type="date"
+                  value={formData.dateLogged}
+                  onChange={(e) => setFormData({ ...formData, dateLogged: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-riskType">Type *</Label>
+                <Select
+                  value={formData.riskType}
+                  onValueChange={(value: "Risk" | "Opportunity") => 
+                    setFormData({ ...formData, riskType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Risk">Risk</SelectItem>
+                    <SelectItem value="Opportunity">Opportunity</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-risk">Risk/Opportunity Description *</Label>
+                <Textarea
+                  id="edit-risk"
+                  value={formData.risk}
+                  onChange={(e) => setFormData({ ...formData, risk: e.target.value })}
+                  placeholder="Describe the risk or opportunity..."
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-probability">Probability *</Label>
+                <Select
+                  value={formData.probability}
+                  onValueChange={(value: "High" | "Moderate" | "Low") => 
+                    setFormData({ ...formData, probability: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select probability" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Moderate">Moderate</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-impact">Impact *</Label>
+                <Select
+                  value={formData.impact}
+                  onValueChange={(value: "High" | "Moderate" | "Low") => 
+                    setFormData({ ...formData, impact: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select impact" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Moderate">Moderate</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-userLogged">User Logged *</Label>
+                <Input
+                  id="edit-userLogged"
+                  value={formData.userLogged}
+                  onChange={(e) => setFormData({ ...formData, userLogged: e.target.value })}
+                  placeholder="Enter user name"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-status">Status *</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: "Open" | "In Progress" | "Closed") => 
+                    setFormData({ ...formData, status: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Open">Open</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-actionTaken">Action Taken *</Label>
+                <Textarea
+                  id="edit-actionTaken"
+                  value={formData.actionTaken}
+                  onChange={(e) => setFormData({ ...formData, actionTaken: e.target.value })}
+                  placeholder="Describe actions taken or planned..."
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-remarks">Remarks</Label>
+                <Textarea
+                  id="edit-remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  placeholder="Additional remarks or notes..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={updateRiskMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={updateRiskMutation.isPending}
+              >
+                {updateRiskMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Risk/Opportunity"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -607,7 +997,7 @@ export default function RiskRegister() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
-                  <p className="text-sm">{new Date(selectedRisk.lastUpdated).toLocaleDateString()}</p>
+                  <p className="text-sm">{new Date(selectedRisk.updatedAt).toLocaleDateString()}</p>
                 </div>
               </div>
               
@@ -631,7 +1021,12 @@ export default function RiskRegister() {
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
-            <Button>
+            <Button onClick={() => {
+              if (selectedRisk) {
+                handleEdit(selectedRisk);
+                setIsViewDialogOpen(false);
+              }
+            }}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>

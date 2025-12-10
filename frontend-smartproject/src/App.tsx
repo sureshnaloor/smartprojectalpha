@@ -2,8 +2,10 @@ import { Switch, Route, useRoute } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/contexts/auth-context";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import WbsStructure from "@/pages/wbs-structure";
 import Schedule from "@/pages/schedule";
@@ -42,6 +44,7 @@ import ProjectEquipmentCatalogue from "@/pages/project-equipment-catalogue";
 function Router() {
   return (
     <Switch>
+      <Route path="/login" component={Login} />
       <Route path="/" component={Home} />
 
       {/* Project Dashboard */}
@@ -313,8 +316,10 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router />
-      <Toaster />
+      <AuthProvider>
+        <Router />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

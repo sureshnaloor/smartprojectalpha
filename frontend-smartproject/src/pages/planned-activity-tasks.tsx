@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import { 
   Plus, 
   Search, 
@@ -50,7 +54,8 @@ import {
 } from "@/components/ui/table";
 
 interface Task {
-  id: string;
+  id: number;
+  activityId: number;
   name: string;
   status: 'not_started' | 'in_progress' | 'completed' | 'on_hold';
   priority: 'low' | 'medium' | 'high' | 'critical';
@@ -58,11 +63,14 @@ interface Task {
   startDate: string;
   endDate: string;
   progress: number;
-  remarks: string;
+  remarks: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Activity {
-  id: string;
+  id: number;
+  projectId: number;
   name: string;
   category: 'backlog' | 'planned' | 'advanced';
   status: 'not_started' | 'in_progress' | 'completed' | 'on_hold';
@@ -71,243 +79,68 @@ interface Activity {
   endDate: string;
   progress: number;
   assignedTo: string;
-  remarks: string;
+  remarks: string | null;
   tasks: Task[];
   isExpanded?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// Dummy data for the next 2 weeks
-const dummyPlannedData: Activity[] = [
-  {
-    id: "act-1",
-    name: "Foundation Excavation",
-    category: "backlog",
-    status: "not_started",
-    priority: "high",
-    startDate: "2024-01-10",
-    endDate: "2024-01-15",
-    progress: 0,
-    assignedTo: "Civil Team",
-    remarks: "Overdue by 5 days due to weather conditions",
-    tasks: [
-      {
-        id: "task-1-1",
-        name: "Site Survey and Marking",
-        status: "not_started",
-        priority: "high",
-        assignedTo: "John Smith",
-        startDate: "2024-01-10",
-        endDate: "2024-01-11",
-        progress: 0,
-        remarks: "Pending site access approval"
-      },
-      {
-        id: "task-1-2",
-        name: "Excavation Work",
-        status: "not_started",
-        priority: "high",
-        assignedTo: "Mike Wilson",
-        startDate: "2024-01-12",
-        endDate: "2024-01-15",
-        progress: 0,
-        remarks: "Requires heavy machinery"
-      }
-    ]
-  },
-  {
-    id: "act-2",
-    name: "Electrical Conduit Installation",
-    category: "backlog",
-    status: "in_progress",
-    priority: "medium",
-    startDate: "2024-01-08",
-    endDate: "2024-01-14",
-    progress: 30,
-    assignedTo: "Electrical Team",
-    remarks: "Started late due to material delays",
-    tasks: [
-      {
-        id: "task-2-1",
-        name: "Conduit Routing Design",
-        status: "completed",
-        priority: "medium",
-        assignedTo: "Sarah Johnson",
-        startDate: "2024-01-08",
-        endDate: "2024-01-09",
-        progress: 100,
-        remarks: "Design approved by client"
-      },
-      {
-        id: "task-2-2",
-        name: "Conduit Installation",
-        status: "in_progress",
-        priority: "medium",
-        assignedTo: "David Brown",
-        startDate: "2024-01-10",
-        endDate: "2024-01-14",
-        progress: 40,
-        remarks: "60% of conduits installed"
-      }
-    ]
-  },
-  {
-    id: "act-3",
-    name: "Mechanical Equipment Installation",
-    category: "planned",
-    status: "not_started",
-    priority: "high",
-    startDate: "2024-01-16",
-    endDate: "2024-01-22",
-    progress: 0,
-    assignedTo: "Mechanical Team",
-    remarks: "Scheduled as per original plan",
-    tasks: [
-      {
-        id: "task-3-1",
-        name: "Equipment Delivery",
-        status: "not_started",
-        priority: "high",
-        assignedTo: "Lisa Chen",
-        startDate: "2024-01-16",
-        endDate: "2024-01-17",
-        progress: 0,
-        remarks: "Equipment arriving on 16th"
-      },
-      {
-        id: "task-3-2",
-        name: "Installation and Testing",
-        status: "not_started",
-        priority: "high",
-        assignedTo: "Robert Davis",
-        startDate: "2024-01-18",
-        endDate: "2024-01-22",
-        progress: 0,
-        remarks: "Requires crane support"
-      }
-    ]
-  },
-  {
-    id: "act-4",
-    name: "HVAC Ductwork Installation",
-    category: "planned",
-    status: "not_started",
-    priority: "medium",
-    startDate: "2024-01-18",
-    endDate: "2024-01-25",
-    progress: 0,
-    assignedTo: "HVAC Team",
-    remarks: "Dependent on mechanical equipment installation",
-    tasks: [
-      {
-        id: "task-4-1",
-        name: "Ductwork Fabrication",
-        status: "not_started",
-        priority: "medium",
-        assignedTo: "Tom Anderson",
-        startDate: "2024-01-18",
-        endDate: "2024-01-20",
-        progress: 0,
-        remarks: "Fabrication in progress off-site"
-      },
-      {
-        id: "task-4-2",
-        name: "Ductwork Installation",
-        status: "not_started",
-        priority: "medium",
-        assignedTo: "Emma Wilson",
-        startDate: "2024-01-21",
-        endDate: "2024-01-25",
-        progress: 0,
-        remarks: "Will start after mechanical installation"
-      }
-    ]
-  },
-  {
-    id: "act-5",
-    name: "Instrumentation Calibration",
-    category: "advanced",
-    status: "not_started",
-    priority: "low",
-    startDate: "2024-01-20",
-    endDate: "2024-01-26",
-    progress: 0,
-    assignedTo: "Instrumentation Team",
-    remarks: "Advanced due to early completion of electrical work",
-    tasks: [
-      {
-        id: "task-5-1",
-        name: "Calibration Equipment Setup",
-        status: "not_started",
-        priority: "low",
-        assignedTo: "Alex Turner",
-        startDate: "2024-01-20",
-        endDate: "2024-01-22",
-        progress: 0,
-        remarks: "Equipment available early"
-      },
-      {
-        id: "task-5-2",
-        name: "Instrument Calibration",
-        status: "not_started",
-        priority: "low",
-        assignedTo: "Maria Garcia",
-        startDate: "2024-01-23",
-        endDate: "2024-01-26",
-        progress: 0,
-        remarks: "Can start early due to available resources"
-      }
-    ]
-  },
-  {
-    id: "act-6",
-    name: "Quality Control Testing",
-    category: "advanced",
-    status: "not_started",
-    priority: "medium",
-    startDate: "2024-01-22",
-    endDate: "2024-01-28",
-    progress: 0,
-    assignedTo: "Quality Team",
-    remarks: "Advanced due to early completion of mechanical work",
-    tasks: [
-      {
-        id: "task-6-1",
-        name: "Test Plan Preparation",
-        status: "not_started",
-        priority: "medium",
-        assignedTo: "Quality Manager",
-        startDate: "2024-01-22",
-        endDate: "2024-01-23",
-        progress: 0,
-        remarks: "Test procedures ready"
-      },
-      {
-        id: "task-6-2",
-        name: "System Testing",
-        status: "not_started",
-        priority: "medium",
-        assignedTo: "Test Engineers",
-        startDate: "2024-01-24",
-        endDate: "2024-01-28",
-        progress: 0,
-        remarks: "Will start after equipment installation"
-      }
-    ]
-  }
-];
+// Helper function to get 2-week rolling window dates
+const getTwoWeekWindow = () => {
+  const today = new Date();
+  const twoWeeksLater = new Date(today);
+  twoWeeksLater.setDate(today.getDate() + 14);
+  return {
+    startDate: today.toISOString().split('T')[0],
+    endDate: twoWeeksLater.toISOString().split('T')[0],
+  };
+};
 
 export default function PlannedActivityTasks() {
   const params = useParams();
   const projectId = params.projectId;
-  
-  const [activities, setActivities] = useState<Activity[]>(dummyPlannedData);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Calculate 2-week rolling window
+  const { startDate, endDate } = getTwoWeekWindow();
+
+  // Fetch activities with 2-week window
+  const { data: activitiesData = [], isLoading: activitiesLoading } = useQuery<Activity[]>({
+    queryKey: [`/api/projects/${projectId}/planned-activities`, startDate, endDate],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/projects/${projectId}/planned-activities?startDate=${startDate}&endDate=${endDate}`);
+      return response.json();
+    },
+  });
+
+  const [activities, setActivities] = useState<Activity[]>(activitiesData);
+  useEffect(() => {
+    setActivities(activitiesData.map(a => ({ ...a, isExpanded: false })));
+  }, [activitiesData]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+
+  // Form state for activity
+  const [activityFormData, setActivityFormData] = useState({
+    name: "",
+    category: "planned" as 'backlog' | 'planned' | 'advanced',
+    status: "not_started" as 'not_started' | 'in_progress' | 'completed' | 'on_hold',
+    priority: "medium" as 'low' | 'medium' | 'high' | 'critical',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    progress: 0,
+    assignedTo: "",
+    remarks: "",
+  });
 
   // Filter activities based on search and filters
   const filteredActivities = activities.filter(activity => {
@@ -358,7 +191,222 @@ export default function PlannedActivityTasks() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const toggleActivityExpansion = (activityId: string) => {
+  // Mutations
+  const createActivityMutation = useMutation({
+    mutationFn: async (data: Omit<Activity, "id" | "projectId" | "tasks" | "isExpanded" | "createdAt" | "updatedAt">) => {
+      const response = await apiRequest("POST", `/api/projects/${projectId}/planned-activities`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/planned-activities`] });
+      toast({
+        title: "Success",
+        description: "Activity created successfully",
+      });
+      resetActivityForm();
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create activity. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateActivityMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Omit<Activity, "id" | "projectId" | "tasks" | "isExpanded" | "createdAt" | "updatedAt">> }) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/planned-activities/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/planned-activities`] });
+      toast({
+        title: "Success",
+        description: "Activity updated successfully",
+      });
+      resetActivityForm();
+      setIsEditDialogOpen(false);
+      setSelectedActivity(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update activity. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}/planned-activities/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/planned-activities`] });
+      toast({
+        title: "Success",
+        description: "Activity deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete activity. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async ({ activityId, data }: { activityId: number; data: {
+      name: string;
+      status: 'not_started' | 'in_progress' | 'completed' | 'on_hold';
+      priority: 'low' | 'medium' | 'high' | 'critical';
+      assignedTo: string;
+      startDate: string;
+      endDate: string;
+      progress: number;
+      remarks: string | null;
+    } }) => {
+      const response = await apiRequest("POST", `/api/projects/${projectId}/planned-activities/${activityId}/tasks`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/planned-activities`] });
+      toast({
+        title: "Success",
+        description: "Task created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create task. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ activityId, id, data }: { activityId: number; id: number; data: Partial<{
+      name: string;
+      status: 'not_started' | 'in_progress' | 'completed' | 'on_hold';
+      priority: 'low' | 'medium' | 'high' | 'critical';
+      assignedTo: string;
+      startDate: string;
+      endDate: string;
+      progress: number;
+      remarks: string | null;
+    }> }) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/planned-activities/${activityId}/tasks/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/planned-activities`] });
+      toast({
+        title: "Success",
+        description: "Task updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update task. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async ({ activityId, id }: { activityId: number; id: number }) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}/planned-activities/${activityId}/tasks/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/planned-activities`] });
+      toast({
+        title: "Success",
+        description: "Task deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete task. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetActivityForm = () => {
+    setActivityFormData({
+      name: "",
+      category: "planned",
+      status: "not_started",
+      priority: "medium",
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      progress: 0,
+      assignedTo: "",
+      remarks: "",
+    });
+  };
+
+  const handleActivitySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!activityFormData.name.trim() || !activityFormData.assignedTo.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Name and Assigned To are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const activityData = {
+      name: activityFormData.name,
+      category: activityFormData.category,
+      status: activityFormData.status,
+      priority: activityFormData.priority,
+      startDate: activityFormData.startDate,
+      endDate: activityFormData.endDate,
+      progress: activityFormData.progress,
+      assignedTo: activityFormData.assignedTo,
+      remarks: activityFormData.remarks || null,
+    };
+
+    if (selectedActivity) {
+      updateActivityMutation.mutate({ id: selectedActivity.id, data: activityData });
+    } else {
+      createActivityMutation.mutate(activityData);
+    }
+  };
+
+  const handleEditActivity = (activity: Activity) => {
+    setSelectedActivity(activity);
+    setActivityFormData({
+      name: activity.name,
+      category: activity.category,
+      status: activity.status,
+      priority: activity.priority,
+      startDate: activity.startDate,
+      endDate: activity.endDate,
+      progress: activity.progress,
+      assignedTo: activity.assignedTo,
+      remarks: activity.remarks || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteActivity = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this activity? All associated tasks will also be deleted.")) {
+      deleteActivityMutation.mutate(id);
+    }
+  };
+
+  const toggleActivityExpansion = (activityId: number) => {
     setActivities(prev => prev.map(activity => 
       activity.id === activityId 
         ? { ...activity, isExpanded: !activity.isExpanded }
@@ -404,28 +452,22 @@ export default function PlannedActivityTasks() {
         </div>
       </div>
 
-      {/* Placeholder content */}
-      <Card>
-        <CardContent className="p-8 text-center">
-          <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Planned Activity/Tasks</h3>
-          <p className="text-gray-600">This page will show activities planned for the next 2 weeks with three categories:</p>
-          <div className="mt-4 space-y-2 text-sm text-gray-600">
-            <div className="flex items-center justify-center space-x-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <span>Backlog Activities (overdue)</span>
-            </div>
-            <div className="flex items-center justify-center space-x-2">
-              <Target className="h-4 w-4 text-blue-500" />
-              <span>Planned Activities (on schedule)</span>
-            </div>
-            <div className="flex items-center justify-center space-x-2">
-              <TrendingUp className="h-4 w-4 text-green-500" />
-              <span>Advanced Activities (ahead of schedule)</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {activitiesLoading ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto" />
+            <p className="text-gray-600 mt-4">Loading activities...</p>
+          </CardContent>
+        </Card>
+      ) : filteredActivities.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Activities Found</h3>
+            <p className="text-gray-600">No activities found for the next 2 weeks. Click "Add Activity" to create one.</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Filters */}
       <Card className="mb-6">
@@ -651,8 +693,22 @@ export default function PlannedActivityTasks() {
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEditActivity(activity)}
+                            >
                               <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleDeleteActivity(activity.id)}
+                              disabled={deleteActivityMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </TableCell>
@@ -791,8 +847,22 @@ export default function PlannedActivityTasks() {
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEditActivity(activity)}
+                            >
                               <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleDeleteActivity(activity.id)}
+                              disabled={deleteActivityMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </TableCell>
@@ -931,8 +1001,22 @@ export default function PlannedActivityTasks() {
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEditActivity(activity)}
+                            >
                               <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleDeleteActivity(activity.id)}
+                              disabled={deleteActivityMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </TableCell>
@@ -987,6 +1071,346 @@ export default function PlannedActivityTasks() {
           </Card>
         )}
       </div>
+
+      {/* Add Activity Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) {
+          resetActivityForm();
+          setSelectedActivity(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Activity</DialogTitle>
+            <DialogDescription>
+              Create a new activity for the next 2 weeks planning window.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleActivitySubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="name">Activity Name *</Label>
+                <Input
+                  id="name"
+                  value={activityFormData.name}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, name: e.target.value })}
+                  placeholder="Enter activity name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="category">Category *</Label>
+                <Select
+                  value={activityFormData.category}
+                  onValueChange={(value: 'backlog' | 'planned' | 'advanced') => 
+                    setActivityFormData({ ...activityFormData, category: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="planned">Planned</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="status">Status *</Label>
+                <Select
+                  value={activityFormData.status}
+                  onValueChange={(value: 'not_started' | 'in_progress' | 'completed' | 'on_hold') => 
+                    setActivityFormData({ ...activityFormData, status: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not Started</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="priority">Priority *</Label>
+                <Select
+                  value={activityFormData.priority}
+                  onValueChange={(value: 'low' | 'medium' | 'high' | 'critical') => 
+                    setActivityFormData({ ...activityFormData, priority: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="startDate">Start Date *</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={activityFormData.startDate}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, startDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="endDate">End Date *</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={activityFormData.endDate}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, endDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="progress">Progress (%)</Label>
+                <Input
+                  id="progress"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={activityFormData.progress}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, progress: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="assignedTo">Assigned To *</Label>
+                <Input
+                  id="assignedTo"
+                  value={activityFormData.assignedTo}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, assignedTo: e.target.value })}
+                  placeholder="Enter assignee name"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="remarks">Remarks</Label>
+                <Textarea
+                  id="remarks"
+                  value={activityFormData.remarks}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, remarks: e.target.value })}
+                  placeholder="Enter any remarks or notes..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={createActivityMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={createActivityMutation.isPending}
+              >
+                {createActivityMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Activity"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Activity Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          resetActivityForm();
+          setSelectedActivity(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Activity</DialogTitle>
+            <DialogDescription>
+              Update activity details.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleActivitySubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-name">Activity Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={activityFormData.name}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, name: e.target.value })}
+                  placeholder="Enter activity name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-category">Category *</Label>
+                <Select
+                  value={activityFormData.category}
+                  onValueChange={(value: 'backlog' | 'planned' | 'advanced') => 
+                    setActivityFormData({ ...activityFormData, category: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="planned">Planned</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-status">Status *</Label>
+                <Select
+                  value={activityFormData.status}
+                  onValueChange={(value: 'not_started' | 'in_progress' | 'completed' | 'on_hold') => 
+                    setActivityFormData({ ...activityFormData, status: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not Started</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-priority">Priority *</Label>
+                <Select
+                  value={activityFormData.priority}
+                  onValueChange={(value: 'low' | 'medium' | 'high' | 'critical') => 
+                    setActivityFormData({ ...activityFormData, priority: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-startDate">Start Date *</Label>
+                <Input
+                  id="edit-startDate"
+                  type="date"
+                  value={activityFormData.startDate}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, startDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-endDate">End Date *</Label>
+                <Input
+                  id="edit-endDate"
+                  type="date"
+                  value={activityFormData.endDate}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, endDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-progress">Progress (%)</Label>
+                <Input
+                  id="edit-progress"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={activityFormData.progress}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, progress: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-assignedTo">Assigned To *</Label>
+                <Input
+                  id="edit-assignedTo"
+                  value={activityFormData.assignedTo}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, assignedTo: e.target.value })}
+                  placeholder="Enter assignee name"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-remarks">Remarks</Label>
+                <Textarea
+                  id="edit-remarks"
+                  value={activityFormData.remarks}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, remarks: e.target.value })}
+                  placeholder="Enter any remarks or notes..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={updateActivityMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={updateActivityMutation.isPending}
+              >
+                {updateActivityMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Activity"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

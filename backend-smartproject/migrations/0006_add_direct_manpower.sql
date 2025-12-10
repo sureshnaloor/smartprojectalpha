@@ -27,3 +27,5 @@ CREATE TABLE IF NOT EXISTS "direct_manpower_entries" (
 ALTER TABLE "direct_manpower_positions" ADD CONSTRAINT "direct_manpower_positions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "direct_manpower_entries" ADD CONSTRAINT "direct_manpower_entries_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE cascade ON UPDATE no action;
 
+
+

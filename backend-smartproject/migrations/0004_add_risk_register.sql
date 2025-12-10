@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS "risk_register" (
 -- Add foreign key constraints
 ALTER TABLE "risk_register" ADD CONSTRAINT "risk_register_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE cascade ON UPDATE no action;
 
+
+

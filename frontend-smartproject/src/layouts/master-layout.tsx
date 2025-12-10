@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { SideNavigation } from "@/components/project/side-navigation";
 import { useMobile } from "@/hooks/use-mobile";
 import { Toaster } from "sonner";
+import { UserProfile } from "@/components/user-profile";
 
 interface MasterLayoutProps {
   children: React.ReactNode;
@@ -49,10 +50,7 @@ export default function MasterLayout({ children }: MasterLayoutProps) {
               </button>
               <div className="relative">
                 <button className="flex items-center focus:outline-none">
-                  <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white">
-                    <span className="text-sm">JD</span>
-                  </div>
-                  <span className="ml-2 text-sm font-medium hidden md:block">John Doe</span>
+                  <UserProfile />
                 </button>
               </div>
             </div>

@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import { 
   Plus, 
   Search, 
@@ -64,175 +68,254 @@ import {
 } from "@/components/ui/popover";
 
 interface IndirectManpowerPosition {
-  id: string;
+  id: number;
+  projectId: number;
+  positionId: string;
   name: string;
   order: number;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface IndirectManpowerEntry {
-  id: string;
+  id: number;
+  projectId: number;
   date: string;
   positions: { [positionId: string]: number }; // Percentage values (0-100)
   totalOverhead: number;
-  remarks: string;
+  remarks: string | null;
   createdBy: string;
   createdAt: string;
-  lastUpdated: string;
+  updatedAt: string;
 }
 
-// Available indirect positions
-const availableIndirectPositions: IndirectManpowerPosition[] = [
-  { id: "project_manager", name: "Project Manager", order: 1, isActive: true },
-  { id: "project_engineer", name: "Project Engineer", order: 2, isActive: true },
-  { id: "planner", name: "Planner", order: 3, isActive: true },
-  { id: "admin_staff", name: "Admin Staff", order: 4, isActive: true },
-  { id: "purchasing_engineer", name: "Purchasing Engineer", order: 5, isActive: true },
-  { id: "supply_chain_staff", name: "Supply Chain Staff", order: 6, isActive: true },
-  { id: "hr_staff", name: "HR Staff", order: 7, isActive: true },
-  { id: "it_staff", name: "IT Staff", order: 8, isActive: true },
-  { id: "portfolio_manager", name: "Portfolio Manager", order: 9, isActive: true },
-  { id: "quality_manager", name: "Quality Manager", order: 10, isActive: true },
-  { id: "safety_manager", name: "Safety Manager", order: 11, isActive: true },
-  { id: "finance_staff", name: "Finance Staff", order: 12, isActive: true },
-  { id: "legal_staff", name: "Legal Staff", order: 13, isActive: false },
-  { id: "marketing_staff", name: "Marketing Staff", order: 14, isActive: false },
-  { id: "business_analyst", name: "Business Analyst", order: 15, isActive: false },
-  { id: "contract_manager", name: "Contract Manager", order: 16, isActive: false },
-];
-
-// Dummy data with percentage values
-const dummyIndirectManpowerData: IndirectManpowerEntry[] = [
-  {
-    id: "1",
-    date: "2024-01-15",
-    positions: {
-      "project_manager": 25,
-      "project_engineer": 30,
-      "planner": 20,
-      "admin_staff": 15,
-      "purchasing_engineer": 10,
-      "supply_chain_staff": 8,
-      "hr_staff": 5,
-      "it_staff": 3,
-      "portfolio_manager": 15,
-      "quality_manager": 12,
-      "safety_manager": 8,
-      "finance_staff": 10
-    },
-    totalOverhead: 161,
-    remarks: "Initial project setup phase, high overhead allocation for planning and management",
-    createdBy: "John Smith",
-    createdAt: "2024-01-14",
-    lastUpdated: "2024-01-15"
-  },
-  {
-    id: "2",
-    date: "2024-01-16",
-    positions: {
-      "project_manager": 20,
-      "project_engineer": 35,
-      "planner": 25,
-      "admin_staff": 12,
-      "purchasing_engineer": 15,
-      "supply_chain_staff": 12,
-      "hr_staff": 4,
-      "it_staff": 3,
-      "portfolio_manager": 10,
-      "quality_manager": 15,
-      "safety_manager": 10,
-      "finance_staff": 8
-    },
-    totalOverhead: 169,
-    remarks: "Construction phase begins, increased engineering and planning overhead",
-    createdBy: "Sarah Johnson",
-    createdAt: "2024-01-15",
-    lastUpdated: "2024-01-16"
-  },
-  {
-    id: "3",
-    date: "2024-01-17",
-    positions: {
-      "project_manager": 18,
-      "project_engineer": 40,
-      "planner": 30,
-      "admin_staff": 10,
-      "purchasing_engineer": 18,
-      "supply_chain_staff": 15,
-      "hr_staff": 3,
-      "it_staff": 2,
-      "portfolio_manager": 8,
-      "quality_manager": 18,
-      "safety_manager": 12,
-      "finance_staff": 6
-    },
-    totalOverhead: 180,
-    remarks: "Peak construction activity, maximum overhead allocation",
-    createdBy: "Mike Wilson",
-    createdAt: "2024-01-16",
-    lastUpdated: "2024-01-17"
-  },
-  {
-    id: "4",
-    date: "2024-01-18",
-    positions: {
-      "project_manager": 15,
-      "project_engineer": 35,
-      "planner": 25,
-      "admin_staff": 8,
-      "purchasing_engineer": 12,
-      "supply_chain_staff": 10,
-      "hr_staff": 3,
-      "it_staff": 2,
-      "portfolio_manager": 6,
-      "quality_manager": 20,
-      "safety_manager": 15,
-      "finance_staff": 5
-    },
-    totalOverhead: 151,
-    remarks: "Quality and safety focus, reduced management overhead",
-    createdBy: "Lisa Chen",
-    createdAt: "2024-01-17",
-    lastUpdated: "2024-01-18"
-  },
-  {
-    id: "5",
-    date: "2024-01-19",
-    positions: {
-      "project_manager": 12,
-      "project_engineer": 30,
-      "planner": 20,
-      "admin_staff": 6,
-      "purchasing_engineer": 8,
-      "supply_chain_staff": 6,
-      "hr_staff": 2,
-      "it_staff": 2,
-      "portfolio_manager": 5,
-      "quality_manager": 25,
-      "safety_manager": 20,
-      "finance_staff": 4
-    },
-    totalOverhead: 140,
-    remarks: "Final phase, reduced overhead as project nears completion",
-    createdBy: "David Brown",
-    createdAt: "2024-01-18",
-    lastUpdated: "2024-01-19"
-  }
+// Default positions to initialize if none exist
+const defaultIndirectPositions = [
+  { positionId: "project_manager", name: "Project Manager", order: 1, isActive: true },
+  { positionId: "project_engineer", name: "Project Engineer", order: 2, isActive: true },
+  { positionId: "planner", name: "Planner", order: 3, isActive: true },
+  { positionId: "admin_staff", name: "Admin Staff", order: 4, isActive: true },
+  { positionId: "purchasing_engineer", name: "Purchasing Engineer", order: 5, isActive: true },
+  { positionId: "supply_chain_staff", name: "Supply Chain Staff", order: 6, isActive: true },
+  { positionId: "hr_staff", name: "HR Staff", order: 7, isActive: true },
+  { positionId: "it_staff", name: "IT Staff", order: 8, isActive: true },
+  { positionId: "portfolio_manager", name: "Portfolio Manager", order: 9, isActive: true },
+  { positionId: "quality_manager", name: "Quality Manager", order: 10, isActive: true },
+  { positionId: "safety_manager", name: "Safety Manager", order: 11, isActive: true },
+  { positionId: "finance_staff", name: "Finance Staff", order: 12, isActive: true },
+  { positionId: "legal_staff", name: "Legal Staff", order: 13, isActive: false },
+  { positionId: "marketing_staff", name: "Marketing Staff", order: 14, isActive: false },
+  { positionId: "business_analyst", name: "Business Analyst", order: 15, isActive: false },
+  { positionId: "contract_manager", name: "Contract Manager", order: 16, isActive: false },
 ];
 
 export default function IndirectManpowerList() {
   const params = useParams();
   const projectId = params.projectId;
-  
-  const [indirectManpowerEntries, setIndirectManpowerEntries] = useState<IndirectManpowerEntry[]>(dummyIndirectManpowerData);
-  const [positions, setPositions] = useState<IndirectManpowerPosition[]>(availableIndirectPositions);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch positions
+  const { data: positionsData = [], isLoading: positionsLoading } = useQuery<IndirectManpowerPosition[]>({
+    queryKey: [`/api/projects/${projectId}/indirect-manpower-positions`],
+  });
+
+  // Fetch entries
+  const { data: indirectManpowerEntries = [], isLoading: entriesLoading } = useQuery<IndirectManpowerEntry[]>({
+    queryKey: [`/api/projects/${projectId}/indirect-manpower-entries`],
+  });
+
+  const [positions, setPositions] = useState<IndirectManpowerPosition[]>(positionsData);
+  useEffect(() => {
+    setPositions(positionsData);
+  }, [positionsData]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<IndirectManpowerEntry | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    createdBy: "",
+    remarks: "",
+    positions: {} as { [positionId: string]: number },
+  });
+
+  // Mutations
+  const updatePositionsMutation = useMutation({
+    mutationFn: async (positionsData: Omit<IndirectManpowerPosition, "id" | "projectId" | "createdAt" | "updatedAt">[]) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/indirect-manpower-positions`, positionsData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/indirect-manpower-positions`] });
+      toast({
+        title: "Success",
+        description: "Position settings saved successfully",
+      });
+      setIsColumnSettingsOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save position settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Initialize positions if empty (after mutation is defined)
+  useEffect(() => {
+    if (!positionsLoading && positionsData.length === 0 && projectId) {
+      const initPositions = defaultIndirectPositions.map(p => ({
+        ...p,
+        projectId: parseInt(projectId),
+      }));
+      updatePositionsMutation.mutate(initPositions);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionsData.length, positionsLoading, projectId]);
+
+  // Entry Mutations
+  const createEntryMutation = useMutation({
+    mutationFn: async (data: Omit<IndirectManpowerEntry, "id" | "projectId" | "createdAt" | "updatedAt">) => {
+      const response = await apiRequest("POST", `/api/projects/${projectId}/indirect-manpower-entries`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/indirect-manpower-entries`] });
+      toast({
+        title: "Success",
+        description: "Overhead entry created successfully",
+      });
+      resetForm();
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create overhead entry. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEntryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Omit<IndirectManpowerEntry, "id" | "projectId" | "createdAt" | "updatedAt">> }) => {
+      const response = await apiRequest("PUT", `/api/projects/${projectId}/indirect-manpower-entries/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/indirect-manpower-entries`] });
+      toast({
+        title: "Success",
+        description: "Overhead entry updated successfully",
+      });
+      resetForm();
+      setIsEditDialogOpen(false);
+      setSelectedEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update overhead entry. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/projects/${projectId}/indirect-manpower-entries/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/indirect-manpower-entries`] });
+      toast({
+        title: "Success",
+        description: "Overhead entry deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete overhead entry. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      createdBy: "",
+      remarks: "",
+      positions: {},
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.createdBy.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Created by is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calculate total overhead (sum of percentages)
+    const totalOverhead = Object.values(formData.positions).reduce((sum, percent) => sum + (percent || 0), 0);
+
+    const entryData = {
+      date: formData.date,
+      positions: formData.positions,
+      totalOverhead: totalOverhead,
+      remarks: formData.remarks || null,
+      createdBy: formData.createdBy,
+    };
+
+    if (selectedEntry) {
+      updateEntryMutation.mutate({ id: selectedEntry.id, data: entryData });
+    } else {
+      createEntryMutation.mutate(entryData);
+    }
+  };
+
+  const handleEdit = (entry: IndirectManpowerEntry) => {
+    setSelectedEntry(entry);
+    setFormData({
+      date: entry.date,
+      createdBy: entry.createdBy,
+      remarks: entry.remarks || "",
+      positions: entry.positions || {},
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this overhead entry?")) {
+      deleteEntryMutation.mutate(id);
+    }
+  };
+
+  const handleSavePositions = () => {
+    const positionsData = positions.map(p => ({
+      positionId: p.positionId,
+      name: p.name,
+      order: p.order,
+      isActive: p.isActive,
+    }));
+    updatePositionsMutation.mutate(positionsData);
+  };
 
   // Get active positions sorted by order
   const activePositions = positions.filter(p => p.isActive).sort((a, b) => a.order - b.order);
@@ -246,7 +329,7 @@ export default function IndirectManpowerList() {
 
   // Calculate totals for each position
   const getPositionTotal = (positionId: string) => {
-    return indirectManpowerEntries.reduce((total, entry) => total + (entry.positions[positionId] || 0), 0);
+    return indirectManpowerEntries.reduce((total, entry) => total + (entry.positions?.[positionId] || 0), 0);
   };
 
   // Calculate overall total
@@ -279,15 +362,15 @@ export default function IndirectManpowerList() {
       return;
     }
 
-    const draggedPos = positions.find(p => p.id === draggedColumn);
-    const targetPos = positions.find(p => p.id === targetPositionId);
+    const draggedPos = positions.find(p => p.positionId === draggedColumn);
+    const targetPos = positions.find(p => p.positionId === targetPositionId);
     
     if (draggedPos && targetPos) {
       // Create new positions array with updated order
       const newPositions = positions.map(p => {
-        if (p.id === draggedColumn) {
+        if (p.positionId === draggedColumn) {
           return { ...p, order: targetPos.order };
-        } else if (p.id === targetPositionId) {
+        } else if (p.positionId === targetPositionId) {
           return { ...p, order: draggedPos.order };
         }
         return p;
@@ -313,7 +396,7 @@ export default function IndirectManpowerList() {
 
   const togglePositionVisibility = (positionId: string) => {
     setPositions(prev => prev.map(p => 
-      p.id === positionId ? { ...p, isActive: !p.isActive } : p
+      p.positionId === positionId ? { ...p, isActive: !p.isActive } : p
     ));
   };
 
@@ -440,6 +523,11 @@ export default function IndirectManpowerList() {
           <CardTitle>Daily Overhead Allocation</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          {(positionsLoading || entriesLoading) ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
           <div className="w-full overflow-x-auto" style={{ maxWidth: 'calc(100vw - 300px)' }}>
             <div className="min-w-max" style={{ minWidth: `${(activePositions.length + 5) * 112 + 96}px` }}>
               <div className="overflow-hidden border rounded-lg">
@@ -453,15 +541,15 @@ export default function IndirectManpowerList() {
                         <TableHead 
                           key={position.id}
                           className={`w-28 cursor-move border-r ${
-                            draggedColumn === position.id ? 'bg-blue-100' : ''
+                            draggedColumn === position.positionId ? 'bg-blue-100' : ''
                           } ${
-                            dragOverColumn === position.id ? 'bg-green-100' : ''
+                            dragOverColumn === position.positionId ? 'bg-green-100' : ''
                           }`}
                           draggable
-                          onDragStart={(e) => handleColumnDragStart(e, position.id)}
-                          onDragOver={(e) => handleColumnDragOver(e, position.id)}
+                          onDragStart={(e) => handleColumnDragStart(e, position.positionId)}
+                          onDragOver={(e) => handleColumnDragOver(e, position.positionId)}
                           onDragLeave={handleColumnDragLeave}
-                          onDrop={(e) => handleColumnDrop(e, position.id)}
+                          onDrop={(e) => handleColumnDrop(e, position.positionId)}
                         >
                           <div className="flex items-center justify-between p-1">
                             <span className="text-xs font-medium leading-tight break-words min-w-0 flex-1">
@@ -496,7 +584,7 @@ export default function IndirectManpowerList() {
                         {activePositions.map((position) => (
                           <TableCell key={position.id} className="text-center border-r w-28">
                             <div className="text-xs font-medium">
-                              {formatPercentage(entry.positions[position.id] || 0)}
+                              {formatPercentage(entry.positions?.[position.positionId] || 0)}
                             </div>
                           </TableCell>
                         ))}
@@ -508,7 +596,7 @@ export default function IndirectManpowerList() {
                         <TableCell className="border-r w-32">
                           <div className="max-w-32">
                             <p className="text-xs text-gray-600 truncate">
-                              {entry.remarks}
+                              {entry.remarks || "-"}
                             </p>
                           </div>
                         </TableCell>
@@ -528,10 +616,21 @@ export default function IndirectManpowerList() {
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEdit(entry)}
+                            >
                               <Edit className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleDelete(entry.id)}
+                              disabled={deleteEntryMutation.isPending}
+                            >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
@@ -546,7 +645,7 @@ export default function IndirectManpowerList() {
                       {activePositions.map((position) => (
                         <TableCell key={position.id} className="text-center border-r w-28">
                           <div className="text-xs font-bold text-green-600">
-                            {formatPercentage(getPositionTotal(position.id))}
+                            {formatPercentage(getPositionTotal(position.positionId))}
                           </div>
                         </TableCell>
                       ))}
@@ -562,33 +661,46 @@ export default function IndirectManpowerList() {
               </div>
             </div>
           </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Add Overhead Entry Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-6xl">
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if (!open) {
+          resetForm();
+          setSelectedEntry(null);
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Overhead Entry</DialogTitle>
             <DialogDescription>
               Add daily overhead allocation for all positions (percentage-based).
             </DialogDescription>
           </DialogHeader>
+          <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">Date *</Label>
               <Input
                 id="date"
                 type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
               />
             </div>
             
             <div>
-              <Label htmlFor="createdBy">Created By</Label>
+                <Label htmlFor="createdBy">Created By *</Label>
               <Input
                 id="createdBy"
+                  value={formData.createdBy}
+                  onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
                 placeholder="Enter your name"
+                  required
               />
             </div>
 
@@ -596,6 +708,8 @@ export default function IndirectManpowerList() {
               <Label htmlFor="remarks">Remarks</Label>
               <Textarea
                 id="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 placeholder="Enter any remarks or notes..."
                 rows={2}
               />
@@ -607,31 +721,169 @@ export default function IndirectManpowerList() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
                 {activePositions.map((position) => (
                   <div key={position.id}>
-                    <Label htmlFor={position.id} className="text-xs">
+                      <Label htmlFor={`pos-${position.positionId}`} className="text-xs">
                       {position.name}
                     </Label>
                     <Input
-                      id={position.id}
+                        id={`pos-${position.positionId}`}
                       type="number"
                       min="0"
                       max="100"
                       step="0.1"
+                        value={formData.positions[position.positionId] || ""}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          positions: {
+                            ...formData.positions,
+                            [position.positionId]: parseFloat(e.target.value) || 0
+                          }
+                        })}
                       placeholder="0"
                       className="text-xs"
                     />
                   </div>
                 ))}
               </div>
+                <div className="mt-2 text-sm font-semibold text-blue-600">
+                  Total: {Object.values(formData.positions).reduce((sum, percent) => sum + (percent || 0), 0).toFixed(1)}%
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={createEntryMutation.isPending}
+              >
               Cancel
             </Button>
-            <Button onClick={() => setIsAddDialogOpen(false)}>
-              Add Entry
+              <Button 
+                type="submit"
+                disabled={createEntryMutation.isPending}
+              >
+                {createEntryMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Entry"
+                )}
             </Button>
           </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Overhead Entry Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          resetForm();
+          setSelectedEntry(null);
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Overhead Entry</DialogTitle>
+            <DialogDescription>
+              Update daily overhead allocation.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-date">Date *</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-createdBy">Created By *</Label>
+                <Input
+                  id="edit-createdBy"
+                  value={formData.createdBy}
+                  onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
+                  placeholder="Enter your name"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-remarks">Remarks</Label>
+                <Textarea
+                  id="edit-remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  placeholder="Enter any remarks or notes..."
+                  rows={2}
+                />
+              </div>
+
+              {/* Position inputs */}
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium">Overhead Allocation (%)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                  {activePositions.map((position) => (
+                    <div key={position.id}>
+                      <Label htmlFor={`edit-pos-${position.positionId}`} className="text-xs">
+                        {position.name}
+                      </Label>
+                      <Input
+                        id={`edit-pos-${position.positionId}`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={formData.positions[position.positionId] || ""}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          positions: {
+                            ...formData.positions,
+                            [position.positionId]: parseFloat(e.target.value) || 0
+                          }
+                        })}
+                        placeholder="0"
+                        className="text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-sm font-semibold text-blue-600">
+                  Total: {Object.values(formData.positions).reduce((sum, percent) => sum + (percent || 0), 0).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={updateEntryMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={updateEntryMutation.isPending}
+              >
+                {updateEntryMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Entry"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -661,7 +913,7 @@ export default function IndirectManpowerList() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
-                  <p className="text-sm">{formatDate(selectedEntry.lastUpdated)}</p>
+                  <p className="text-sm">{formatDate(selectedEntry.updatedAt)}</p>
                 </div>
               </div>
 
@@ -672,7 +924,7 @@ export default function IndirectManpowerList() {
                     <div key={position.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm font-medium">{position.name}</span>
                       <span className="text-sm font-bold text-blue-600">
-                        {formatPercentage(selectedEntry.positions[position.id] || 0)}
+                        {formatPercentage(selectedEntry.positions?.[position.positionId] || 0)}
                       </span>
                     </div>
                   ))}
@@ -689,7 +941,12 @@ export default function IndirectManpowerList() {
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
-            <Button>
+            <Button onClick={() => {
+              if (selectedEntry) {
+                handleEdit(selectedEntry);
+                setIsViewDialogOpen(false);
+              }
+            }}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
@@ -714,7 +971,7 @@ export default function IndirectManpowerList() {
                     <input
                       type="checkbox"
                       checked={position.isActive}
-                      onChange={() => togglePositionVisibility(position.id)}
+                      onChange={() => togglePositionVisibility(position.positionId)}
                       className="rounded"
                     />
                     <span className="text-sm font-medium">{position.name}</span>
@@ -737,12 +994,28 @@ export default function IndirectManpowerList() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsColumnSettingsOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsColumnSettingsOpen(false)}
+              disabled={updatePositionsMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button onClick={() => setIsColumnSettingsOpen(false)}>
+            <Button 
+              onClick={handleSavePositions}
+              disabled={updatePositionsMutation.isPending}
+            >
+              {updatePositionsMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
               <Save className="h-4 w-4 mr-2" />
               Save Settings
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
