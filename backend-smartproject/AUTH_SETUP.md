@@ -43,13 +43,17 @@ LINKEDIN_CALLBACK_URL=http://localhost:8080/api/auth/linkedin/callback
 
 1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/)
 2. Create a new app
-3. In the "Auth" tab, add redirect URLs:
+3. **Enable OpenID Connect Product:**
+   - Go to your app's "Products" tab
+   - Find "Sign In with LinkedIn using OpenID Connect"
+   - Click "Request access" or "Add product"
+   - This enables the new scopes: `openid`, `profile`, `email`
+4. In the "Auth" tab, add redirect URLs:
    - `http://localhost:8080/api/auth/linkedin/callback` (for development)
    - `https://yourdomain.com/api/auth/linkedin/callback` (for production)
-4. Request the following scopes:
-   - `r_emailaddress`
-   - `r_liteprofile`
 5. Copy the Client ID and Client Secret to your `.env` file
+
+**Note:** LinkedIn deprecated the old `r_emailaddress` and `r_liteprofile` scopes. The app now uses OpenID Connect scopes: `openid`, `profile`, `email`.
 
 ## API Endpoints
 

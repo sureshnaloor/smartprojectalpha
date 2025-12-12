@@ -28,7 +28,7 @@ router.get(
 router.get(
   "/linkedin",
   passport.authenticate("linkedin", {
-    scope: ["r_emailaddress", "r_liteprofile"],
+    scope: ["openid", "profile", "email"],
   })
 );
 
