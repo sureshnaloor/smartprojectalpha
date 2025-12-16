@@ -39,14 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const data = await response.json();
-      console.log("Auth status response:", data);
       
       if (data.authenticated && data.user) {
-        console.log("User authenticated:", data.user);
         setUser(data.user);
         setAuthenticated(true);
       } else {
-        console.log("User not authenticated");
         setUser(null);
         setAuthenticated(false);
       }

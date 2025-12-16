@@ -18,16 +18,21 @@ dotenv.config();
 const app = express();
 
 // Session configuration
+// Determine cookie security: only mark secure when running in production with HTTPS
+const isProd = process.env.NODE_ENV === "production";
+const baseUrl = process.env.BASE_URL || "";
+const cookieSecure = isProd && baseUrl.startsWith("https");
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: cookieSecure,
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: cookieSecure ? "none" : "lax",
     },
   })
 );

@@ -15,10 +15,10 @@
 ## For Your Setup
 
 ### Authorized JavaScript Origins
-Add these (depending on where your Vite app runs):
+Add these (depending on where your frontend app runs):
 
 ```
-http://localhost:5173
+http://localhost:8080
 http://localhost:3000
 ```
 
@@ -46,10 +46,10 @@ http://localhost:8080/api/auth/google/callback
 ### 1. Authorized JavaScript Origins
 Add:
 ```
-http://localhost:5173
+http://localhost:8080
 http://localhost:3000
 ```
-(Add both if you're not sure which port Vite uses)
+(Add both if you're not sure which port your frontend uses)
 
 ### 2. Authorized Redirect URIs
 Add:
@@ -59,18 +59,16 @@ http://localhost:8080/api/auth/google/callback
 
 ## How to Check Your Vite Port
 
-When you run `npm run dev` in the frontend, check the console output:
+When you run the frontend, check where it runs:
 ```
-VITE v5.x.x  ready in xxx ms
-
-➜  Local:   http://localhost:5173/
+Frontend serves on: http://localhost:8080/
 ```
 
-Use whatever port it shows (usually 5173 for Vite, or 3000 if you configured it).
+Use whatever port it shows (usually 8080 when served with the backend on the same port, or 3000 if you configured it for dev).
 
 ## Why Both Are Needed
 
-1. **JavaScript Origins** (`localhost:5173` or `3000`):
+1. **JavaScript Origins** (`localhost:8080` or `3000`):
    - Your React app runs here
    - Google needs to know this origin is allowed
 
@@ -82,7 +80,7 @@ Use whatever port it shows (usually 5173 for Vite, or 3000 if you configured it)
 ## Quick Fix
 
 1. Go to Google Cloud Console → Credentials → Your OAuth Client
-2. **Authorized JavaScript origins**: Add `http://localhost:5173` (or `3000` if that's what you use)
+2. **Authorized JavaScript origins**: Add `http://localhost:8080` (or `3000` if running dev server on different port)
 3. **Authorized redirect URIs**: Add `http://localhost:8080/api/auth/google/callback`
 4. **Save**
 5. Restart your servers and try again

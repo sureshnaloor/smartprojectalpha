@@ -7,8 +7,6 @@ import { Loader2, LogOut } from "lucide-react";
 export function UserProfile() {
   const { user, loading, authenticated, checkAuth, logout } = useAuth();
 
-  // Debug logging
-  console.log("UserProfile render:", { user, loading, authenticated, userName: user?.name });
 
   // Re-check auth if we have authenticated=true but no user (edge case)
   useEffect(() => {

@@ -14,7 +14,7 @@ SESSION_SECRET=your-secret-key-change-in-production
 BASE_URL=http://localhost:8080
 
 # Frontend URL (where Vite dev server runs)
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:8080
 
 # Google OAuth
 GOOGLE_CLIENT_ID=your-google-client-id

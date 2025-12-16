@@ -7,23 +7,16 @@ import { eq } from "drizzle-orm";
 
 // Serialize user for session
 passport.serializeUser((user: any, done) => {
-  console.log("🔍 Serializing user:", { id: user.id, name: user.name, email: user.email });
   done(null, user.id);
 });
 
 // Deserialize user from session
 passport.deserializeUser(async (id: number, done) => {
   try {
-    console.log("🔍 Deserializing user with ID:", id);
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    if (user) {
-      console.log("✅ User deserialized:", { id: user.id, name: user.name, email: user.email });
-    } else {
-      console.log("❌ User not found with ID:", id);
-    }
     done(null, user || null);
   } catch (error) {
-    console.error("❌ Error deserializing user:", error);
+    console.error("Error deserializing user:", error);
     done(error, null);
   }
 });
