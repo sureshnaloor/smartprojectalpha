@@ -39,7 +39,9 @@ import {
   UserPlus,
   ClipboardList,
   MoreHorizontal,
-  MessageSquareText as MessageSquareTextIcon
+  MessageSquareText as MessageSquareTextIcon,
+  LayoutDashboard,
+  Briefcase
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -511,6 +513,28 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       )}>
                         <Users className="mr-3 h-5 w-5" />
                         <span>Resource Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/newlanding">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/newlanding') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/newlanding') ? 600 : 500, letterSpacing: '0.01em' }}>
+                        <LayoutDashboard className="mr-3 h-5 w-5" />
+                        <span>New Landing</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/newproject">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        isActive('/newproject') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/newproject') ? 600 : 500, letterSpacing: '0.01em' }}>
+                        <Briefcase className="mr-3 h-5 w-5" />
+                        <span>New Project Detail</span>
                       </a>
                     </Link>
                   </li>

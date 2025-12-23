@@ -40,6 +40,9 @@ import ProjectRequestForInspection from "@/pages/project-request-for-inspection"
 import ProjectItpAndReports from "@/pages/project-itp-and-reports";
 import ProjectOtherDocuments from "@/pages/project-other-documents";
 import ProjectEquipmentCatalogue from "@/pages/project-equipment-catalogue";
+import NewLanding from "@/pages/new-landing";
+import NewProject from "@/pages/new-project";
+
 
 // Implementing a flatter routing approach without nesting
 function Router() {
@@ -273,6 +276,11 @@ function Router() {
 
       {/* Resource Master */}
       <Route path="/resource-master" component={ResourceMaster} />
+
+      {/* New Pages Ported from Vanilla JS */}
+      <Route path="/newlanding" component={NewLanding} />
+      <Route path="/newproject" component={NewProject} />
+
 
       {/* Collaboration Hub */}
       <Route path="/collab">
