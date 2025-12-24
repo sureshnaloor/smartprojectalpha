@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddProjectModal } from "@/components/project/add-project-modal";
+import { EditProjectModal } from "@/components/project/edit-project-modal";
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog";
 
 // Project type from API
@@ -34,6 +35,7 @@ interface Project {
   budget: string;
   currency: string;
   projectType: string | null;
+  status: string | null;
   createdAt: string;
 }
 
@@ -72,8 +74,10 @@ export default function NewLanding() {
   const [, setLocation] = useLocation();
   const [filter, setFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [editProjectId, setEditProjectId] = useState<number | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -120,7 +124,8 @@ export default function NewLanding() {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.description?.toLowerCase() || "").includes(search.toLowerCase());
     const matchesTypeFilter = typeFilter === "all" || p.projectType === typeFilter;
-    return matchesSearch && matchesTypeFilter;
+    const matchesStatusFilter = statusFilter === "all" || p.status === statusFilter;
+    return matchesSearch && matchesTypeFilter && matchesStatusFilter;
   });
 
   // Calculate stats from real data
@@ -265,21 +270,16 @@ export default function NewLanding() {
 
         <div className="max-w-7xl mx-auto px-4 py-12">
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
             {[
               { label: "Active Projects", value: activeProjects.toString(), icon: Building2, color: "text-blue-600", bg: "bg-blue-50" },
               { label: "Total Budget", value: formatBudget(totalBudget.toString(), "USD"), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Done Tasks", value: "247", icon: CheckCircle2, color: "text-amber-600", bg: "bg-amber-50" },
-              { label: "Pending", value: "15", icon: ListTodo, color: "text-purple-600", bg: "bg-purple-50" },
             ].map((stat, i) => (
               <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-4">
                   <div className={cn("p-3 rounded-xl", stat.bg)}>
                     <stat.icon className={cn("w-6 h-6", stat.color)} />
                   </div>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                    +8%
-                  </span>
                 </div>
                 <div className="text-3xl font-bold text-slate-900 mb-1">{stat.value}</div>
                 <div className="text-sm text-slate-500 font-medium">{stat.label}</div>
@@ -301,9 +301,9 @@ export default function NewLanding() {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                   <select
-                    className="flex-1 sm:w-40 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
+                    className="flex-1 sm:w-36 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
                   >
@@ -314,6 +314,20 @@ export default function NewLanding() {
                     <option value="Commercial">Commercial</option>
                     <option value="Petrochem">Petrochem</option>
                     <option value="Oil&Gas">Oil & Gas</option>
+                  </select>
+                  <select
+                    className="flex-1 sm:w-36 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="concept">Concept</option>
+                    <option value="planning">Planning</option>
+                    <option value="active">Active</option>
+                    <option value="in progress">In Progress</option>
+                    <option value="on-hold">On Hold</option>
+                    <option value="aborted">Aborted</option>
+                    <option value="completed">Completed</option>
                   </select>
                   <button
                     onClick={() => setIsAddProjectModalOpen(true)}
@@ -423,6 +437,12 @@ export default function NewLanding() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setEditProjectId(project.id)}
+                                  className="text-blue-400 hover:text-blue-600 p-1 rounded transition-colors"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
                                 <DeleteProjectDialog
                                   projectId={project.id}
                                   projectName={project.name}
@@ -501,10 +521,18 @@ export default function NewLanding() {
         onClose={() => setIsAddProjectModalOpen(false)}
         onSuccess={(projectId) => {
           setIsAddProjectModalOpen(false);
-          // Optionally navigate to new project
-          // setLocation(`/projects/${projectId}`);
         }}
       />
+
+      {/* Edit Project Modal */}
+      {editProjectId && (
+        <EditProjectModal
+          projectId={editProjectId}
+          isOpen={editProjectId !== null}
+          onClose={() => setEditProjectId(null)}
+          onSuccess={() => setEditProjectId(null)}
+        />
+      )}
     </MasterLayout>
   );
 }

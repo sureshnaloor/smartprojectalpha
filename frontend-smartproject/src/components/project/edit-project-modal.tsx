@@ -3,8 +3,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { insertProjectSchema, Project, WbsItem } from "@/types";
+import { Project, WbsItem } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 
 import {
   Dialog,
@@ -38,6 +39,20 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 
+// Form schema for the frontend - uses Date objects
+const formSchema = z.object({
+  name: z.string().min(3, "Project name must be at least 3 characters"),
+  description: z.string().optional().nullable(),
+  budget: z.coerce.number().positive("Budget must be a positive number"),
+  currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
+  projectType: z.enum(["Highway", "Infrastructure", "Power", "Commercial", "Petrochem", "Oil&Gas"]).optional().nullable(),
+  status: z.enum(["concept", "planning", "active", "in progress", "aborted", "on-hold", "completed"]).optional().nullable(),
+  startDate: z.date(),
+  endDate: z.date(),
+});
+
+type ProjectFormData = z.infer<typeof formSchema>;
+
 interface EditProjectModalProps {
   projectId: number;
   isOpen: boolean;
@@ -48,7 +63,6 @@ interface EditProjectModalProps {
 export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: EditProjectModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showDuration, setShowDuration] = useState(false);
 
   // Fetch project data
   const { data: project, isLoading } = useQuery<Project>({
@@ -64,17 +78,17 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
 
   // Determine if currency can be edited (only if there are no WBS items yet)
   const canEditCurrency = wbsItems.length === 0;
-  
+
   // Determine if budget can be edited (only if there are only the 3 default WBS items)
-  const hasOnlyDefaultWbs = wbsItems.length === 3 && 
+  const hasOnlyDefaultWbs = wbsItems.length === 3 &&
     wbsItems.every(item => item.isTopLevel) &&
     wbsItems.every(item => item.parentId === null);
-  
+
   const canEditBudget = hasOnlyDefaultWbs || wbsItems.length === 0;
 
-  // Form definition
-  const form = useForm<Project>({
-    resolver: zodResolver(insertProjectSchema),
+  // Form definition with Date-based schema
+  const form = useForm<ProjectFormData>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       description: "",
@@ -82,6 +96,8 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
       startDate: new Date(),
       endDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
       currency: "USD",
+      projectType: undefined,
+      status: undefined,
     },
   });
 
@@ -94,19 +110,20 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
         budget: Number(project.budget),
         startDate: new Date(project.startDate),
         endDate: new Date(project.endDate),
-        currency: project.currency || "USD",
+        currency: (project.currency || "USD") as "USD" | "EUR" | "SAR",
+        projectType: project.projectType as any,
+        status: project.status as any,
       });
     }
   }, [project, form]);
 
   // Get form values
-  const { startDate, endDate } = form.watch();
+  const { startDate } = form.watch();
 
   // Update dates and duration when one changes
   const updateEndDate = (newStartDate: Date) => {
     const currentEndDate = form.getValues("endDate");
-    if (currentEndDate && newStartDate > new Date(currentEndDate)) {
-      // If new start date is after current end date, set end date to start date + 1 month
+    if (currentEndDate && newStartDate > currentEndDate) {
       const newEndDate = new Date(newStartDate);
       newEndDate.setMonth(newEndDate.getMonth() + 1);
       form.setValue("endDate", newEndDate);
@@ -115,23 +132,30 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
 
   // Update project mutation
   const updateProject = useMutation({
-    mutationFn: async (data: Project) => {
-      const response = await apiRequest("PATCH", `/api/projects/${projectId}`, data);
+    mutationFn: async (data: ProjectFormData) => {
+      // Transform dates to ISO strings for API
+      const apiData = {
+        name: data.name,
+        description: data.description || null,
+        budget: data.budget,
+        currency: data.currency,
+        projectType: data.projectType || null,
+        status: data.status || null,
+        startDate: data.startDate.toISOString().split('T')[0],
+        endDate: data.endDate.toISOString().split('T')[0],
+      };
+      const response = await apiRequest("PATCH", `/api/projects/${projectId}`, apiData);
       return response.json();
     },
     onSuccess: () => {
       // Invalidate all project-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
-      
-      // Invalidate WBS queries as they might show aggregated budget/cost data
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
-      
-      // Force refetch of all tabs data
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/costs`] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/schedule`] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/reports`] });
-      
+
       toast({
         title: "Project Updated",
         description: "The project has been updated successfully.",
@@ -150,7 +174,7 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
   });
 
   // Form submission handler
-  const onSubmit = (data: Project) => {
+  const onSubmit = (data: ProjectFormData) => {
     updateProject.mutate(data);
   };
 
@@ -171,7 +195,7 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Project</DialogTitle>
           <DialogDescription>
@@ -203,7 +227,7 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
                   <FormItem>
                     <FormLabel>Total Budget</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         type="number"
                         step="0.01"
                         min="0"
@@ -228,9 +252,9 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Currency</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
                       disabled={!canEditCurrency}
                     >
                       <FormControl>
@@ -252,6 +276,65 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="projectType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project Type</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || undefined}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Highway">Highway</SelectItem>
+                      <SelectItem value="Infrastructure">Infrastructure</SelectItem>
+                      <SelectItem value="Power">Power</SelectItem>
+                      <SelectItem value="Commercial">Commercial</SelectItem>
+                      <SelectItem value="Petrochem">Petrochem</SelectItem>
+                      <SelectItem value="Oil&Gas">Oil & Gas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || undefined}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="concept">Concept</SelectItem>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="in progress">In Progress</SelectItem>
+                      <SelectItem value="on-hold">On Hold</SelectItem>
+                      <SelectItem value="aborted">Aborted</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -328,7 +411,7 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 disabled={updateProject.isPending}
               >
@@ -346,4 +429,4 @@ export function EditProjectModal({ projectId, isOpen, onClose, onSuccess }: Edit
       </DialogContent>
     </Dialog>
   );
-} 
+}

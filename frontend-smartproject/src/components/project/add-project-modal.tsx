@@ -47,6 +47,7 @@ const formSchema = z.object({
   budget: z.coerce.number().positive("Budget must be a positive number"),
   currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
   projectType: z.enum(["Highway", "Infrastructure", "Power", "Commercial", "Petrochem", "Oil&Gas"]).optional(),
+  status: z.enum(["concept", "planning", "active", "in progress", "aborted", "on-hold", "completed"]).optional(),
   startDate: z.date(),
   endDate: z.date(),
 });
@@ -75,6 +76,7 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
       endDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
       currency: "USD",
       projectType: undefined,
+      status: "concept",
     },
   });
 
@@ -102,6 +104,7 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
         budget: data.budget,
         currency: data.currency,
         projectType: data.projectType || null,
+        status: data.status || null,
         startDate: data.startDate.toISOString().split('T')[0],
         endDate: data.endDate.toISOString().split('T')[0],
       };
@@ -233,6 +236,36 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
                       <SelectItem value="Commercial">Commercial</SelectItem>
                       <SelectItem value="Petrochem">Petrochem</SelectItem>
                       <SelectItem value="Oil&Gas">Oil & Gas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="concept">Concept</SelectItem>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="in progress">In Progress</SelectItem>
+                      <SelectItem value="on-hold">On Hold</SelectItem>
+                      <SelectItem value="aborted">Aborted</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

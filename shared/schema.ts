@@ -12,6 +12,7 @@ export const projects = pgTable("projects", {
   budget: numeric("budget", { precision: 12, scale: 2 }).notNull(),
   currency: text("currency").default("USD").notNull(),
   projectType: text("project_type"), // Highway, Infrastructure, Power, Commercial, Petrochem, Oil&Gas
+  status: text("status"), // concept, planning, active, in progress, aborted, on-hold, completed
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -175,6 +176,7 @@ export const insertProjectSchema = createInsertSchema(projects)
     budget: z.string().or(z.number()).transform(val => val.toString()),
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
     projectType: z.enum(["Highway", "Infrastructure", "Power", "Commercial", "Petrochem", "Oil&Gas"]).optional().nullable(),
+    status: z.enum(["concept", "planning", "active", "in progress", "aborted", "on-hold", "completed"]).optional().nullable(),
     startDate: z.date().or(z.string()).transform(val => {
       if (typeof val === 'string') {
         return new Date(val).toISOString().split('T')[0];
