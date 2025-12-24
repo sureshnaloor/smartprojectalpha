@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import MasterLayout from "@/layouts/master-layout";
 import ReactECharts from "echarts-for-react";
 import anime from "animejs";
@@ -11,58 +14,38 @@ import {
   Filter,
   ArrowUpRight,
   User,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Trash2,
+  Edit,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AddProjectModal } from "@/components/project/add-project-modal";
+import { DeleteProjectDialog } from "@/components/project/delete-project-dialog";
 
-// Sample project data from main.js
-const sampleProjects = [
-  {
-    id: 1,
-    name: "Highway Extension Project",
-    status: "active",
-    progress: 65,
-    budget: { allocated: 2500000, spent: 1800000 },
-    startDate: "2024-04-15",
-    endDate: "2025-04-15",
-    image: "/resources/project-1.jpg",
-    description: "Major highway extension connecting urban areas",
-    wbsCount: 4,
-    taskCount: 47,
-    manager: "Sarah Johnson",
-    location: "Downtown District"
-  },
-  {
-    id: 2,
-    name: "Office Complex Construction",
-    status: "active",
-    progress: 40,
-    budget: { allocated: 5200000, spent: 2100000 },
-    startDate: "2024-05-01",
-    endDate: "2025-11-01",
-    image: "/resources/project-2.jpg",
-    description: "Modern office complex with sustainable design",
-    wbsCount: 8,
-    taskCount: 89,
-    manager: "Michael Chen",
-    location: "Business District"
-  },
-  {
-    id: 3,
-    name: "Residential Development",
-    status: "planning",
-    progress: 15,
-    budget: { allocated: 8100000, spent: 1200000 },
-    startDate: "2024-06-01",
-    endDate: "2026-06-01",
-    image: "/resources/project-3.jpg",
-    description: "Multi-unit residential development project",
-    wbsCount: 6,
-    taskCount: 156,
-    manager: "Emily Rodriguez",
-    location: "Suburban Area"
-  }
-];
+// Project type from API
+interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  startDate: string;
+  endDate: string;
+  budget: string;
+  currency: string;
+  projectType: string | null;
+  createdAt: string;
+}
+
+// Map project types to images
+const projectTypeImages: Record<string, string> = {
+  "Highway": "/resources/project-1.jpg",
+  "Infrastructure": "/resources/project-2.jpg",
+  "Power": "/resources/project-3.jpg",
+  "Commercial": "/resources/project-2.jpg",
+  "Petrochem": "/resources/project-1.jpg",
+  "Oil&Gas": "/resources/project-3.jpg",
+};
 
 const recentActivity = [
   {
@@ -86,11 +69,19 @@ const recentActivity = [
 ];
 
 export default function NewLanding() {
-  const [projects, setProjects] = useState(sampleProjects);
+  const [, setLocation] = useLocation();
   const [filter, setFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  // Fetch projects from API
+  const { data: projects = [], isLoading, isError } = useQuery<Project[]>({
+    queryKey: ['/api/projects'],
+  });
 
   useEffect(() => {
     // Hero Animations
@@ -124,11 +115,78 @@ export default function NewLanding() {
     return () => observer.disconnect();
   }, []);
 
+  // Filter projects
   const filteredProjects = projects.filter(p => {
-    const matchesFilter = filter === "all" || p.status === filter;
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.manager.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
+      (p.description?.toLowerCase() || "").includes(search.toLowerCase());
+    const matchesTypeFilter = typeFilter === "all" || p.projectType === typeFilter;
+    return matchesSearch && matchesTypeFilter;
+  });
+
+  // Calculate stats from real data
+  const totalBudget = projects.reduce((sum, p) => sum + Number(p.budget), 0);
+  const activeProjects = projects.length;
+
+  // Get image for project
+  const getProjectImage = (project: Project) => {
+    if (project.projectType && projectTypeImages[project.projectType]) {
+      return projectTypeImages[project.projectType];
+    }
+    // Default image based on project id
+    const images = ["/resources/project-1.jpg", "/resources/project-2.jpg", "/resources/project-3.jpg"];
+    return images[project.id % 3];
+  };
+
+  // Determine project status based on dates
+  const getProjectStatus = (project: Project): "active" | "planning" | "completed" => {
+    const now = new Date();
+    const startDate = new Date(project.startDate);
+    const endDate = new Date(project.endDate);
+
+    if (now < startDate) return "planning";
+    if (now > endDate) return "completed";
+    return "active";
+  };
+
+  // Calculate progress based on timeline
+  const getProjectProgress = (project: Project): number => {
+    const now = new Date();
+    const startDate = new Date(project.startDate);
+    const endDate = new Date(project.endDate);
+
+    if (now < startDate) return 0;
+    if (now > endDate) return 100;
+
+    const totalDuration = endDate.getTime() - startDate.getTime();
+    const elapsed = now.getTime() - startDate.getTime();
+    return Math.round((elapsed / totalDuration) * 100);
+  };
+
+  // Format currency
+  const formatBudget = (budget: string, currency: string): string => {
+    const num = Number(budget);
+    if (num >= 1000000) {
+      return `${currency} ${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `${currency} ${(num / 1000).toFixed(0)}K`;
+    }
+    return `${currency} ${num.toFixed(0)}`;
+  };
+
+  // Get unique project types for filter
+  const projectTypes = Array.from(new Set(projects.map(p => p.projectType).filter(Boolean)));
+
+  // Chart data based on project types
+  const chartData = projectTypes.map((type, index) => {
+    const colors = ['#475569', '#F59E0B', '#10B981', '#EA580C', '#8B5CF6', '#EC4899'];
+    const typeProjects = projects.filter(p => p.projectType === type);
+    const totalBudget = typeProjects.reduce((sum, p) => sum + Number(p.budget), 0) / 1000000;
+    return {
+      name: type || 'Other',
+      value: Math.round(totalBudget * 10) / 10,
+      itemStyle: { color: colors[index % colors.length] }
+    };
   });
 
   const chartOption = {
@@ -157,14 +215,16 @@ export default function NewLanding() {
         emphasis: {
           label: { show: true, fontSize: '18', fontWeight: 'bold' }
         },
-        data: [
-          { name: 'Highway Projects', value: 4.3, itemStyle: { color: '#475569' } },
-          { name: 'Commercial', value: 5.2, itemStyle: { color: '#F59E0B' } },
-          { name: 'Residential', value: 8.1, itemStyle: { color: '#10B981' } },
-          { name: 'Infrastructure', value: 3.6, itemStyle: { color: '#EA580C' } }
+        data: chartData.length > 0 ? chartData : [
+          { name: 'No Projects', value: 1, itemStyle: { color: '#E5E7EB' } }
         ]
       }
     ]
+  };
+
+  // Navigate to project
+  const handleProjectClick = (projectId: number) => {
+    setLocation(`/projects/${projectId}`);
   };
 
   return (
@@ -189,7 +249,11 @@ export default function NewLanding() {
               real-time budget tracking, and automated reporting.
             </p>
             <div className="animate-text flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-lg font-semibold transition-all hover:scale-105 active:scale-95">
+              <button
+                onClick={() => setIsAddProjectModalOpen(true)}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-lg font-semibold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
                 Create New Project
               </button>
               <button className="bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 px-8 py-3 rounded-lg font-semibold transition-all">
@@ -203,8 +267,8 @@ export default function NewLanding() {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             {[
-              { label: "Active Projects", value: "12", icon: Building2, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "Total Budget", value: "$24.7M", icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "Active Projects", value: activeProjects.toString(), icon: Building2, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "Total Budget", value: formatBudget(totalBudget.toString(), "USD"), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
               { label: "Done Tasks", value: "247", icon: CheckCircle2, color: "text-amber-600", bg: "bg-amber-50" },
               { label: "Pending", value: "15", icon: ListTodo, color: "text-purple-600", bg: "bg-purple-50" },
             ].map((stat, i) => (
@@ -239,76 +303,150 @@ export default function NewLanding() {
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                   <select
-                    className="flex-1 sm:w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
+                    className="flex-1 sm:w-40 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
                   >
-                    <option value="all">All</option>
-                    <option value="active">Active</option>
-                    <option value="planning">Planning</option>
+                    <option value="all">All Types</option>
+                    <option value="Highway">Highway</option>
+                    <option value="Infrastructure">Infrastructure</option>
+                    <option value="Power">Power</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Petrochem">Petrochem</option>
+                    <option value="Oil&Gas">Oil & Gas</option>
                   </select>
-                  <button className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
-                    <Filter className="w-4 h-4" />
+                  <button
+                    onClick={() => setIsAddProjectModalOpen(true)}
+                    className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Projects Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6" ref={cardsRef}>
-                {filteredProjects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="card-animate group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+              {/* Loading State */}
+              {isLoading && (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+                  <span className="ml-2 text-slate-600">Loading projects...</span>
+                </div>
+              )}
+
+              {/* Error State */}
+              {isError && (
+                <div className="text-center py-20 bg-white rounded-2xl border border-red-200">
+                  <p className="text-red-600">Failed to load projects. Please try again.</p>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!isLoading && !isError && filteredProjects.length === 0 && (
+                <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                  <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">No projects found</h3>
+                  <p className="text-slate-500 mb-6">
+                    {search || typeFilter !== "all" ? "Try adjusting your filters" : "Create your first project to get started"}
+                  </p>
+                  <button
+                    onClick={() => setIsAddProjectModalOpen(true)}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-lg font-semibold transition-all inline-flex items-center gap-2"
                   >
-                    <div className="relative h-48 overflow-hidden">
-                      <img
-                        src={project.image}
-                        alt={project.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute top-4 right-4">
-                        <span className={cn(
-                          "px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md",
-                          project.status === 'active' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600'
-                        )}>
-                          {project.status.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{project.name}</h3>
-                      <p className="text-sm text-slate-500 mb-4 line-clamp-2">{project.description}</p>
+                    <Plus className="w-4 h-4" />
+                    Create Project
+                  </button>
+                </div>
+              )}
 
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between text-xs font-bold mb-2">
-                            <span className="text-slate-500 uppercase tracking-wider">Completion</span>
-                            <span className="text-slate-900">{project.progress}%</span>
+              {/* Projects Grid */}
+              {!isLoading && !isError && filteredProjects.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6" ref={cardsRef}>
+                  {filteredProjects.map((project) => {
+                    const status = getProjectStatus(project);
+                    const progress = getProjectProgress(project);
+
+                    return (
+                      <div
+                        key={project.id}
+                        className="card-animate group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+                      >
+                        <div className="relative h-48 overflow-hidden">
+                          <img
+                            src={getProjectImage(project)}
+                            alt={project.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute top-4 left-4">
+                            {project.projectType && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-900/70 text-white backdrop-blur-md">
+                                {project.projectType}
+                              </span>
+                            )}
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
-                              style={{ width: `${project.progress}%` }}
-                            />
+                          <div className="absolute top-4 right-4">
+                            <span className={cn(
+                              "px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md",
+                              status === 'active' ? 'bg-emerald-500/20 text-emerald-600' :
+                                status === 'planning' ? 'bg-amber-500/20 text-amber-600' :
+                                  'bg-blue-500/20 text-blue-600'
+                            )}>
+                              {status.toUpperCase()}
+                            </span>
                           </div>
                         </div>
+                        <div className="p-6">
+                          <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{project.name}</h3>
+                          <p className="text-sm text-slate-500 mb-4 line-clamp-2">
+                            {project.description || "No description provided"}
+                          </p>
 
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
-                              {project.manager.split(' ').map(n => n[0]).join('')}
+                          <div className="space-y-4">
+                            <div>
+                              <div className="flex justify-between text-xs font-bold mb-2">
+                                <span className="text-slate-500 uppercase tracking-wider">Completion</span>
+                                <span className="text-slate-900">{progress}%</span>
+                              </div>
+                              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
                             </div>
-                            <span className="text-xs font-medium text-slate-600">{project.manager}</span>
+
+                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                                  <DollarSign className="w-4 h-4" />
+                                </div>
+                                <span className="text-sm font-semibold text-slate-600">
+                                  {formatBudget(project.budget, project.currency)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <DeleteProjectDialog
+                                  projectId={project.id}
+                                  projectName={project.name}
+                                  trigger={
+                                    <button className="text-red-400 hover:text-red-600 p-1 rounded transition-colors">
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  }
+                                />
+                                <button
+                                  onClick={() => handleProjectClick(project.id)}
+                                  className="text-amber-600 hover:text-amber-700 font-bold text-xs flex items-center gap-1"
+                                >
+                                  DETAILS <ArrowUpRight className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <button className="text-amber-600 hover:text-amber-700 font-bold text-xs flex items-center gap-1">
-                            DETAILS <ArrowUpRight className="w-3 h-3" />
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="space-y-8">
@@ -316,7 +454,7 @@ export default function NewLanding() {
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <DollarSign className="w-5 h-5 text-amber-500" />
-                  Budget Allocation
+                  Budget by Type
                 </h3>
                 <div className="h-[300px]">
                   <ReactECharts option={chartOption} style={{ height: '100%' }} />
@@ -356,6 +494,17 @@ export default function NewLanding() {
           </div>
         </div>
       </div>
+
+      {/* Add Project Modal */}
+      <AddProjectModal
+        isOpen={isAddProjectModalOpen}
+        onClose={() => setIsAddProjectModalOpen(false)}
+        onSuccess={(projectId) => {
+          setIsAddProjectModalOpen(false);
+          // Optionally navigate to new project
+          // setLocation(`/projects/${projectId}`);
+        }}
+      />
     </MasterLayout>
   );
 }

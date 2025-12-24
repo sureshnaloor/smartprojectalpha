@@ -46,6 +46,7 @@ const formSchema = z.object({
   description: z.string().optional(),
   budget: z.coerce.number().positive("Budget must be a positive number"),
   currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
+  projectType: z.enum(["Highway", "Infrastructure", "Power", "Commercial", "Petrochem", "Oil&Gas"]).optional(),
   startDate: z.date(),
   endDate: z.date(),
 });
@@ -73,6 +74,7 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
       startDate: new Date(),
       endDate: new Date(new Date().setMonth(new Date().getMonth() + 6)),
       currency: "USD",
+      projectType: undefined,
     },
   });
 
@@ -99,6 +101,7 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
         description: data.description || null,
         budget: data.budget,
         currency: data.currency,
+        projectType: data.projectType || null,
         startDate: data.startDate.toISOString().split('T')[0],
         endDate: data.endDate.toISOString().split('T')[0],
       };
@@ -163,7 +166,7 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
                   <FormItem>
                     <FormLabel>Total Budget</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         type="number"
                         step="0.01"
                         min="0"
@@ -184,8 +187,8 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Currency</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -207,6 +210,35 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="projectType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project Type</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Highway">Highway</SelectItem>
+                      <SelectItem value="Infrastructure">Infrastructure</SelectItem>
+                      <SelectItem value="Power">Power</SelectItem>
+                      <SelectItem value="Commercial">Commercial</SelectItem>
+                      <SelectItem value="Petrochem">Petrochem</SelectItem>
+                      <SelectItem value="Oil&Gas">Oil & Gas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -287,7 +319,7 @@ export function AddProjectModal({ isOpen, onClose, onSuccess }: AddProjectModalP
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 disabled={createProject.isPending}
               >
