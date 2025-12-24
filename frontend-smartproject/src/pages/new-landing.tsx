@@ -49,27 +49,6 @@ const projectTypeImages: Record<string, string> = {
   "Oil&Gas": "/resources/project-3.jpg",
 };
 
-const recentActivity = [
-  {
-    id: 1,
-    project: "Highway Extension Project",
-    action: "Completed Task",
-    description: "Finished rough grading for north section",
-    timestamp: "2 hours ago",
-    type: "task",
-    user: "John Smith"
-  },
-  {
-    id: 2,
-    project: "Office Complex Construction",
-    action: "Budget Update",
-    description: "Added $150K for additional steel reinforcement",
-    timestamp: "4 hours ago",
-    type: "budget",
-    user: "Michael Chen"
-  }
-];
-
 export default function NewLanding() {
   const [, setLocation] = useLocation();
   const [filter, setFilter] = useState("all");
@@ -227,6 +206,76 @@ export default function NewLanding() {
     ]
   };
 
+  // Status colors
+  const statusColors: Record<string, string> = {
+    'concept': '#6B7280',
+    'planning': '#F59E0B',
+    'active': '#10B981',
+    'in progress': '#059669',
+    'on-hold': '#F97316',
+    'aborted': '#EF4444',
+    'completed': '#3B82F6'
+  };
+
+  // Chart data for projects by status
+  const statusData = Object.entries(
+    projects.reduce((acc, project) => {
+      const status = project.status || 'active';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([status, count]) => ({
+    name: status.charAt(0).toUpperCase() + status.slice(1),
+    value: count,
+    itemStyle: { color: statusColors[status] || '#6B7280' }
+  }));
+
+  const statusChartOption = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: statusData.map(d => d.name),
+      axisLabel: {
+        rotate: 45,
+        fontSize: 10,
+        color: '#6B7280'
+      }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#6B7280' },
+      splitLine: { lineStyle: { color: '#E5E7EB' } }
+    },
+    series: [{
+      name: 'Projects',
+      type: 'bar',
+      data: statusData.map(d => ({
+        value: d.value,
+        itemStyle: d.itemStyle
+      })),
+      barWidth: '60%',
+      itemStyle: {
+        borderRadius: [4, 4, 0, 0]
+      },
+      label: {
+        show: true,
+        position: 'top',
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#374151'
+      }
+    }]
+  };
+
   // Navigate to project
   const handleProjectClick = (projectId: number) => {
     setLocation(`/projects/${projectId}`);
@@ -373,100 +422,121 @@ export default function NewLanding() {
 
               {/* Projects Grid */}
               {!isLoading && !isError && filteredProjects.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6" ref={cardsRef}>
-                  {filteredProjects.map((project) => {
-                    const status = getProjectStatus(project);
-                    const progress = getProjectProgress(project);
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6" ref={cardsRef}>
+                    {filteredProjects.slice(0, 12).map((project) => {
+                      const progress = getProjectProgress(project);
+                      const displayStatus = project.status || "active";
 
-                    return (
-                      <div
-                        key={project.id}
-                        className="card-animate group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300"
-                      >
-                        <div className="relative h-48 overflow-hidden">
-                          <img
-                            src={getProjectImage(project)}
-                            alt={project.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <div className="absolute top-4 left-4">
-                            {project.projectType && (
-                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-900/70 text-white backdrop-blur-md">
-                                {project.projectType}
-                              </span>
-                            )}
-                          </div>
-                          <div className="absolute top-4 right-4">
-                            <span className={cn(
-                              "px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md",
-                              status === 'active' ? 'bg-emerald-500/20 text-emerald-600' :
-                                status === 'planning' ? 'bg-amber-500/20 text-amber-600' :
-                                  'bg-blue-500/20 text-blue-600'
-                            )}>
-                              {status.toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-6">
-                          <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{project.name}</h3>
-                          <p className="text-sm text-slate-500 mb-4 line-clamp-2">
-                            {project.description || "No description provided"}
-                          </p>
-
-                          <div className="space-y-4">
-                            <div>
-                              <div className="flex justify-between text-xs font-bold mb-2">
-                                <span className="text-slate-500 uppercase tracking-wider">Completion</span>
-                                <span className="text-slate-900">{progress}%</span>
-                              </div>
-                              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
-                                  <DollarSign className="w-4 h-4" />
-                                </div>
-                                <span className="text-sm font-semibold text-slate-600">
-                                  {formatBudget(project.budget, project.currency)}
+                      return (
+                        <div
+                          key={project.id}
+                          className="card-animate group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+                        >
+                          <div className="relative h-48 overflow-hidden">
+                            <img
+                              src={getProjectImage(project)}
+                              alt={project.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <div className="absolute top-4 left-4">
+                              {project.projectType && (
+                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-900/70 text-white backdrop-blur-md">
+                                  {project.projectType}
                                 </span>
+                              )}
+                            </div>
+                            <div className="absolute top-4 right-4">
+                              <span className={cn(
+                                "px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md",
+                                displayStatus === 'active' ? 'bg-emerald-500/20 text-emerald-600' :
+                                  displayStatus === 'in progress' ? 'bg-emerald-500/20 text-emerald-600' :
+                                    displayStatus === 'planning' ? 'bg-amber-500/20 text-amber-600' :
+                                      displayStatus === 'concept' ? 'bg-slate-500/20 text-slate-600' :
+                                        displayStatus === 'on-hold' ? 'bg-orange-500/20 text-orange-600' :
+                                          displayStatus === 'completed' ? 'bg-blue-500/20 text-blue-600' :
+                                            displayStatus === 'aborted' ? 'bg-red-500/20 text-red-600' :
+                                              'bg-blue-500/20 text-blue-600'
+                              )}>
+                                {displayStatus.toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="p-6">
+                            <h3 className="text-xl font-bold text-slate-900 mb-2 truncate">{project.name}</h3>
+                            <p className="text-sm text-slate-500 mb-4 line-clamp-2">
+                              {project.description || "No description provided"}
+                            </p>
+
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex justify-between text-xs font-bold mb-2">
+                                  <span className="text-slate-500 uppercase tracking-wider">Completion</span>
+                                  <span className="text-slate-900">{progress}%</span>
+                                </div>
+                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setEditProjectId(project.id)}
-                                  className="text-blue-400 hover:text-blue-600 p-1 rounded transition-colors"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <DeleteProjectDialog
-                                  projectId={project.id}
-                                  projectName={project.name}
-                                  trigger={
-                                    <button className="text-red-400 hover:text-red-600 p-1 rounded transition-colors">
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  }
-                                />
-                                <button
-                                  onClick={() => handleProjectClick(project.id)}
-                                  className="text-amber-600 hover:text-amber-700 font-bold text-xs flex items-center gap-1"
-                                >
-                                  DETAILS <ArrowUpRight className="w-3 h-3" />
-                                </button>
+
+                              <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                                    <DollarSign className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-sm font-semibold text-slate-600">
+                                    {formatBudget(project.budget, project.currency)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setEditProjectId(project.id)}
+                                    className="text-blue-400 hover:text-blue-600 p-1 rounded transition-colors"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <DeleteProjectDialog
+                                    projectId={project.id}
+                                    projectName={project.name}
+                                    trigger={
+                                      <button className="text-red-400 hover:text-red-600 p-1 rounded transition-colors">
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    }
+                                  />
+                                  <button
+                                    onClick={() => handleProjectClick(project.id)}
+                                    className="text-amber-600 hover:text-amber-700 font-bold text-xs flex items-center gap-1"
+                                  >
+                                    DETAILS <ArrowUpRight className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Show All Projects Button */}
+                  {filteredProjects.length > 12 && (
+                    <div className="mt-6 text-center">
+                      <button
+                        onClick={() => setLocation('/projects')}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
+                      >
+                        View All {filteredProjects.length} Projects
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
+
             </div>
 
             <div className="space-y-8">
@@ -481,33 +551,14 @@ export default function NewLanding() {
                 </div>
               </div>
 
-              {/* Recent Activity */}
+              {/* Projects by Status Chart */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-6">Recent Activity</h3>
-                <div className="space-y-6">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex gap-4">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-                        activity.type === 'task' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                      )}>
-                        {activity.type === 'task' ? <CheckCircle2 className="w-5 h-5" /> : <DollarSign className="w-5 h-5" />}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-slate-900">{activity.action}</div>
-                        <div className="text-xs text-slate-500 mb-1">{activity.project}</div>
-                        <p className="text-sm text-slate-600">{activity.description}</p>
-                        <div className="mt-2 flex items-center gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          <span className="flex items-center gap-1"><User className="w-3 h-3" /> {activity.user}</span>
-                          <span>•</span>
-                          <span>{activity.timestamp}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <button className="w-full py-3 text-slate-500 text-xs font-bold hover:text-slate-900 transition-colors uppercase tracking-widest flex items-center justify-center gap-2">
-                    View All Logs <ExternalLink className="w-3 h-3" />
-                  </button>
+                <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-500" />
+                  Projects by Status
+                </h3>
+                <div className="h-[300px]">
+                  <ReactECharts option={statusChartOption} style={{ height: '100%' }} />
                 </div>
               </div>
             </div>
