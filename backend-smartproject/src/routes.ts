@@ -203,20 +203,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Create a partial schema for the project update
-      const partialProjectSchema = z.object({
-        name: z.string().optional(),
-        description: z.string().nullable().optional(),
-        budget: z.coerce.number().optional(),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-        currency: z.enum(["USD", "EUR", "SAR"]).optional(),
-      });
-
-      const projectData = partialProjectSchema.parse(req.body);
+      // Use the project schema in partial mode for validation
+      const projectData = projectSchema.partial().parse(req.body);
 
       // Check if budget is being changed
-      if (projectData.budget !== undefined && projectData.budget !== Number(project.budget)) {
+      if (projectData.budget !== undefined && Number(projectData.budget) !== Number(project.budget)) {
         // Get all WBS items for the project
         const wbsItems = await storage.getWbsItems(id);
 
@@ -227,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (hasOnlyDefaultWbs) {
           // Calculate budget difference
-          const budgetDifference = projectData.budget - Number(project.budget);
+          const budgetDifference = Number(projectData.budget) - Number(project.budget);
 
           // Find the "Procurement & Construction" WBS item
           const procurementWbs = wbsItems.find(item => item.name === "Procurement & Construction");
@@ -256,13 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Convert budget to string if it's a number for storage compatibility
-      const storageData = {
-        ...projectData,
-        budget: projectData.budget !== undefined ? projectData.budget.toString() : undefined
-      };
-
-      const updatedProject = await storage.updateProject(id, storageData);
+      const updatedProject = await storage.updateProject(id, projectData);
 
       res.json(updatedProject);
     } catch (err) {
@@ -4339,7 +4324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const activities = await storage.getPlannedActivities(projectId, startDate, endDate);
-      
+
       // Fetch tasks for each activity
       const activitiesWithTasks = await Promise.all(
         activities.map(async (activity) => {
@@ -4347,7 +4332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { ...activity, tasks };
         })
       );
-      
+
       res.json(activitiesWithTasks);
     } catch (err) {
       handleError(err, res);
