@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import MasterLayout from "@/layouts/master-layout";
 import ReactECharts from "echarts-for-react";
 import anime from "animejs";
@@ -19,239 +21,120 @@ import {
     AlertTriangle,
     Lightbulb,
     Briefcase,
-    FileText
+    FileText,
+    Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
+import { Project, WbsItem, Dependency } from "@shared/schema";
 
-// Sample data from project.js
-const sampleWBSData = [
-    {
-        id: 'wbs-1',
-        name: 'Site Preparation',
-        type: 'wbs',
-        expanded: true,
-        children: [
-            {
-                id: 'wp-1-1',
-                name: 'Land Clearing',
-                type: 'workpackage',
-                budget: { allocated: 150000, spent: 120000 },
-                progress: 80,
-                children: [
-                    {
-                        id: 'act-1-1-1',
-                        name: 'Tree Removal',
-                        type: 'activity',
-                        duration: 5,
-                        startDate: '2024-04-15',
-                        endDate: '2024-04-20',
-                        status: 'completed',
-                        progress: 100
-                    },
-                    {
-                        id: 'act-1-1-2',
-                        name: 'Grading',
-                        type: 'activity',
-                        duration: 8,
-                        startDate: '2024-04-21',
-                        endDate: '2024-04-29',
-                        status: 'in-progress',
-                        progress: 60
-                    }
-                ]
-            },
-            {
-                id: 'wp-1-2',
-                name: 'Utility Relocation',
-                type: 'workpackage',
-                budget: { allocated: 200000, spent: 180000 },
-                progress: 90,
-                children: [
-                    {
-                        id: 'act-1-2-1',
-                        name: 'Water Lines',
-                        type: 'activity',
-                        duration: 6,
-                        startDate: '2024-04-25',
-                        endDate: '2024-05-01',
-                        status: 'completed',
-                        progress: 100
-                    },
-                    {
-                        id: 'act-1-2-2',
-                        name: 'Electrical',
-                        type: 'activity',
-                        duration: 4,
-                        startDate: '2024-04-28',
-                        endDate: '2024-05-02',
-                        status: 'in-progress',
-                        progress: 75
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        id: 'wbs-2',
-        name: 'Foundation',
-        type: 'wbs',
-        expanded: true,
-        children: [
-            {
-                id: 'wp-2-1',
-                name: 'Excavation',
-                type: 'workpackage',
-                budget: { allocated: 300000, spent: 150000 },
-                progress: 50,
-                children: [
-                    {
-                        id: 'act-2-1-1',
-                        name: 'Site Excavation',
-                        type: 'activity',
-                        duration: 10,
-                        startDate: '2024-05-03',
-                        endDate: '2024-05-13',
-                        status: 'in-progress',
-                        progress: 50
-                    }
-                ]
-            },
-            {
-                id: 'wp-2-2',
-                name: 'Base Layer',
-                type: 'workpackage',
-                budget: { allocated: 400000, spent: 0 },
-                progress: 0,
-                children: [
-                    {
-                        id: 'act-2-2-1',
-                        name: 'Aggregate Base',
-                        type: 'activity',
-                        duration: 12,
-                        startDate: '2024-05-14',
-                        endDate: '2024-05-26',
-                        status: 'not-started',
-                        progress: 0
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        id: 'wbs-3',
-        name: 'Pavement',
-        type: 'wbs',
-        expanded: false,
-        children: [
-            {
-                id: 'wp-3-1',
-                name: 'Asphalt Base',
-                type: 'workpackage',
-                budget: { allocated: 800000, spent: 0 },
-                progress: 0,
-                children: [
-                    {
-                        id: 'act-3-1-1',
-                        name: 'Asphalt Installation',
-                        type: 'activity',
-                        duration: 15,
-                        startDate: '2024-05-27',
-                        endDate: '2024-06-11',
-                        status: 'not-started',
-                        progress: 0
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        id: 'wbs-4',
-        name: 'Signage',
-        type: 'wbs',
-        expanded: false,
-        children: [
-            {
-                id: 'wp-4-1',
-                name: 'Regulatory Signs',
-                type: 'workpackage',
-                budget: { allocated: 50000, spent: 0 },
-                progress: 0,
-                children: [
-                    {
-                        id: 'act-4-1-1',
-                        name: 'Sign Installation',
-                        type: 'activity',
-                        duration: 5,
-                        startDate: '2024-06-10',
-                        endDate: '2024-06-15',
-                        status: 'not-started',
-                        progress: 0
-                    }
-                ]
-            }
-        ]
-    }
-];
-
-const activityDependencies = [
-    { from: 'act-1-1-1', to: 'act-1-1-2' },
-    { from: 'act-1-1-2', to: 'act-2-1-1' },
-    { from: 'act-1-2-1', to: 'act-2-1-1' },
-    { from: 'act-1-2-2', to: 'act-2-1-1' },
-    { from: 'act-2-1-1', to: 'act-2-2-1' },
-    { from: 'act-2-2-1', to: 'act-3-1-1' },
-    { from: 'act-3-1-1', to: 'act-4-1-1' }
-];
+// Types for the hierarchical WBS tree used in the UI
+interface WbsTreeNode extends Omit<WbsItem, 'startDate' | 'endDate'> {
+    startDate: string | null;
+    endDate: string | null;
+    expanded: boolean;
+    children: WbsTreeNode[];
+    progress?: number;
+    budget?: { allocated: number; spent: number };
+}
 
 export default function NewProject() {
-    const [wbs, setWbs] = useState(sampleWBSData);
+    const { projectId } = useParams<{ projectId: string }>();
+    const [, setLocation] = useLocation();
+    const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
     const [timelineView, setTimelineView] = useState<'week' | 'month' | 'quarter'>('month');
     const infoRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        anime({
-            targets: infoRef.current?.querySelectorAll(".animate-item"),
-            opacity: [0, 1],
-            translateX: [-20, 0],
-            delay: anime.stagger(100),
-            duration: 800,
-            easing: "easeOutExpo"
+    // Fetch Project Details
+    const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
+        queryKey: [`/api/projects/${projectId}`],
+        enabled: !!projectId,
+    });
+
+    // Fetch WBS Items
+    const { data: flatWbsItems = [], isLoading: isWbsLoading } = useQuery<WbsItem[]>({
+        queryKey: [`/api/projects/${projectId}/wbs`],
+        enabled: !!projectId,
+    });
+
+    // Fetch Dependencies
+    const { data: apiDependencies = [], isLoading: isDepsLoading } = useQuery<Dependency[]>({
+        queryKey: [`/api/projects/${projectId}/dependencies`],
+        enabled: !!projectId,
+    });
+
+    // Transform flat WBS into tree structure
+    const wbsTree = useMemo(() => {
+        const itemMap = new Map<number, WbsTreeNode>();
+        const roots: WbsTreeNode[] = [];
+
+        // First pass: Create nodes and map by ID
+        flatWbsItems.forEach(item => {
+            itemMap.set(item.id, {
+                ...item,
+                expanded: expandedIds.has(item.id) || item.isTopLevel || false,
+                children: [],
+                progress: Number(item.percentComplete || 0),
+                budget: {
+                    allocated: Number(item.budgetedCost || 0),
+                    spent: Number(item.actualCost || 0)
+                }
+            });
         });
-    }, []);
 
-    const toggleWbs = (id: string) => {
-        const updateItems = (items: any[]): any[] => {
-            return items.map(item => {
-                if (item.id === id) return { ...item, expanded: !item.expanded };
-                if (item.children) return { ...item, children: updateItems(item.children) };
-                return item;
+        // Second pass: Build hierarchy
+        flatWbsItems.forEach(item => {
+            const node = itemMap.get(item.id)!;
+            if (item.parentId && itemMap.has(item.parentId)) {
+                itemMap.get(item.parentId)!.children.push(node);
+            } else {
+                roots.push(node);
+            }
+        });
+
+        return roots;
+    }, [flatWbsItems, expandedIds]);
+
+    // Extract activities for charts
+    const activities = useMemo(() => {
+        return flatWbsItems.filter(item => item.type === 'Activity');
+    }, [flatWbsItems]);
+
+    // Animations
+    useEffect(() => {
+        if (!isProjectLoading && infoRef.current) {
+            anime({
+                targets: infoRef.current?.querySelectorAll(".animate-item"),
+                opacity: [0, 1],
+                translateX: [-20, 0],
+                delay: anime.stagger(100),
+                duration: 800,
+                easing: "easeOutExpo"
             });
-        };
-        setWbs(updateItems(wbs));
+        }
+    }, [isProjectLoading]);
+
+    const toggleWbs = (id: number) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     };
 
-    const extractActivities = (wbsData: any[]) => {
-        const activities: any[] = [];
-        const traverse = (items: any[]) => {
-            items.forEach(item => {
-                if (item.type === 'activity') activities.push(item);
-                if (item.children) traverse(item.children);
-            });
-        };
-        traverse(wbsData);
-        return activities;
-    };
-
-    const activities = extractActivities(wbs);
-
-    const getStatusColor = (status: string) => {
+    const getStatusColor = (status: string | null) => {
         const colors: Record<string, string> = {
             'not-started': '#9CA3AF',
             'in-progress': '#F59E0B',
             'completed': '#10B981',
-            'blocked': '#EF4444'
+            'blocked': '#EF4444',
+            'planning': '#F59E0B',
+            'active': '#059669',
+            'on-hold': '#F97316',
+            'aborted': '#EF4444'
         };
-        return colors[status] || '#6B7280';
+        return colors[status?.toLowerCase() || ''] || '#6B7280';
     };
 
     const networkOption = {
@@ -264,9 +147,8 @@ export default function NewProject() {
                         return `
                             <div class="px-2 py-1">
                                 <div class="font-bold border-b border-slate-200 mb-1">${activity.name}</div>
-                                <div class="text-xs text-slate-500">Status: ${activity.status}</div>
+                                <div class="text-xs text-slate-500">Progress: ${activity.percentComplete}%</div>
                                 <div class="text-xs text-slate-500">Duration: ${activity.duration} days</div>
-                                <div class="text-xs text-slate-500">Progress: ${activity.progress}%</div>
                             </div>
                         `;
                     }
@@ -283,7 +165,7 @@ export default function NewProject() {
                 draggable: true,
                 symbolSize: 45,
                 itemStyle: {
-                    color: getStatusColor(act.status),
+                    color: getStatusColor('active'), // Default to active color for nodes
                     borderColor: '#fff',
                     borderWidth: 2,
                     shadowColor: 'rgba(0, 0, 0, 0.1)',
@@ -297,12 +179,12 @@ export default function NewProject() {
                     color: '#475569'
                 }
             })),
-            links: activityDependencies.map(dep => {
-                const source = activities.find(a => a.id === dep.from);
-                const target = activities.find(a => a.id === dep.to);
+            links: apiDependencies.map(dep => {
+                const source = flatWbsItems.find(a => a.id === dep.predecessorId);
+                const target = flatWbsItems.find(a => a.id === dep.successorId);
                 return {
-                    source: source?.name || dep.from,
-                    target: target?.name || dep.to
+                    source: source?.name || `ID-${dep.predecessorId}`,
+                    target: target?.name || `ID-${dep.successorId}`
                 };
             }),
             force: {
@@ -332,30 +214,30 @@ export default function NewProject() {
         const categories = sortedActivities.map(act => act.name);
 
         const data = sortedActivities.map((act, idx) => {
-            const start = new Date(act.startDate).getTime();
-            const end = new Date(act.endDate).getTime();
+            const start = act.startDate ? new Date(act.startDate).getTime() : Date.now();
+            const end = act.endDate ? new Date(act.endDate).getTime() : start + (act.duration || 1) * 24 * 60 * 60 * 1000;
             return {
                 name: act.name,
                 value: [idx, start, end, end - start],
                 itemStyle: {
-                    color: getStatusColor(act.status),
+                    color: getStatusColor(Number(act.percentComplete) === 100 ? 'completed' : 'in-progress'),
                     borderRadius: 4
                 }
             };
         });
 
-        const now = new Date('2024-04-15').getTime();
+        const now = project?.startDate ? new Date(project.startDate).getTime() : Date.now();
         let minDate, maxDate;
 
         if (timelineView === 'week') {
             minDate = now;
-            maxDate = now + 14 * 24 * 60 * 60 * 1000; // 2 weeks
+            maxDate = now + 14 * 24 * 60 * 60 * 1000;
         } else if (timelineView === 'month') {
             minDate = now;
-            maxDate = now + 45 * 24 * 60 * 60 * 1000; // 45 days
+            maxDate = now + 45 * 24 * 60 * 60 * 1000;
         } else {
             minDate = now;
-            maxDate = now + 120 * 24 * 60 * 60 * 1000; // 4 months
+            maxDate = now + 120 * 24 * 60 * 60 * 1000;
         }
 
         return {
@@ -393,17 +275,16 @@ export default function NewProject() {
                 type: 'custom',
                 renderItem: (params: any, api: any) => {
                     const categoryIndex = api.value(0);
-                    const start = api.coord([api.value(1), categoryIndex]);
-                    const end = api.coord([api.value(2), categoryIndex]);
+                    const coordStart = api.coord([api.value(1), categoryIndex]);
+                    const coordEnd = api.coord([api.value(2), categoryIndex]);
                     const height = api.size([0, 1])[1] * 0.4;
-
-                    const width = Math.max(end[0] - start[0], 5);
+                    const width = Math.max(coordEnd[0] - coordStart[0], 5);
 
                     return {
                         type: 'rect',
                         shape: {
-                            x: start[0],
-                            y: start[1] - height / 2,
+                            x: coordStart[0],
+                            y: coordStart[1] - height / 2,
                             width: width,
                             height: height,
                             r: 4
@@ -417,9 +298,7 @@ export default function NewProject() {
         };
     };
 
-    const ganttOption = getGanttOption();
-
-    const renderWbsTree = (items: any[], level = 0) => {
+    const renderWbsTree = (items: WbsTreeNode[], level = 0) => {
         return items.map(item => (
             <div key={item.id}>
                 <div
@@ -435,7 +314,7 @@ export default function NewProject() {
                         </span>
                         <div className={cn(
                             "w-2 h-2 rounded-full",
-                            item.type === 'wbs' ? 'bg-blue-500' : item.type === 'workpackage' ? 'bg-amber-500' : 'bg-emerald-500'
+                            item.type === 'Summary' ? 'bg-blue-500' : item.type === 'WorkPackage' ? 'bg-amber-500' : 'bg-emerald-500'
                         )} />
                         <div>
                             <div className="text-sm font-bold text-slate-800">{item.name}</div>
@@ -463,8 +342,40 @@ export default function NewProject() {
         ));
     };
 
+    if (isProjectLoading || isWbsLoading || isDepsLoading) {
+        return (
+            <MasterLayout projectId={projectId ? parseInt(projectId) : undefined}>
+                <div className="min-h-screen flex items-center justify-center bg-white">
+                    <div className="text-center">
+                        <Loader2 className="w-12 h-12 animate-spin text-amber-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold text-slate-900">Loading Project Data...</h2>
+                    </div>
+                </div>
+            </MasterLayout>
+        );
+    }
+
+    if (!project) {
+        return (
+            <MasterLayout projectId={projectId ? parseInt(projectId) : undefined}>
+                <div className="min-h-screen flex items-center justify-center bg-white">
+                    <div className="text-center">
+                        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold text-slate-900">Project Not Found</h2>
+                        <button
+                            onClick={() => setLocation('/newlanding')}
+                            className="mt-4 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold"
+                        >
+                            Return to Portfolio
+                        </button>
+                    </div>
+                </div>
+            </MasterLayout>
+        );
+    }
+
     return (
-        <MasterLayout>
+        <MasterLayout projectId={project.id}>
             <div className="min-h-screen bg-white">
                 {/* Header Section */}
                 <section
@@ -478,32 +389,43 @@ export default function NewProject() {
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-8 relative z-10" ref={infoRef}>
                         <div className="animate-item">
                             <div className="flex items-center gap-4 mb-4">
-                                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                                <button
+                                    onClick={() => setLocation('/newlanding')}
+                                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                >
                                     <ArrowLeft size={20} />
                                 </button>
-                                <h1 className="text-3xl font-bold font-display">Highway Extension Project</h1>
-                                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/30">
-                                    ACTIVE
+                                <h1 className="text-3xl font-bold font-display">{project.name}</h1>
+                                <span className={cn(
+                                    "px-3 py-1 text-xs font-bold rounded-full border",
+                                    project.status === 'active' || project.status === 'in progress'
+                                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                        : "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                                )}>
+                                    {project.status?.toUpperCase() || 'PLANNING'}
                                 </span>
                             </div>
                             <div className="flex flex-wrap gap-6 text-sm text-slate-400">
-                                <div className="flex items-center gap-2"><MapPin size={16} /> Downtown District</div>
-                                <div className="flex items-center gap-2"><User size={16} /> Sarah Johnson</div>
-                                <div className="flex items-center gap-2"><Calendar size={16} /> Apr 15, 2024 - Apr 15, 2025</div>
+                                <div className="flex items-center gap-2"><Briefcase size={16} /> {project.projectType || 'General'}</div>
+                                <div className="flex items-center gap-2"><Calendar size={16} /> {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}</div>
                             </div>
                         </div>
                         <div className="animate-item flex gap-12">
                             <div className="text-center">
-                                <div className="text-2xl font-bold">65%</div>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progress</div>
+                                <div className="text-2xl font-bold">
+                                    {Math.round(flatWbsItems.reduce((acc, item) => acc + Number(item.percentComplete || 0), 0) / (flatWbsItems.length || 1))}%
+                                </div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Avg Progress</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-amber-500">$2.5M</div>
+                                <div className="text-2xl font-bold text-amber-500">
+                                    {project.currency} {(Number(project.budget) / 1000000).toFixed(1)}M
+                                </div>
                                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Budget</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold">34 / 47</div>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tasks</div>
+                                <div className="text-2xl font-bold">{activities.length} / {flatWbsItems.length}</div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Activities</div>
                             </div>
                         </div>
                     </div>
@@ -530,7 +452,7 @@ export default function NewProject() {
                                 </div>
                             </div>
                             <div className="p-2">
-                                {renderWbsTree(wbs)}
+                                {renderWbsTree(wbsTree)}
                             </div>
                         </div>
 
@@ -572,11 +494,17 @@ export default function NewProject() {
                                 </div>
                             </div>
                             <div className="p-6 h-[400px]">
-                                <ReactECharts
-                                    option={ganttOption}
-                                    style={{ height: '100%' }}
-                                    notMerge={true}
-                                />
+                                {activities.length > 0 ? (
+                                    <ReactECharts
+                                        option={getGanttOption()}
+                                        style={{ height: '100%' }}
+                                        notMerge={true}
+                                    />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-slate-400 font-medium">
+                                        No activities to display on timeline
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -590,9 +518,9 @@ export default function NewProject() {
                             </h3>
                             <div className="space-y-4">
                                 {[
-                                    { label: "Allocated", value: "$2,500,000", color: "text-slate-600" },
-                                    { label: "Spent to date", value: "$1,800,000", color: "text-slate-600" },
-                                    { label: "Remaining", value: "$700,000", color: "text-emerald-600 font-bold" },
+                                    { label: "Total Allocated", value: `${project.currency} ${Number(project.budget).toLocaleString()}`, color: "text-slate-600" },
+                                    { label: "Used Budget", value: `${project.currency} ${flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0).toLocaleString()}`, color: "text-slate-600" },
+                                    { label: "Remaining", value: `${project.currency} ${(Number(project.budget) - flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0)).toLocaleString()}`, color: "text-emerald-600 font-bold" },
                                 ].map((row, i) => (
                                     <div key={i} className="flex justify-between items-center text-sm">
                                         <span className="text-slate-500">{row.label}</span>
@@ -602,10 +530,15 @@ export default function NewProject() {
                                 <div className="pt-4 border-t border-slate-200">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-xs font-bold text-slate-500 uppercase">Usage</span>
-                                        <span className="text-xs font-bold text-slate-900">72%</span>
+                                        <span className="text-xs font-bold text-slate-900">
+                                            {Math.round((flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0) / (Number(project.budget) || 1)) * 100)}%
+                                        </span>
                                     </div>
                                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-500" style={{ width: '72%' }} />
+                                        <div
+                                            className="h-full bg-gradient-to-r from-blue-500 to-emerald-500"
+                                            style={{ width: `${Math.round((flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0) / (Number(project.budget) || 1)) * 100)}%` }}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -619,10 +552,10 @@ export default function NewProject() {
                             <h3 className="font-bold text-slate-900 mb-6">Project Metadata</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 {[
-                                    { label: "Total WBS", value: "4", icon: ListTodo },
-                                    { label: "Critical Path", value: "12d", icon: Activity },
-                                    { label: "Risks", value: "2 High", icon: AlertTriangle },
-                                    { label: "Learnt", value: "8 Items", icon: Lightbulb },
+                                    { label: "Total WBS", value: flatWbsItems.length.toString(), icon: ListTodo },
+                                    { label: "Dependencies", value: apiDependencies.length.toString(), icon: Activity },
+                                    { label: "Risks", value: "0", icon: AlertTriangle },
+                                    { label: "Learnt", value: "0 Items", icon: Lightbulb },
                                 ].map((stat, i) => (
                                     <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                                         <stat.icon className="w-4 h-4 text-slate-400 mb-2" />

@@ -279,7 +279,9 @@ function Router() {
 
       {/* New Pages Ported from Vanilla JS */}
       <Route path="/newlanding" component={NewLanding} />
-      <Route path="/newproject" component={NewProject} />
+      <Route path="/newproject/:projectId">
+        {params => <NewProject />}
+      </Route>
 
 
       {/* Collaboration Hub */}

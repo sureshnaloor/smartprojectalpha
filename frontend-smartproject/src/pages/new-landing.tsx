@@ -278,7 +278,7 @@ export default function NewLanding() {
 
   // Navigate to project
   const handleProjectClick = (projectId: number) => {
-    setLocation(`/projects/${projectId}`);
+    setLocation(`/newproject/${projectId}`);
   };
 
   return (

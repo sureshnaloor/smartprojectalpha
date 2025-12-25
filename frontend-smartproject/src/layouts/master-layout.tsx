@@ -7,9 +7,10 @@ import { SharedNavigation } from "@/components/shared-navigation";
 
 interface MasterLayoutProps {
   children: React.ReactNode;
+  projectId?: number;
 }
 
-export default function MasterLayout({ children }: MasterLayoutProps) {
+export default function MasterLayout({ children, projectId }: MasterLayoutProps) {
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const [, setLocation] = useLocation();
@@ -23,11 +24,11 @@ export default function MasterLayout({ children }: MasterLayoutProps) {
       <Toaster position="top-right" />
       {/* Top Navigation - Fixed */}
       <SharedNavigation variant="app" />
-      
+
       <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 4rem)', paddingTop: '4rem' }}>
         <div className="flex flex-1 overflow-hidden">
           {/* Left Sidebar Navigation - Show global navigation for master pages */}
-          <SideNavigation currentProjectId={undefined} />
+          <SideNavigation currentProjectId={projectId} />
 
           {/* Main Content Area */}
           <main className="flex-1 flex flex-col">
