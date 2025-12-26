@@ -291,6 +291,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // WBS methods
+  async getWbsItemsByParentId(parentId: number): Promise<WbsItem[]> {
+    return await db.select().from(wbsItems).where(eq(wbsItems.parentId, parentId));
+  }
+
   async getWbsItems(projectId: number): Promise<WbsItem[]> {
     const dbItems = await db
       .select()
@@ -387,6 +391,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteWbsItem(id: number): Promise<void> {
+    // Get all children recursively and delete them
+    const children = await this.getWbsItemsByParentId(id);
+    for (const child of children) {
+      await this.deleteWbsItem(child.id);
+    }
+    // Finally delete the item itself
     await db.delete(wbsItems).where(eq(wbsItems.id, id));
   }
 
@@ -513,12 +523,12 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async createTask(data: InsertTask): Promise<Task> {
+  async createTask(data: any): Promise<Task> {
     const [result] = await db.insert(tasks).values(data).returning();
     return result;
   }
 
-  async updateTask(id: number, data: InsertTask): Promise<Task | undefined> {
+  async updateTask(id: number, data: Partial<any>): Promise<Task | undefined> {
     const [result] = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
     return result;
   }
@@ -538,7 +548,7 @@ export class DatabaseStorage implements IStorage {
     return activity;
   }
 
-  async createActivity(data: InsertActivity): Promise<Activity> {
+  async createActivity(data: any): Promise<Activity> {
     const [result] = await db.insert(activities).values(data).returning();
     return {
       ...result,
@@ -546,7 +556,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateActivity(id: number, data: InsertActivity): Promise<Activity | undefined> {
+  async updateActivity(id: number, data: Partial<any>): Promise<Activity | undefined> {
     const [result] = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
     return result ? {
       ...result,
@@ -569,7 +579,7 @@ export class DatabaseStorage implements IStorage {
     return resource;
   }
 
-  async createResource(data: InsertResource): Promise<Resource> {
+  async createResource(data: any): Promise<Resource> {
     const [result] = await db.insert(resources).values(data).returning();
     return {
       ...result,
@@ -578,7 +588,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateResource(id: number, data: InsertResource): Promise<Resource | undefined> {
+  async updateResource(id: number, data: Partial<any>): Promise<Resource | undefined> {
     const [result] = await db.update(resources).set(data).where(eq(resources.id, id)).returning();
     return result ? {
       ...result,
@@ -602,7 +612,7 @@ export class DatabaseStorage implements IStorage {
     return taskResource;
   }
 
-  async createTaskResource(data: InsertTaskResource): Promise<TaskResource> {
+  async createTaskResource(data: any): Promise<TaskResource> {
     const [result] = await db.insert(taskResources).values(data).returning();
     return {
       ...result,
@@ -610,7 +620,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateTaskResource(id: number, data: InsertTaskResource): Promise<TaskResource | undefined> {
+  async updateTaskResource(id: number, data: Partial<any>): Promise<TaskResource | undefined> {
     const [result] = await db.update(taskResources).set(data).where(eq(taskResources.id, id)).returning();
     return result ? {
       ...result,
@@ -633,12 +643,12 @@ export class DatabaseStorage implements IStorage {
     return activity;
   }
 
-  async createProjectActivity(data: InsertProjectActivity): Promise<ProjectActivity> {
+  async createProjectActivity(data: any): Promise<ProjectActivity> {
     const [result] = await db.insert(projectActivities).values(data).returning();
     return result;
   }
 
-  async updateProjectActivity(id: number, data: InsertProjectActivity): Promise<ProjectActivity | undefined> {
+  async updateProjectActivity(id: number, data: Partial<any>): Promise<ProjectActivity | undefined> {
     const [result] = await db.update(projectActivities).set(data).where(eq(projectActivities.id, id)).returning();
     return result;
   }
@@ -658,12 +668,12 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async createProjectTask(data: InsertProjectTask): Promise<ProjectTask> {
+  async createProjectTask(data: any): Promise<ProjectTask> {
     const [result] = await db.insert(projectTasks).values(data).returning();
     return result;
   }
 
-  async updateProjectTask(id: number, data: InsertProjectTask): Promise<ProjectTask | undefined> {
+  async updateProjectTask(id: number, data: Partial<any>): Promise<ProjectTask | undefined> {
     const [result] = await db.update(projectTasks).set(data).where(eq(projectTasks.id, id)).returning();
     return result;
   }
@@ -683,12 +693,12 @@ export class DatabaseStorage implements IStorage {
     return resource;
   }
 
-  async createProjectResource(data: InsertProjectResource): Promise<ProjectResource> {
+  async createProjectResource(data: any): Promise<ProjectResource> {
     const [result] = await db.insert(projectResources).values(data).returning();
     return result;
   }
 
-  async updateProjectResource(id: number, data: InsertProjectResource): Promise<ProjectResource | undefined> {
+  async updateProjectResource(id: number, data: Partial<any>): Promise<ProjectResource | undefined> {
     const [result] = await db.update(projectResources).set(data).where(eq(projectResources.id, id)).returning();
     return result;
   }
@@ -712,17 +722,17 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async createDailyProgress(data: InsertDailyProgress): Promise<DailyProgress> {
+  async createDailyProgress(data: any): Promise<DailyProgress> {
     const [entry] = await db.insert(dailyProgress).values(data).returning();
     return entry;
   }
 
-  async createDailyProgressBulk(data: InsertDailyProgress[]): Promise<DailyProgress[]> {
+  async createDailyProgressBulk(data: any[]): Promise<DailyProgress[]> {
     const entries = await db.insert(dailyProgress).values(data).returning();
     return entries;
   }
 
-  async updateDailyProgress(id: number, data: Partial<InsertDailyProgress>): Promise<DailyProgress | undefined> {
+  async updateDailyProgress(id: number, data: Partial<any>): Promise<DailyProgress | undefined> {
     const [entry] = await db
       .update(dailyProgress)
       .set(data)
@@ -750,17 +760,17 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async createResourcePlan(data: InsertResourcePlan): Promise<ResourcePlan> {
+  async createResourcePlan(data: any): Promise<ResourcePlan> {
     const [entry] = await db.insert(resourcePlans).values(data).returning();
     return entry;
   }
 
-  async createResourcePlanBulk(data: InsertResourcePlan[]): Promise<ResourcePlan[]> {
+  async createResourcePlanBulk(data: any[]): Promise<ResourcePlan[]> {
     const entries = await db.insert(resourcePlans).values(data).returning();
     return entries;
   }
 
-  async updateResourcePlan(id: number, data: Partial<InsertResourcePlan>): Promise<ResourcePlan | undefined> {
+  async updateResourcePlan(id: number, data: Partial<any>): Promise<ResourcePlan | undefined> {
     const [entry] = await db
       .update(resourcePlans)
       .set({ ...data, updatedAt: new Date() })
@@ -788,12 +798,12 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async createRiskRegister(data: InsertRiskRegister): Promise<RiskRegister> {
+  async createRiskRegister(data: any): Promise<RiskRegister> {
     const [entry] = await db.insert(riskRegister).values(data).returning();
     return entry;
   }
 
-  async updateRiskRegister(id: number, data: Partial<InsertRiskRegister>): Promise<RiskRegister | undefined> {
+  async updateRiskRegister(id: number, data: Partial<any>): Promise<RiskRegister | undefined> {
     const [entry] = await db
       .update(riskRegister)
       .set({ ...data, updatedAt: new Date() })
@@ -821,12 +831,12 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async createLessonLearntRegister(data: InsertLessonLearntRegister): Promise<LessonLearntRegister> {
+  async createLessonLearntRegister(data: any): Promise<LessonLearntRegister> {
     const [entry] = await db.insert(lessonLearntRegister).values(data).returning();
     return entry;
   }
 
-  async updateLessonLearntRegister(id: number, data: Partial<InsertLessonLearntRegister>): Promise<LessonLearntRegister | undefined> {
+  async updateLessonLearntRegister(id: number, data: Partial<any>): Promise<LessonLearntRegister | undefined> {
     const [entry] = await db
       .update(lessonLearntRegister)
       .set({ ...data, updatedAt: new Date() })
@@ -854,12 +864,12 @@ export class DatabaseStorage implements IStorage {
     return position;
   }
 
-  async createDirectManpowerPosition(data: InsertDirectManpowerPosition): Promise<DirectManpowerPosition> {
+  async createDirectManpowerPosition(data: any): Promise<DirectManpowerPosition> {
     const [position] = await db.insert(directManpowerPositions).values(data).returning();
     return position;
   }
 
-  async updateDirectManpowerPosition(id: number, data: Partial<InsertDirectManpowerPosition>): Promise<DirectManpowerPosition | undefined> {
+  async updateDirectManpowerPosition(id: number, data: Partial<any>): Promise<DirectManpowerPosition | undefined> {
     const [position] = await db
       .update(directManpowerPositions)
       .set({ ...data, updatedAt: new Date() })
@@ -872,10 +882,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(directManpowerPositions).where(eq(directManpowerPositions.id, id));
   }
 
-  async updateDirectManpowerPositions(projectId: number, positions: InsertDirectManpowerPosition[]): Promise<DirectManpowerPosition[]> {
+  async updateDirectManpowerPositions(projectId: number, positions: any[]): Promise<DirectManpowerPosition[]> {
     // Delete existing positions for this project
     await db.delete(directManpowerPositions).where(eq(directManpowerPositions.projectId, projectId));
-    
+
     // Insert new positions
     if (positions.length > 0) {
       const newPositions = await db.insert(directManpowerPositions).values(positions).returning();
@@ -899,12 +909,12 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async createDirectManpowerEntry(data: InsertDirectManpowerEntry): Promise<DirectManpowerEntry> {
+  async createDirectManpowerEntry(data: any): Promise<DirectManpowerEntry> {
     const [entry] = await db.insert(directManpowerEntries).values(data).returning();
     return entry;
   }
 
-  async updateDirectManpowerEntry(id: number, data: Partial<InsertDirectManpowerEntry>): Promise<DirectManpowerEntry | undefined> {
+  async updateDirectManpowerEntry(id: number, data: Partial<any>): Promise<DirectManpowerEntry | undefined> {
     const [entry] = await db
       .update(directManpowerEntries)
       .set({ ...data, updatedAt: new Date() })
@@ -932,12 +942,12 @@ export class DatabaseStorage implements IStorage {
     return position;
   }
 
-  async createIndirectManpowerPosition(data: InsertIndirectManpowerPosition): Promise<IndirectManpowerPosition> {
+  async createIndirectManpowerPosition(data: any): Promise<IndirectManpowerPosition> {
     const [position] = await db.insert(indirectManpowerPositions).values(data).returning();
     return position;
   }
 
-  async updateIndirectManpowerPosition(id: number, data: Partial<InsertIndirectManpowerPosition>): Promise<IndirectManpowerPosition | undefined> {
+  async updateIndirectManpowerPosition(id: number, data: Partial<any>): Promise<IndirectManpowerPosition | undefined> {
     const [position] = await db
       .update(indirectManpowerPositions)
       .set({ ...data, updatedAt: new Date() })
@@ -950,10 +960,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(indirectManpowerPositions).where(eq(indirectManpowerPositions.id, id));
   }
 
-  async updateIndirectManpowerPositions(projectId: number, positions: InsertIndirectManpowerPosition[]): Promise<IndirectManpowerPosition[]> {
+  async updateIndirectManpowerPositions(projectId: number, positions: any[]): Promise<IndirectManpowerPosition[]> {
     // Delete existing positions for this project
     await db.delete(indirectManpowerPositions).where(eq(indirectManpowerPositions.projectId, projectId));
-    
+
     // Insert new positions
     if (positions.length > 0) {
       const newPositions = await db.insert(indirectManpowerPositions).values(positions).returning();
@@ -977,12 +987,12 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async createIndirectManpowerEntry(data: InsertIndirectManpowerEntry): Promise<IndirectManpowerEntry> {
+  async createIndirectManpowerEntry(data: any): Promise<IndirectManpowerEntry> {
     const [entry] = await db.insert(indirectManpowerEntries).values(data).returning();
     return entry;
   }
 
-  async updateIndirectManpowerEntry(id: number, data: Partial<InsertIndirectManpowerEntry>): Promise<IndirectManpowerEntry | undefined> {
+  async updateIndirectManpowerEntry(id: number, data: Partial<any>): Promise<IndirectManpowerEntry | undefined> {
     const [entry] = await db
       .update(indirectManpowerEntries)
       .set({ ...data, updatedAt: new Date() })
@@ -1029,12 +1039,12 @@ export class DatabaseStorage implements IStorage {
     return activity;
   }
 
-  async createPlannedActivity(data: InsertPlannedActivity): Promise<PlannedActivity> {
+  async createPlannedActivity(data: any): Promise<PlannedActivity> {
     const [activity] = await db.insert(plannedActivities).values(data).returning();
     return activity;
   }
 
-  async updatePlannedActivity(id: number, data: Partial<InsertPlannedActivity>): Promise<PlannedActivity | undefined> {
+  async updatePlannedActivity(id: number, data: Partial<any>): Promise<PlannedActivity | undefined> {
     const [activity] = await db
       .update(plannedActivities)
       .set({ ...data, updatedAt: new Date() })
@@ -1062,12 +1072,12 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async createPlannedActivityTask(data: InsertPlannedActivityTask): Promise<PlannedActivityTask> {
+  async createPlannedActivityTask(data: any): Promise<PlannedActivityTask> {
     const [task] = await db.insert(plannedActivityTasks).values(data).returning();
     return task;
   }
 
-  async updatePlannedActivityTask(id: number, data: Partial<InsertPlannedActivityTask>): Promise<PlannedActivityTask | undefined> {
+  async updatePlannedActivityTask(id: number, data: Partial<any>): Promise<PlannedActivityTask | undefined> {
     const [task] = await db
       .update(plannedActivityTasks)
       .set({ ...data, updatedAt: new Date() })
@@ -1093,14 +1103,14 @@ export async function getActivity(id: number) {
   return result[0];
 }
 
-export async function createActivity(data: InsertActivity) {
+export async function createActivity(data: any) {
   return await db.insert(activities).values({
     ...data,
     updatedAt: new Date(),
   }).returning();
 }
 
-export async function updateActivity(id: number, data: InsertActivity) {
+export async function updateActivity(id: number, data: any) {
   return await db
     .update(activities)
     .set({

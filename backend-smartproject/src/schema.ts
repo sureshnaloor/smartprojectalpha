@@ -247,22 +247,31 @@ export const insertProjectSchema = createInsertSchema(projects)
   });
 
 // Base WBS schema - a simpler version without all the refinements
-const baseWbsSchema = createInsertSchema(wbsItems)
+export const baseWbsSchema = createInsertSchema(wbsItems)
   .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true, actualStartDate: true, actualEndDate: true } as any)
   .extend({
+    projectId: z.number(),
+    parentId: z.number().nullable().optional(),
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    code: z.string().optional(),
+    level: z.number().optional(),
+    isTopLevel: z.boolean().optional(),
     budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
-    type: z.enum(["Summary", "WorkPackage", "Activity"]),
+    type: z.enum(["Summary", "WorkPackage", "WBS", "Activity"]),
     startDate: z.date().or(z.string()).transform(val => {
       if (val === undefined || val === null) return undefined;
       if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
       }
       return val.toISOString().split('T')[0];
     }).optional(),
     endDate: z.date().or(z.string()).transform(val => {
       if (val === undefined || val === null) return undefined;
       if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
       }
       return val.toISOString().split('T')[0];
     }).optional(),
@@ -276,8 +285,8 @@ const baseWbsSchema = createInsertSchema(wbsItems)
 export const insertWbsItemSchema = baseWbsSchema
   .refine(
     (data) => {
-      // Summary and WorkPackage types must have budgetedCost
-      if (data.type === "Summary" || data.type === "WorkPackage") {
+      // Summary, WorkPackage and WBS types must have budgetedCost
+      if (data.type === "Summary" || data.type === "WorkPackage" || data.type === "WBS") {
         return data.budgetedCost !== undefined && parseFloat(data.budgetedCost) >= 0;
       }
       return true;
@@ -320,7 +329,7 @@ export const insertWbsItemSchema = baseWbsSchema
   )
   .refine(
     (data) => {
-      // Summary and WorkPackage should not have dates
+      // Summary and WorkPackage should not have dates, but WBS can
       if (data.type === "Summary" || data.type === "WorkPackage") {
         return data.startDate === undefined && data.endDate === undefined;
       }

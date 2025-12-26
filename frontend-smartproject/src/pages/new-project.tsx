@@ -22,11 +22,30 @@ import {
     Lightbulb,
     Briefcase,
     FileText,
-    Loader2
+    Loader2,
+    Edit2,
+    Trash2,
+    Info,
+    MoreVertical,
+    Layers,
+    DollarSign
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Project, WbsItem, Dependency } from "@shared/schema";
+import { AddWbsModal } from "@/components/project/add-wbs-modal";
+import { EditWbsModal } from "@/components/project/edit-wbs-modal";
+import { WbsDetailsSheet } from "@/components/project/wbs-details-sheet";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 // Types for the hierarchical WBS tree used in the UI
 interface WbsTreeNode extends Omit<WbsItem, 'startDate' | 'endDate'> {
@@ -44,6 +63,15 @@ export default function NewProject() {
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
     const [timelineView, setTimelineView] = useState<'week' | 'month' | 'quarter'>('month');
     const infoRef = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
+
+    // Modal states
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedWbsItem, setSelectedWbsItem] = useState<{ id: number; name: string; level: number } | null>(null);
+    const [editWbsId, setEditWbsId] = useState<number | null>(null);
+    const [isDetailsSheetOpen, setIsDetailsSheetOpen] = useState(false);
+    const [detailsWbsId, setDetailsWbsId] = useState<number | null>(null);
 
     // Fetch Project Details
     const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
@@ -135,6 +163,33 @@ export default function NewProject() {
             'aborted': '#EF4444'
         };
         return colors[status?.toLowerCase() || ''] || '#6B7280';
+    };
+
+    // Delete WBS Item mutation
+    const deleteWbsMutation = useMutation({
+        mutationFn: async (id: number) => {
+            await apiRequest("DELETE", `/api/wbs/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+            toast({
+                title: "Deleted",
+                description: "WBS item and its children removed",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to delete item",
+                variant: "destructive",
+            });
+        }
+    });
+
+    const handleDeleteWbs = (id: number) => {
+        if (confirm("Are you sure you want to delete this WBS item and all its sub-items?")) {
+            deleteWbsMutation.mutate(id);
+        }
     };
 
     const networkOption = {
@@ -303,38 +358,92 @@ export default function NewProject() {
             <div key={item.id}>
                 <div
                     className={cn(
-                        "flex items-center justify-between py-3 px-4 hover:bg-slate-50 border-b border-slate-100 cursor-pointer group",
-                        level > 0 && "ml-6 border-l-2 border-slate-200"
+                        "flex items-center justify-between py-3 px-4 hover:bg-slate-50 border-b border-slate-100 group transition-all"
                     )}
-                    onClick={() => toggleWbs(item.id)}
+                    style={{ paddingLeft: `${level * 32 + 16}px` }}
                 >
                     <div className="flex items-center gap-3">
-                        <span className="text-slate-400">
+                        <span className="text-slate-400 cursor-pointer flex items-center justify-center w-4 h-4" onClick={() => toggleWbs(item.id)}>
                             {item.children?.length > 0 ? (item.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
                         </span>
                         <div className={cn(
                             "w-2 h-2 rounded-full",
                             item.type === 'Summary' ? 'bg-blue-500' : item.type === 'WorkPackage' ? 'bg-amber-500' : 'bg-emerald-500'
                         )} />
-                        <div>
+                        <div
+                            className="flex-1 cursor-pointer hover:text-blue-400 transition-colors"
+                            onClick={() => {
+                                setDetailsWbsId(item.id);
+                                setIsDetailsSheetOpen(true);
+                            }}
+                        >
                             <div className="text-sm font-bold text-slate-800">{item.name}</div>
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.type}</div>
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-0.5">{item.type}</div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                        {item.progress !== undefined && (
-                            <div className="w-24">
-                                <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
-                                    <span>{item.progress}%</span>
-                                </div>
-                                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500" style={{ width: `${item.progress}%` }} />
-                                </div>
-                            </div>
-                        )}
-                        <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 rounded transition-all">
-                            <MoreHorizontal size={14} className="text-slate-500" />
-                        </button>
+                    <div className="flex items-center gap-4">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    className="p-1.5 hover:bg-slate-200 rounded-lg transition-all text-slate-400 hover:text-blue-500"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {/* 2 Dots Vertical Icon (::) */}
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="6" cy="4" r="1.2" fill="currentColor" />
+                                        <circle cx="6" cy="8" r="1.2" fill="currentColor" />
+                                    </svg>
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="bg-white border-slate-200 shadow-xl min-w-40">
+                                <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400 px-3 py-2">Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDetailsWbsId(item.id);
+                                        setIsDetailsSheetOpen(true);
+                                    }}
+                                    className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
+                                >
+                                    <Info size={14} className="mr-2" />
+                                    View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedWbsItem({ id: item.id, name: item.name, level: item.level });
+                                        setIsAddModalOpen(true);
+                                    }}
+                                    disabled={item.level >= 3}
+                                    className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
+                                >
+                                    <Plus size={14} className="mr-2" />
+                                    Add Child WBS
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditWbsId(item.id);
+                                        setIsEditModalOpen(true);
+                                    }}
+                                    className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
+                                >
+                                    <Edit2 size={14} className="mr-2" />
+                                    Edit Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteWbs(item.id);
+                                    }}
+                                    className="text-xs font-semibold text-red-600 focus:bg-red-50 cursor-pointer px-3 py-2"
+                                >
+                                    <Trash2 size={14} className="mr-2" />
+                                    Delete Item
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
                 {item.expanded && item.children && renderWbsTree(item.children, level + 1)}
@@ -443,7 +552,13 @@ export default function NewProject() {
                                     Work Breakdown Structure
                                 </h3>
                                 <div className="flex gap-2">
-                                    <button className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedWbsItem(null);
+                                            setIsAddModalOpen(true);
+                                        }}
+                                        className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors"
+                                    >
                                         <Plus size={16} className="text-slate-600" />
                                     </button>
                                     <button className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors">
@@ -586,6 +701,29 @@ export default function NewProject() {
                     </div>
                 </div>
             </div>
+
+            <AddWbsModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                projectId={project.id}
+                parentId={selectedWbsItem?.id}
+                parentName={selectedWbsItem?.name}
+                parentLevel={selectedWbsItem?.level}
+            />
+
+            {editWbsId && (
+                <EditWbsModal
+                    isOpen={isEditModalOpen}
+                    onOpenChange={setIsEditModalOpen}
+                    wbsId={editWbsId}
+                />
+            )}
+
+            <WbsDetailsSheet
+                isOpen={isDetailsSheetOpen}
+                onOpenChange={setIsDetailsSheetOpen}
+                wbsId={detailsWbsId}
+            />
         </MasterLayout>
     );
 }

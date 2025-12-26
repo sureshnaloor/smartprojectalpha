@@ -2,6 +2,18 @@ import { pgTable, text, serial, integer, numeric, date, timestamp, boolean, prim
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users Table
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  picture: text("picture"), // Profile picture URL
+  provider: text("provider").notNull(), // 'google', 'linkedin', 'email'
+  providerId: text("provider_id").notNull(), // OAuth provider ID or email for email auth
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Projects Table
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -96,6 +108,49 @@ export const tasks = pgTable("tasks", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Resource Plans Table
+export const resourcePlans = pgTable("resource_plans", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  resourceName: text("resource_name").notNull(),
+  resourceType: text("resource_type").notNull(), // Manpower, Equipment, Material
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
+  unit: text("unit").notNull(),
+  costPerUnit: numeric("cost_per_unit", { precision: 12, scale: 2 }).notNull(),
+  totalCost: numeric("total_cost", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").default("Planned").notNull(), // Planned, Allocated, In Use, Completed
+  remarks: text("remarks"),
+  createdBy: text("created_by").notNull().default("System"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertResourcePlanSchema = createInsertSchema(resourcePlans)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    quantity: z.string().or(z.number()).transform(val => val.toString()),
+    costPerUnit: z.string().or(z.number()).transform(val => val.toString()),
+    totalCost: z.string().or(z.number()).transform(val => val.toString()),
+    startDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    endDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    resourceType: z.enum(["Manpower", "Equipment", "Material"]),
+    status: z.enum(["Planned", "Allocated", "In Use", "Completed"]).default("Planned"),
+  });
+export type ResourcePlan = typeof resourcePlans.$inferSelect;
+export type InsertResourcePlan = z.infer<typeof insertResourcePlanSchema>;
 
 // Task Resources Table (for the many-to-many relationship between tasks and resources)
 export const taskResources = pgTable("task_resources", {
@@ -192,22 +247,31 @@ export const insertProjectSchema = createInsertSchema(projects)
   });
 
 // Base WBS schema - a simpler version without all the refinements
-const baseWbsSchema = createInsertSchema(wbsItems)
+export const baseWbsSchema = createInsertSchema(wbsItems)
   .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true, actualStartDate: true, actualEndDate: true } as any)
   .extend({
+    projectId: z.number(),
+    parentId: z.number().nullable().optional(),
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    code: z.string().optional(),
+    level: z.number().optional(),
+    isTopLevel: z.boolean().optional(),
     budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
-    type: z.enum(["Summary", "WorkPackage", "Activity"]),
+    type: z.enum(["Summary", "WorkPackage", "WBS", "Activity"]),
     startDate: z.date().or(z.string()).transform(val => {
       if (val === undefined || val === null) return undefined;
       if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
       }
       return val.toISOString().split('T')[0];
     }).optional(),
     endDate: z.date().or(z.string()).transform(val => {
       if (val === undefined || val === null) return undefined;
       if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
       }
       return val.toISOString().split('T')[0];
     }).optional(),
@@ -221,8 +285,8 @@ const baseWbsSchema = createInsertSchema(wbsItems)
 export const insertWbsItemSchema = baseWbsSchema
   .refine(
     (data) => {
-      // Summary and WorkPackage types must have budgetedCost
-      if (data.type === "Summary" || data.type === "WorkPackage") {
+      // Summary, WorkPackage and WBS types must have budgetedCost
+      if (data.type === "Summary" || data.type === "WorkPackage" || data.type === "WBS") {
         return data.budgetedCost !== undefined && parseFloat(data.budgetedCost) >= 0;
       }
       return true;
@@ -265,7 +329,7 @@ export const insertWbsItemSchema = baseWbsSchema
   )
   .refine(
     (data) => {
-      // Summary and WorkPackage should not have dates
+      // Summary and WorkPackage should not have dates, but WBS can
       if (data.type === "Summary" || data.type === "WorkPackage") {
         return data.startDate === undefined && data.endDate === undefined;
       }
@@ -356,6 +420,12 @@ export const insertProjectCollaborationThreadSchema = createInsertSchema(project
 export const insertProjectCollaborationMessageSchema = createInsertSchema(projectCollaborationMessages)
   .omit({ id: true, createdAt: true } as any);
 
+// User schema
+export const insertUserSchema = createInsertSchema(users)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    provider: z.enum(["google", "linkedin", "email"]),
+  });
 
 // Types
 export type Project = typeof projects.$inferSelect;
@@ -530,3 +600,305 @@ export const insertProjectResourceSchema = createInsertSchema(projectResources)
 
 export type ProjectResource = typeof projectResources.$inferSelect;
 export type InsertProjectResource = z.infer<typeof insertProjectResourceSchema>;
+
+
+// Daily Progress Table
+export const dailyProgress = pgTable("daily_progress", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  mainCategory: text("main_category").notNull(), // Enum constraint handled in Zod
+  subCategory: text("sub_category").notNull(),
+  activity: text("activity").notNull(),
+  task: text("task").notNull(),
+  taskCompletion: integer("task_completion").notNull(),
+  activityCompletion: integer("activity_completion").notNull(),
+  resourcesDeployed: text("resources_deployed").array().notNull(), // Using Array of Strings
+  obstruction: text("obstruction").notNull(), // Headwind, Tailwind, None
+  remarks: text("remarks"),
+  status: text("status").notNull(), // In Progress, Completed, On Hold
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDailyProgressSchema = createInsertSchema(dailyProgress)
+  .omit({ id: true, createdAt: true } as any)
+  .extend({
+    date: z.string().or(z.date()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    taskCompletion: z.string().or(z.number()).transform(val => typeof val === 'string' ? parseInt(val) : val),
+    activityCompletion: z.string().or(z.number()).transform(val => typeof val === 'string' ? parseInt(val) : val),
+    resourcesDeployed: z.array(z.string()).or(z.string().transform(val => val.split(',').map(s => s.trim()))),
+    mainCategory: z.enum(['Design', 'Construction', 'Installation', 'Testing', 'Pre-commissioning', 'Commissioning']),
+    obstruction: z.enum(['Headwind', 'Tailwind', 'None']),
+    status: z.enum(['In Progress', 'Completed', 'On Hold']),
+  });
+
+export type DailyProgress = typeof dailyProgress.$inferSelect;
+export type InsertDailyProgress = z.infer<typeof insertDailyProgressSchema>;
+
+// Risk Register Table
+export const riskRegister = pgTable("risk_register", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  dateLogged: date("date_logged").notNull(),
+  risk: text("risk").notNull(),
+  riskType: text("risk_type").notNull(), // Risk, Opportunity
+  probability: text("probability").notNull(), // High, Moderate, Low
+  impact: text("impact").notNull(), // High, Moderate, Low
+  userLogged: text("user_logged").notNull(),
+  actionTaken: text("action_taken").notNull(),
+  remarks: text("remarks"),
+  status: text("status").default("Open").notNull(), // Open, In Progress, Closed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRiskRegisterSchema = createInsertSchema(riskRegister)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    dateLogged: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    riskType: z.enum(["Risk", "Opportunity"]),
+    probability: z.enum(["High", "Moderate", "Low"]),
+    impact: z.enum(["High", "Moderate", "Low"]),
+    status: z.enum(["Open", "In Progress", "Closed"]).default("Open"),
+  });
+
+export type RiskRegister = typeof riskRegister.$inferSelect;
+export type InsertRiskRegister = z.infer<typeof insertRiskRegisterSchema>;
+
+// Direct Manpower Positions Table (project-specific position definitions)
+export const directManpowerPositions = pgTable("direct_manpower_positions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  positionId: text("position_id").notNull(), // e.g., "mason", "carpenter"
+  name: text("name").notNull(), // e.g., "Mason", "Carpenter"
+  order: integer("order").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Direct Manpower Entries Table (daily manpower allocation)
+export const directManpowerEntries = pgTable("direct_manpower_entries", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  positions: text("positions").notNull(), // JSON string: { "mason": 5, "carpenter": 3, ... }
+  totalManpower: integer("total_manpower").notNull(),
+  remarks: text("remarks"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDirectManpowerPositionSchema = createInsertSchema(directManpowerPositions)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export const insertDirectManpowerEntrySchema = createInsertSchema(directManpowerEntries)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    date: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    positions: z.record(z.string(), z.number()).or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return val; // Already JSON string
+      }
+      return JSON.stringify(val); // Convert object to JSON string
+    }),
+    totalManpower: z.string().or(z.number()).transform(val => typeof val === 'string' ? parseInt(val) : val),
+  });
+
+export type DirectManpowerPosition = typeof directManpowerPositions.$inferSelect;
+export type InsertDirectManpowerPosition = z.infer<typeof insertDirectManpowerPositionSchema>;
+
+export type DirectManpowerEntry = typeof directManpowerEntries.$inferSelect;
+export type InsertDirectManpowerEntry = z.infer<typeof insertDirectManpowerEntrySchema>;
+
+// Lesson Learnt Register Table
+export const lessonLearntRegister = pgTable("lesson_learnt_register", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  category: text("category").notNull(), // Design, Engineering, Construction, etc.
+  lesson: text("lesson").notNull(),
+  type: text("type").notNull(), // Risk, Opportunity
+  dateLogged: date("date_logged").notNull(),
+  loggedBy: text("logged_by").notNull(),
+  documents: text("documents").array().default([]), // Array of document names/links
+  status: text("status").default("Open").notNull(), // Open, In Progress, Resolved, Closed
+  impact: text("impact").notNull(), // Low, Medium, High, Critical
+  priority: text("priority").notNull(), // Low, Medium, High, Urgent
+  description: text("description").notNull(),
+  recommendations: text("recommendations").notNull(),
+  actionsTaken: text("actions_taken").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLessonLearntRegisterSchema = createInsertSchema(lessonLearntRegister)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    dateLogged: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    category: z.enum(["Design", "Engineering", "Construction", "Installation", "Testing", "Pre-commissioning", "Commissioning", "Procurement", "Subcontracts", "Quality", "Safety", "Others"]),
+    type: z.enum(["Risk", "Opportunity"]),
+    status: z.enum(["Open", "In Progress", "Resolved", "Closed"]).default("Open"),
+    impact: z.enum(["Low", "Medium", "High", "Critical"]),
+    priority: z.enum(["Low", "Medium", "High", "Urgent"]),
+    documents: z.array(z.string()).default([]),
+  });
+
+export type LessonLearntRegister = typeof lessonLearntRegister.$inferSelect;
+export type InsertLessonLearntRegister = z.infer<typeof insertLessonLearntRegisterSchema>;
+
+// Indirect Manpower Positions Table (project-specific position definitions)
+export const indirectManpowerPositions = pgTable("indirect_manpower_positions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  positionId: text("position_id").notNull(), // e.g., "project_manager", "project_engineer"
+  name: text("name").notNull(), // e.g., "Project Manager", "Project Engineer"
+  order: integer("order").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Indirect Manpower Entries Table (daily overhead allocation - percentage-based)
+export const indirectManpowerEntries = pgTable("indirect_manpower_entries", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  positions: text("positions").notNull(), // JSON string: { "project_manager": 25, "project_engineer": 30, ... }
+  totalOverhead: numeric("total_overhead", { precision: 10, scale: 2 }).notNull(), // Sum of percentages
+  remarks: text("remarks"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertIndirectManpowerPositionSchema = createInsertSchema(indirectManpowerPositions)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export const insertIndirectManpowerEntrySchema = createInsertSchema(indirectManpowerEntries)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    date: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    positions: z.record(z.string(), z.number()).or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return val; // Already JSON string
+      }
+      return JSON.stringify(val); // Convert object to JSON string
+    }),
+    totalOverhead: z.string().or(z.number()).transform(val => val.toString()),
+  });
+
+export type IndirectManpowerPosition = typeof indirectManpowerPositions.$inferSelect;
+export type InsertIndirectManpowerPosition = z.infer<typeof insertIndirectManpowerPositionSchema>;
+
+export type IndirectManpowerEntry = typeof indirectManpowerEntries.$inferSelect;
+export type InsertIndirectManpowerEntry = z.infer<typeof insertIndirectManpowerEntrySchema>;
+
+// Planned Activities Table
+export const plannedActivities = pgTable("planned_activities", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // 'backlog' | 'planned' | 'advanced'
+  status: text("status").notNull(), // 'not_started' | 'in_progress' | 'completed' | 'on_hold'
+  priority: text("priority").notNull(), // 'low' | 'medium' | 'high' | 'critical'
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  progress: integer("progress").default(0).notNull(), // 0-100
+  assignedTo: text("assigned_to").notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Planned Activity Tasks Table (tasks that belong to activities)
+export const plannedActivityTasks = pgTable("planned_activity_tasks", {
+  id: serial("id").primaryKey(),
+  activityId: integer("activity_id").notNull().references(() => plannedActivities.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  status: text("status").notNull(), // 'not_started' | 'in_progress' | 'completed' | 'on_hold'
+  priority: text("priority").notNull(), // 'low' | 'medium' | 'high' | 'critical'
+  assignedTo: text("assigned_to").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  progress: integer("progress").default(0).notNull(), // 0-100
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPlannedActivitySchema = createInsertSchema(plannedActivities)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    startDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    endDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    progress: z.string().or(z.number()).transform(val => {
+      const num = typeof val === 'string' ? parseInt(val) : val;
+      return Math.max(0, Math.min(100, num || 0));
+    }),
+  });
+
+export const insertPlannedActivityTaskSchema = createInsertSchema(plannedActivityTasks)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    startDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    endDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+    progress: z.string().or(z.number()).transform(val => {
+      const num = typeof val === 'string' ? parseInt(val) : val;
+      return Math.max(0, Math.min(100, num || 0));
+    }),
+  });
+
+export type PlannedActivity = typeof plannedActivities.$inferSelect;
+export type InsertPlannedActivity = z.infer<typeof insertPlannedActivitySchema>;
+
+export type PlannedActivityTask = typeof plannedActivityTasks.$inferSelect;
+export type InsertPlannedActivityTask = z.infer<typeof insertPlannedActivityTaskSchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;

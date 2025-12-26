@@ -6,6 +6,7 @@ import { eq, isNull } from "drizzle-orm";
 import {
   insertProjectSchema as projectSchema,
   insertWbsItemSchema as wbsItemSchema,
+  baseWbsSchema,
   insertDependencySchema as dependencySchema,
   insertCostEntrySchema as costEntrySchema,
   insertTaskSchema as taskSchema,
@@ -617,93 +618,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Apply additional business rules for WBS hierarchy
+      const allWbsItems = await storage.getWbsItems(wbsItemData.projectId);
+      let level = 1;
+      let code = "";
+      let type: "Summary" | "WBS" | "Activity" | "WorkPackage" = wbsItemData.type;
+      let isTopLevel = false;
 
-      // Rule 1: Top-level items must be Summary
-      if (!wbsItemData.parentId && wbsItemData.type !== "Summary") {
-        return res.status(400).json({
-          message: "Top-level WBS items must be of type 'Summary'"
-        });
-      }
+      if (!wbsItemData.parentId) {
+        // Root level
+        level = 1;
+        type = "Summary";
+        isTopLevel = true;
 
-      // BUDGET VALIDATION
-      // If the WBS item has a parent, validate budget constraints
-      if (wbsItemData.parentId && wbsItemData.type !== "Activity") {
+        // Count existing top-level items to determine next number
+        const topLevelItems = allWbsItems.filter(item => !item.parentId);
+        code = (topLevelItems.length + 1).toString();
+      } else {
+        // Child level
         const parentWbsItem = await storage.getWbsItem(wbsItemData.parentId);
         if (!parentWbsItem) {
           return res.status(404).json({ message: "Parent WBS item not found" });
         }
 
-        // Check that the new item's budget doesn't exceed parent's budget
-        if (wbsItemData.budgetedCost > Number(parentWbsItem.budgetedCost)) {
+        level = parentWbsItem.level + 1;
+        if (level > 3) {
+          return res.status(400).json({ message: "Maximum WBS hierarchy level (3) reached" });
+        }
+
+        type = "WBS";
+        isTopLevel = false;
+
+        // Count existing siblings to determine next sub-number
+        const siblings = allWbsItems.filter(item => item.parentId === wbsItemData.parentId);
+        code = `${parentWbsItem.code}.${siblings.length + 1}`;
+
+        // BUDGET VALIDATION
+        if (wbsItemData.budgetedCost && Number(wbsItemData.budgetedCost) > Number(parentWbsItem.budgetedCost)) {
           return res.status(400).json({
             message: `Budget cannot exceed parent's budget of ${parentWbsItem.budgetedCost}`
           });
         }
 
-        // Get all siblings to validate that total budget doesn't exceed parent budget
-        const allWbsItems = await storage.getWbsItems(wbsItemData.projectId);
-        const siblings = allWbsItems.filter(
-          item => item.parentId === wbsItemData.parentId && item.type !== "Activity"
-        );
-
-        // Calculate sum of existing sibling budgets
         const siblingsSum = siblings.reduce((sum, sibling) => sum + Number(sibling.budgetedCost), 0);
-
-        // Check that new item + siblings doesn't exceed parent budget
-        if (siblingsSum + wbsItemData.budgetedCost > Number(parentWbsItem.budgetedCost)) {
+        if (wbsItemData.budgetedCost && (siblingsSum + Number(wbsItemData.budgetedCost)) > Number(parentWbsItem.budgetedCost)) {
           return res.status(400).json({
             message: `Sum of all child budgets (${siblingsSum + wbsItemData.budgetedCost}) cannot exceed parent's budget (${parentWbsItem.budgetedCost})`
           });
         }
       }
 
-      // TYPE VALIDATION
-      // Rule 2: If parent exists, validate parent-child type relationships
-      if (wbsItemData.parentId) {
-        const parentWbsItem = await storage.getWbsItem(wbsItemData.parentId);
-        if (!parentWbsItem) {
-          return res.status(404).json({ message: "Parent WBS item not found" });
-        }
+      const finalWbsItemData = {
+        ...wbsItemData,
+        level,
+        code,
+        type,
+        isTopLevel,
+        actualCost: "0",
+        percentComplete: "0",
+      };
 
-        // Rule 2a: If parent is Summary, child can be either WorkPackage or Summary
-        if (parentWbsItem.type === "Summary") {
-          if (wbsItemData.type === "Activity") {
-            return res.status(400).json({
-              message: "A 'Summary' WBS item cannot have an 'Activity' as a direct child. It must have a 'WorkPackage' in between."
-            });
-          }
-        }
-        // Rule 2b: If parent is WorkPackage, child can only be Activity
-        else if (parentWbsItem.type === "WorkPackage") {
-          if (wbsItemData.type !== "Activity") {
-            return res.status(400).json({
-              message: "A 'WorkPackage' can only have 'Activity' items as children"
-            });
-          }
-        }
-        // Rule 2c: Activity cannot have children
-        else if (parentWbsItem.type === "Activity") {
-          return res.status(400).json({
-            message: "An 'Activity' item cannot have children"
-          });
-        }
-
-        // Rule 3: Check if creating a WorkPackage under a non-top-level Summary
-        if (wbsItemData.type === "WorkPackage" && parentWbsItem.type === "Summary" && !parentWbsItem.isTopLevel) {
-          // Check if there's already a WorkPackage in the hierarchy between top level and this item
-          const projectWbsItems = await storage.getWbsItems(wbsItemData.projectId);
-          const hasWorkPackageInPath = checkForWorkPackageInPath(projectWbsItems, parentWbsItem);
-
-          if (hasWorkPackageInPath) {
-            return res.status(400).json({
-              message: "Cannot create a 'WorkPackage' at this level. Only one level of 'WorkPackage' is allowed in the hierarchy."
-            });
-          }
-        }
-      }
-
-      const wbsItem = await storage.createWbsItem(wbsItemData);
+      const wbsItem = await storage.createWbsItem(finalWbsItemData as any);
       res.status(201).json(wbsItem);
     } catch (err) {
       handleError(err, res);
@@ -722,22 +696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "WBS item not found" });
       }
 
-      // Use z.object to create a partial schema for validation
-      const partialWbsSchema = z.object({
-        projectId: z.number().optional(),
-        parentId: z.number().nullable().optional(),
-        name: z.string().optional(),
-        description: z.string().nullable().optional(),
-        level: z.number().optional(),
-        code: z.string().optional(),
-        type: z.enum(["Summary", "WorkPackage", "Activity"]).optional(),
-        budgetedCost: z.number().optional(),
-        startDate: z.date().optional(),
-        endDate: z.date().optional(),
-        duration: z.number().optional(),
-        isTopLevel: z.boolean().optional(),
-      });
-
+      const partialWbsSchema = baseWbsSchema.partial();
       const wbsItemData = partialWbsSchema.parse(req.body);
 
       // BUDGET VALIDATION
@@ -3340,6 +3299,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ message: "Correspondence deleted successfully" });
     } catch (err) {
       handleError(err, res);
+    }
+  });
+
+  // DELETE a WBS item (recursively deletes children)
+  app.delete("/api/wbs/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+
+      const wbsItem = await storage.getWbsItem(id);
+      if (!wbsItem) {
+        return res.status(404).json({ message: "WBS item not found" });
+      }
+
+      // Recursive function to get all child IDs
+      const getAllChildIds = async (parentId: number): Promise<number[]> => {
+        const children = await storage.getWbsItemsByParentId(parentId);
+        let ids = children.map(c => c.id);
+        for (const child of children) {
+          const subChildIds = await getAllChildIds(child.id);
+          ids = [...ids, ...subChildIds];
+        }
+        return ids;
+      };
+
+      const childIds = await getAllChildIds(id);
+
+      // Delete all children first
+      for (const childId of childIds.reverse()) { // Reverse to delete from bottom up
+        await storage.deleteWbsItem(childId);
+      }
+
+      // Finally delete the item itself
+      await storage.deleteWbsItem(id);
+
+      res.json({ message: "WBS item and all children deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting WBS item:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 
