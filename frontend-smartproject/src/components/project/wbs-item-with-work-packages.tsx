@@ -17,6 +17,7 @@ interface WbsItemWithWorkPackagesProps {
     isExpanded: boolean;
     onEditWorkPackage: (id: number) => void;
     onDeleteWorkPackage: (id: number) => void;
+    onWorkPackageClick?: (wpId: number) => void;
 }
 
 export function WbsItemWithWorkPackages({
@@ -24,7 +25,8 @@ export function WbsItemWithWorkPackages({
     level,
     isExpanded,
     onEditWorkPackage,
-    onDeleteWorkPackage
+    onDeleteWorkPackage,
+    onWorkPackageClick,
 }: WbsItemWithWorkPackagesProps) {
     const { data: workPackages = [] } = useQuery<WorkPackage[]>({
         queryKey: [`/api/wbs/${wbsItemId}/work-packages`],
@@ -49,11 +51,13 @@ export function WbsItemWithWorkPackages({
                 <div
                     key={wp.id}
                     className={cn(
-                        "flex items-center justify-between py-2 px-4 hover:bg-blue-50 border-b border-blue-100 bg-blue-50/30 rounded-md mx-2 my-1"
+                        "flex items-center justify-between py-2 px-4 hover:bg-blue-50 border-b border-blue-100 bg-blue-50/30 rounded-md mx-2 my-1",
+                        onWorkPackageClick && "cursor-pointer"
                     )}
                     style={{ paddingLeft: `${(level + 1) * 32 + 16}px` }}
+                    onClick={onWorkPackageClick ? () => onWorkPackageClick(wp.id) : undefined}
                 >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1">
                         <div className="w-2 h-2"></div>
                         <div className="flex-1">
                             <div className="text-xs font-semibold uppercase tracking-wider text-gray-800" style={{ letterSpacing: '0.1em' }}>

@@ -42,6 +42,7 @@ import { WbsDetailsSheet } from "@/components/project/wbs-details-sheet";
 import { AddWorkPackageModal } from "@/components/project/add-work-package-modal";
 import { EditWorkPackageModal } from "@/components/project/edit-work-package-modal";
 import { WbsItemWithWorkPackages } from "@/components/project/wbs-item-with-work-packages";
+import { ActivityNetworkDiagram } from "@/components/project/activity-network-diagram";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -81,6 +82,7 @@ export default function NewProject() {
     const [isEditWorkPackageModalOpen, setIsEditWorkPackageModalOpen] = useState(false);
     const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<number | null>(null);
     const [selectedWbsForWorkPackage, setSelectedWbsForWorkPackage] = useState<{ id: number; name: string } | null>(null);
+    const [selectedWpIdForDiagram, setSelectedWpIdForDiagram] = useState<number | null>(null);
 
     // Fetch Project Details
     const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
@@ -465,6 +467,16 @@ export default function NewProject() {
                                     setIsEditWorkPackageModalOpen(true);
                                 }}
                                 onDeleteWorkPackage={handleDeleteWorkPackage}
+                                onWorkPackageClick={(wpId) => {
+                                    setSelectedWpIdForDiagram(wpId);
+                                    // Scroll to diagram section
+                                    setTimeout(() => {
+                                        const diagramElement = document.querySelector('[data-activity-diagram]');
+                                        if (diagramElement) {
+                                            diagramElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }
+                                    }, 100);
+                                }}
                             />
                         )}
                     </>
@@ -607,16 +619,29 @@ export default function NewProject() {
                             </div>
                         </div>
 
-                        {/* Network Diagram */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-slate-100">
+                        {/* Activity Network Diagram */}
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" data-activity-diagram>
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                                 <h3 className="font-bold text-slate-900 flex items-center gap-2">
                                     <Activity className="w-5 h-5 text-blue-500" />
                                     Activity Network Diagram
                                 </h3>
+                                {selectedWpIdForDiagram && (
+                                    <button
+                                        onClick={() => setSelectedWpIdForDiagram(null)}
+                                        className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                                    >
+                                        Show All Activities
+                                    </button>
+                                )}
                             </div>
-                            <div className="p-6 h-[400px]">
-                                <ReactECharts option={networkOption} style={{ height: '100%' }} />
+                            <div className="p-6">
+                                <ActivityNetworkDiagram
+                                    projectId={project.id}
+                                    selectedWpId={selectedWpIdForDiagram}
+                                    projectStartDate={project.startDate}
+                                    projectEndDate={project.endDate}
+                                />
                             </div>
                         </div>
 
