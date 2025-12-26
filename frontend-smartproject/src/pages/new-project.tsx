@@ -43,6 +43,7 @@ import { AddWorkPackageModal } from "@/components/project/add-work-package-modal
 import { EditWorkPackageModal } from "@/components/project/edit-work-package-modal";
 import { WbsItemWithWorkPackages } from "@/components/project/wbs-item-with-work-packages";
 import { ActivityNetworkDiagram } from "@/components/project/activity-network-diagram";
+import { ResourceNetworkDiagram } from "@/components/project/resource-network-diagram";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -637,6 +638,32 @@ export default function NewProject() {
                             </div>
                             <div className="p-6">
                                 <ActivityNetworkDiagram
+                                    projectId={project.id}
+                                    selectedWpId={selectedWpIdForDiagram}
+                                    projectStartDate={project.startDate}
+                                    projectEndDate={project.endDate}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Resource Network Diagram */}
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" data-resource-diagram>
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                    <Briefcase className="w-5 h-5 text-emerald-500" />
+                                    Resources Assigned
+                                </h3>
+                                {selectedWpIdForDiagram && (
+                                    <button
+                                        onClick={() => setSelectedWpIdForDiagram(null)}
+                                        className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                                    >
+                                        Show All Resources
+                                    </button>
+                                )}
+                            </div>
+                            <div className="p-6">
+                                <ResourceNetworkDiagram
                                     projectId={project.id}
                                     selectedWpId={selectedWpIdForDiagram}
                                     projectStartDate={project.startDate}
