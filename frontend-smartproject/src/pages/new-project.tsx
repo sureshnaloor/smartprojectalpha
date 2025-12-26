@@ -28,7 +28,9 @@ import {
     Info,
     MoreVertical,
     Layers,
-    DollarSign
+    DollarSign,
+    Maximize2,
+    Minimize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -59,6 +61,7 @@ export default function NewProject() {
     const { projectId } = useParams<{ projectId: string }>();
     const [, setLocation] = useLocation();
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+    const initializedRef = useRef<boolean>(false);
     const [timelineView, setTimelineView] = useState<'week' | 'month' | 'quarter'>('month');
     const infoRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
@@ -89,6 +92,23 @@ export default function NewProject() {
         enabled: !!projectId,
     });
 
+    // Reset initialization when project changes
+    useEffect(() => {
+        setExpandedIds(new Set());
+        initializedRef.current = false;
+    }, [projectId]);
+
+    // Initialize expanded state with top-level items
+    useEffect(() => {
+        if (flatWbsItems.length > 0 && !initializedRef.current) {
+            const topLevelIds = flatWbsItems
+                .filter(item => item.isTopLevel)
+                .map(item => item.id);
+            setExpandedIds(new Set(topLevelIds));
+            initializedRef.current = true;
+        }
+    }, [flatWbsItems]);
+
     // Transform flat WBS into tree structure
     const wbsTree = useMemo(() => {
         const itemMap = new Map<number, WbsTreeNode>();
@@ -98,7 +118,8 @@ export default function NewProject() {
         flatWbsItems.forEach(item => {
             itemMap.set(item.id, {
                 ...item,
-                expanded: expandedIds.has(item.id) || item.isTopLevel || false,
+                // Ensure top-level items are not forced expanded, effectively allowing toggle
+                expanded: expandedIds.has(item.id),
                 children: [],
                 progress: Number(item.percentComplete || 0),
                 budget: {
@@ -278,7 +299,10 @@ export default function NewProject() {
                         </span>
                         <div className={cn(
                             "w-2 h-2 rounded-full",
-                            item.type === 'Summary' ? 'bg-blue-500' : item.type === 'WorkPackage' ? 'bg-amber-500' : 'bg-emerald-500'
+                            item.type === 'Summary' ? 'bg-blue-500' :
+                                item.type === 'WorkPackage' ? 'bg-amber-500' :
+                                    item.type === 'WBS' ? (item.level >= 3 ? 'bg-slate-500' : 'bg-teal-500') :
+                                        item.type === 'Activity' ? 'bg-slate-500' : 'bg-emerald-500'
                         )} />
                         <div
                             className="flex-1 cursor-pointer hover:text-blue-400 transition-colors"
@@ -426,7 +450,7 @@ export default function NewProject() {
                             </div>
                             <div className="flex flex-wrap gap-6 text-sm text-slate-400">
                                 <div className="flex items-center gap-2"><Briefcase size={16} /> {project.projectType || 'General'}</div>
-                                <div className="flex items-center gap-2"><Calendar size={16} /> {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}</div>
+                                <div className="flex items-center gap-2"><Calendar size={16} /> {project.startDate ? new Date(project.startDate).toLocaleDateString() : 'N/A'} - {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'N/A'}</div>
                             </div>
                         </div>
                         <div className="animate-item flex gap-12">
@@ -471,8 +495,22 @@ export default function NewProject() {
                                     >
                                         <Plus size={16} className="text-slate-600" />
                                     </button>
-                                    <button className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors">
-                                        <Settings size={16} className="text-slate-600" />
+                                    <button
+                                        onClick={() => {
+                                            if (expandedIds.size > 0) {
+                                                setExpandedIds(new Set()); // Collapse all (roots stay visible via default logic)
+                                            } else {
+                                                setExpandedIds(new Set(flatWbsItems.map(i => i.id))); // Expand all
+                                            }
+                                        }}
+                                        className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors"
+                                        title={expandedIds.size > 0 ? "Collapse All" : "Expand All"}
+                                    >
+                                        {expandedIds.size > 0 ? (
+                                            <Minimize2 size={16} className="text-slate-600" />
+                                        ) : (
+                                            <Maximize2 size={16} className="text-slate-600" />
+                                        )}
                                     </button>
                                 </div>
                             </div>

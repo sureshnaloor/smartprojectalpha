@@ -139,14 +139,14 @@ export function parseCsvText(text: string): { data: any[]; errors: string[] } {
 }
 
 export function generateCsvTemplate(): string {
-  return "wbsCode,wbsName,wbsType,wbsDescription,amount,createDate\n" +
-    "1,Engineering & Design,Summary,Engineering and design phase,5000,2023-07-15\n" +
-    "1.1,Preliminary Design,WorkPackage,Initial design work,2000,2023-07-15\n" +
-    "1.1.1,Requirements Analysis,Activity,Gather requirements,,2023-07-15\n" +
-    "2,Procurement & Construction,Summary,Procurement and construction,85000,2023-07-16\n" +
-    "2.1,Material Procurement,WorkPackage,Purchase materials,15000,2023-07-16\n" +
-    "2.1.1,Vendor Selection,Activity,Select vendors,,2023-07-16\n" +
-    "3,Testing & Commissioning,Summary,Testing and commissioning,10000,2023-07-17";
+  return "wbsCode,wbsName,wbsType,wbsDescription,amount\n" +
+    "1,Engineering & Design,Summary,Engineering and design phase,5000\n" +
+    "1.1,Preliminary Design,WorkPackage,Initial design work,2000\n" +
+    "1.1.1,Requirements Analysis,Activity,Gather requirements,\n" +
+    "2,Procurement & Construction,Summary,Procurement and construction,85000\n" +
+    "2.1,Material Procurement,WorkPackage,Purchase materials,15000\n" +
+    "2.1.1,Vendor Selection,Activity,Select vendors,\n" +
+    "3,Testing & Commissioning,Summary,Testing and commissioning,10000";
 }
 
 export function downloadCsvTemplate(): void {
