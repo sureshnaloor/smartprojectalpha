@@ -134,8 +134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create default top-level WBS items for the project - now all will be Summary type
       const totalBudget = Number(project.budget);
-      const startDate = new Date(project.startDate);
-      const endDate = new Date(project.endDate);
 
       const topLevelWbsItems = [
         {
@@ -144,13 +142,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: "Engineering & Design",
           level: 1,
           code: "1",
-          type: "Summary" as const,  // Use const assertion to fix type error
-          budgetedCost: totalBudget * 0.05, // 5% of total budget
+          type: "Summary" as const,
+          budgetedCost: (totalBudget * 0.05).toString(),
+          actualCost: "0",
+          percentComplete: "0",
           isTopLevel: true,
           description: "Engineering and design phase",
-          startDate: startDate,
-          endDate: endDate,
-          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
         },
         {
           projectId: project.id,
@@ -158,13 +155,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: "Procurement & Construction",
           level: 1,
           code: "2",
-          type: "Summary" as const,  // Use const assertion to fix type error
-          budgetedCost: totalBudget * 0.85, // 85% of total budget
+          type: "Summary" as const,
+          budgetedCost: (totalBudget * 0.85).toString(),
+          actualCost: "0",
+          percentComplete: "0",
           isTopLevel: true,
           description: "Procurement and construction phase",
-          startDate: startDate,
-          endDate: endDate,
-          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
         },
         {
           projectId: project.id,
@@ -172,13 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: "Testing & Commissioning",
           level: 1,
           code: "3",
-          type: "Summary" as const,  // Use const assertion to fix type error
-          budgetedCost: totalBudget * 0.10, // 10% of total budget
+          type: "Summary" as const,
+          budgetedCost: (totalBudget * 0.10).toString(),
+          actualCost: "0",
+          percentComplete: "0",
           isTopLevel: true,
           description: "Testing and commissioning phase",
-          startDate: startDate,
-          endDate: endDate,
-          duration: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
         }
       ];
 
@@ -237,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Update the WBS item budget
             await storage.updateWbsItem(procurementWbs.id, {
-              budgetedCost: newBudget
+              budgetedCost: newBudget.toString()
             });
           }
         } else {
@@ -701,7 +696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // BUDGET VALIDATION
       // Check if the budget is being changed
-      if (wbsItemData.budgetedCost !== undefined && wbsItemData.budgetedCost !== Number(wbsItem.budgetedCost)) {
+      if (wbsItemData.budgetedCost !== undefined && Number(wbsItemData.budgetedCost) !== Number(wbsItem.budgetedCost)) {
         // Get all WBS items for the project to validate budget constraints
         const projectWbsItems = await storage.getWbsItems(wbsItem.projectId);
 
@@ -710,7 +705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const parentWbsItem = projectWbsItems.find(item => item.id === wbsItem.parentId);
           if (parentWbsItem) {
             // Only apply this constraint to Summary and WorkPackage types (Activity can't have budget)
-            if (wbsItem.type !== "Activity" && wbsItemData.budgetedCost > Number(parentWbsItem.budgetedCost)) {
+            if (wbsItem.type !== "Activity" && Number(wbsItemData.budgetedCost) > Number(parentWbsItem.budgetedCost)) {
               return res.status(400).json({
                 message: `Budget cannot exceed parent's budget of ${parentWbsItem.budgetedCost}`
               });
@@ -728,7 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter(child => child.type !== "Activity")
               .reduce((sum, child) => sum + Number(child.budgetedCost), 0);
 
-            if (childBudgetSum > wbsItemData.budgetedCost) {
+            if (childBudgetSum > Number(wbsItemData.budgetedCost)) {
               return res.status(400).json({
                 message: `Budget cannot be less than the sum of child budgets (${childBudgetSum})`
               });
@@ -866,7 +861,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/dependencies", async (req: Request, res: Response) => {
     try {
-      const dependencyData = dependencySchema.parse(req.body);
+      const dependencyData = z.object({
+        predecessorId: z.number(),
+        successorId: z.number(),
+        type: z.enum(["FinishToStart", "StartToStart", "FinishToFinish", "StartToFinish"]),
+        lag: z.number().default(0),
+      }).parse(req.body);
 
       // Check for circular dependencies
       if (dependencyData.predecessorId === dependencyData.successorId) {
@@ -938,7 +938,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/costs", async (req: Request, res: Response) => {
     try {
-      const costEntryData = costEntrySchema.parse(req.body);
+      const costEntryData = z.object({
+        wbsItemId: z.number(),
+        amount: z.string().or(z.number()).transform(v => v.toString()),
+        entryDate: z.string().or(z.date()).transform(d => new Date(d).toISOString().split('T')[0]),
+        description: z.string().default(""),
+      }).parse(req.body);
 
       // Validate that the WBS item exists
       const wbsItem = await storage.getWbsItem(costEntryData.wbsItemId);
@@ -1144,75 +1149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             errors.push(`Row ${i + 1}: ${row.wbsType} type must have a positive budget amount`);
             continue;
           }
-
-          // Summary and WorkPackage should not have dates
-          if (row.startDate || row.endDate || row.duration) {
-            errors.push(`Row ${i + 1}: ${row.wbsType} type cannot have dates (startDate, endDate, or duration)`);
-            continue;
-          }
         } else if (row.wbsType === "Activity") {
-          // Validate dates for Activity items
-          if ((!row.startDate && !row.endDate) || (!row.startDate && !row.duration)) {
-            errors.push(`Row ${i + 1}: Activity type must have startDate and either endDate or duration`);
-            continue;
-          }
-
-          // Parse dates if provided
-          let startDate = null;
-          let endDate = null;
-          let duration = null;
-
-          if (row.startDate) {
-            try {
-              startDate = new Date(row.startDate);
-              if (isNaN(startDate.getTime())) {
-                errors.push(`Row ${i + 1}: Invalid startDate format`);
-                continue;
-              }
-            } catch (e) {
-              errors.push(`Row ${i + 1}: Invalid startDate format`);
-              continue;
-            }
-          }
-
-          if (row.endDate) {
-            try {
-              endDate = new Date(row.endDate);
-              if (isNaN(endDate.getTime())) {
-                errors.push(`Row ${i + 1}: Invalid endDate format`);
-                continue;
-              }
-            } catch (e) {
-              errors.push(`Row ${i + 1}: Invalid endDate format`);
-              continue;
-            }
-          }
-
-          if (row.duration) {
-            duration = Number(row.duration);
-            if (isNaN(duration) || duration <= 0) {
-              errors.push(`Row ${i + 1}: Duration must be a positive number`);
-              continue;
-            }
-          }
-
-          // Calculate missing values
-          if (startDate && endDate && !duration) {
-            // Calculate duration from start and end dates
-            const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-            duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          } else if (startDate && duration && !endDate) {
-            // Calculate end date from start date and duration
-            endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + duration);
-          }
-
-          // Ensure dates are consistent
-          if (startDate && endDate && startDate > endDate) {
-            errors.push(`Row ${i + 1}: Start date cannot be after end date`);
-            continue;
-          }
-
           // Activities can't have budget
           if (row.amount && Number(row.amount) !== 0) {
             errors.push(`Row ${i + 1}: Activity type cannot have a budget amount (must be 0 or empty)`);
@@ -1229,11 +1166,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           level,
           code: row.wbsCode,
           type: row.wbsType,
-          budgetedCost: row.wbsType === "Activity" ? 0 : Number(row.amount),
-          startDate: row.wbsType === "Activity" && row.startDate ? new Date(row.startDate) : undefined,
-          endDate: row.wbsType === "Activity" && row.endDate ? new Date(row.endDate) : undefined,
-          duration: row.wbsType === "Activity" && row.duration ? Number(row.duration) : undefined,
+          budgetedCost: row.wbsType === "Activity" ? "0" : Number(row.amount).toString(),
           isTopLevel: level === 1,
+          actualCost: "0",
+          percentComplete: "0"
         };
 
         try {
@@ -1359,70 +1295,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingItem = wbsItemsByCode.get(row.code);
         const isUpdate = !!existingItem;
 
-        // Parse dates if provided
-        let startDate = null;
-        let endDate = null;
-        let duration = null;
-
-        if (row.startDate) {
-          try {
-            startDate = new Date(row.startDate);
-            if (isNaN(startDate.getTime())) {
-              errors.push(`Row ${i + 1}: Invalid startDate format`);
-              continue;
-            }
-          } catch (e) {
-            errors.push(`Row ${i + 1}: Invalid startDate format`);
-            continue;
-          }
-        } else {
-          errors.push(`Row ${i + 1}: startDate is required for Activities`);
-          continue;
-        }
-
-        if (row.endDate) {
-          try {
-            endDate = new Date(row.endDate);
-            if (isNaN(endDate.getTime())) {
-              errors.push(`Row ${i + 1}: Invalid endDate format`);
-              continue;
-            }
-          } catch (e) {
-            errors.push(`Row ${i + 1}: Invalid endDate format`);
-            continue;
-          }
-        }
-
-        if (row.duration) {
-          duration = Number(row.duration);
-          if (isNaN(duration) || duration <= 0) {
-            errors.push(`Row ${i + 1}: Duration must be a positive number`);
-            continue;
-          }
-        }
-
-        // For new activities, require either duration or endDate
-        if (!isUpdate && !row.duration && !row.endDate) {
-          errors.push(`Row ${i + 1}: Either duration or endDate must be provided for new activities`);
-          continue;
-        }
-
-        // Calculate missing values
-        if (startDate && endDate && !duration) {
-          // Calculate duration from start and end dates
-          const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-          duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include end day
-        } else if (startDate && duration && !endDate) {
-          // Calculate end date from start date and duration
-          endDate = new Date(startDate);
-          endDate.setDate(endDate.getDate() + duration - 1); // -1 because duration includes the start day
-        }
-
-        // Ensure dates are consistent
-        if (startDate && endDate && startDate > endDate) {
-          errors.push(`Row ${i + 1}: Start date cannot be after end date`);
-          continue;
-        }
+        // WBS Items no longer use dates or durations.
+        // We'll proceed with creating or updating based only on structural and progress data.
 
         try {
           // If existing item and it's an activity, update it
@@ -1442,10 +1316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const activityData = {
               name: row.name,
               description: row.description || existingItem.description || "",
-              startDate: startDate || undefined,
-              endDate: endDate || undefined,
-              duration: duration || undefined,
-              percentComplete: row.percentComplete !== undefined ? Number(row.percentComplete) : existingItem.percentComplete
+              percentComplete: row.percentComplete !== undefined ? Number(row.percentComplete).toString() : existingItem.percentComplete
             };
 
             // Update the existing activity
@@ -1472,12 +1343,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               level: parentWorkPackage.level + 1,
               code: row.code,
               type: "Activity" as "Summary" | "WorkPackage" | "Activity",
-              budgetedCost: 0, // Activities don't have budget
-              actualCost: 0,
-              percentComplete: row.percentComplete ? Number(row.percentComplete) : 0,
-              startDate: startDate as Date,
-              endDate: endDate || undefined,
-              duration: duration || undefined,
+              budgetedCost: "0", // Activities don't have budget
+              actualCost: "0",
+              percentComplete: row.percentComplete ? Number(row.percentComplete).toString() : "0",
               isTopLevel: false,
             };
 
@@ -1517,150 +1385,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint for finalizing a project schedule - simplified approach to avoid linter errors
   app.post("/api/projects/:projectId/schedule/finalize", async (req: Request, res: Response) => {
     try {
-      const projectId = parseInt(req.params.projectId);
-      if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
-      }
-
-      const project = await storage.getProject(projectId);
-      if (!project) {
-        return res.status(404).json({ message: "Project not found" });
-      }
-
-      // Fetch all WBS items for the project
-      const wbsItems = await storage.getWbsItems(projectId);
-
-      // Get all dependencies for the project
-      const activityIds = wbsItems
-        .filter(item => item.type === "Activity")
-        .map(item => item.id);
-      const allDependencies = await Promise.all(
-        activityIds.map(id => storage.getDependencies(id))
-      );
-      const dependencies = allDependencies.flat();
-
-      // Keep track of updated items
-      const updatedItems: any[] = [];
-      const errors: string[] = [];
-
-      // Skip activity items that don't have dates
-      const activitiesWithDates = wbsItems.filter(
-        item => item.type === "Activity" && item.startDate && item.endDate
-      );
-
-      // Create a map for quick lookup
-      const itemMap = new Map();
-      activitiesWithDates.forEach(item => {
-        itemMap.set(item.id, { ...item });
-      });
-
-      // Group dependencies by successor
-      const successorDeps = new Map<number, Dependency[]>();
-      dependencies.forEach((dep: Dependency) => {
-        const sucDeps = successorDeps.get(dep.successorId) || [];
-        sucDeps.push(dep);
-        successorDeps.set(dep.successorId, sucDeps);
-      });
-
-      // Update dates based on dependencies
-      for (const item of activitiesWithDates) {
-        const deps = successorDeps.get(item.id);
-        if (!deps || deps.length === 0) continue;
-
-        let newStartDate = item.startDate ? new Date(item.startDate) : new Date();
-        let newEndDate = item.endDate ? new Date(item.endDate) : new Date();
-        let datesChanged = false;
-
-        for (const dep of deps) {
-          const predecessor = itemMap.get(dep.predecessorId);
-          if (!predecessor) continue;
-
-          const predStartDate = new Date(predecessor.startDate);
-          const predEndDate = new Date(predecessor.endDate);
-          const lag = dep.lag || 0;
-
-          // Apply constraints based on dependency type
-          switch (dep.type) {
-            case "FS": // Finish-to-Start: successor can't start until predecessor finishes
-              const fsDate = new Date(predEndDate);
-              fsDate.setDate(fsDate.getDate() + lag);
-              if (fsDate > newStartDate) {
-                // Calculate the shift in days
-                const shiftDays = Math.ceil((fsDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60 * 24));
-                newStartDate = fsDate;
-                newEndDate.setDate(newEndDate.getDate() + shiftDays);
-                datesChanged = true;
-              }
-              break;
-
-            case "SS": // Start-to-Start: successor can't start until predecessor starts
-              const ssDate = new Date(predStartDate);
-              ssDate.setDate(ssDate.getDate() + lag);
-              if (ssDate > newStartDate) {
-                // Calculate the shift in days
-                const shiftDays = Math.ceil((ssDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60 * 24));
-                newStartDate = ssDate;
-                newEndDate.setDate(newEndDate.getDate() + shiftDays);
-                datesChanged = true;
-              }
-              break;
-
-            case "FF": // Finish-to-Finish: successor can't finish until predecessor finishes
-              const ffDate = new Date(predEndDate);
-              ffDate.setDate(ffDate.getDate() + lag);
-              if (ffDate > newEndDate) {
-                // Keep the duration the same, shift both dates
-                const duration = Math.ceil((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60 * 24));
-                newEndDate = ffDate;
-                newStartDate = new Date(newEndDate);
-                newStartDate.setDate(newStartDate.getDate() - duration);
-                datesChanged = true;
-              }
-              break;
-
-            case "SF": // Start-to-Finish: successor can't finish until predecessor starts
-              const sfDate = new Date(predStartDate);
-              sfDate.setDate(sfDate.getDate() + lag);
-              if (sfDate > newEndDate) {
-                // Keep the duration the same, shift both dates
-                const duration = Math.ceil((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60 * 24));
-                newEndDate = sfDate;
-                newStartDate = new Date(newEndDate);
-                newStartDate.setDate(newStartDate.getDate() - duration);
-                datesChanged = true;
-              }
-              break;
-          }
-        }
-
-        // If dates have changed, update the item
-        if (datesChanged) {
-          try {
-            const updatedItem = await storage.updateWbsItem(item.id, {
-              startDate: newStartDate,
-              endDate: newEndDate,
-              duration: Math.ceil((newEndDate.getTime() - newStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-            });
-
-            updatedItems.push(updatedItem);
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            errors.push(`Failed to update item ${item.id} (${item.code}): ${errorMessage}`);
-          }
-        }
-      }
-
-      return res.status(200).json({
-        message: "Schedule finalized successfully",
-        updatedCount: updatedItems.length,
-        errorCount: errors.length,
-        errors
-      });
+      // WBS dates have been removed, so this route is currently disabled
+      res.json({ message: "Schedule finalization is currently disabled as WBS dates have been removed.", updatedCount: 0 });
     } catch (err: any) {
-      console.error("Error finalizing schedule:", err);
-      res.status(500).json({
-        message: err.message || "Internal server error"
-      });
+      handleError(err, res);
     }
   });
 
@@ -1724,37 +1452,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Adjusted task request:", JSON.stringify(taskRequest, null, 2));
 
-      // Pre-validate
-      if (taskRequest.startDate) {
-        // If start date is provided, check that we have either endDate OR duration, but not both
-        if (taskRequest.endDate !== undefined && taskRequest.duration !== undefined) {
-          return res.status(400).json({
-            message: "Validation error: Cannot provide both end date and duration",
-            errors: [{
-              code: "custom",
-              message: "Either end date or duration must be provided, but not both",
-              path: ["endDate"]
-            }]
-          });
-        }
-
-        // Check that at least one of endDate or duration is provided
-        if (taskRequest.endDate === undefined && taskRequest.duration === undefined) {
-          return res.status(400).json({
-            message: "Validation error: When start date is provided, either end date or duration must be provided",
-            errors: [{
-              code: "custom",
-              message: "When start date is provided, either end date or duration must be provided",
-              path: ["endDate"]
-            }]
-          });
-        }
-      }
-
       // Try validation
       try {
         // Attempt validation
-        const validationResult = taskSchema.safeParse(taskRequest);
+        const validationResult = taskSchema.extend({
+          startDate: z.string().optional().nullable(),
+          endDate: z.string().optional().nullable(),
+          duration: z.number().optional().nullable(),
+        }).safeParse(taskRequest);
         if (!validationResult.success) {
           console.error("Task validation failed:", JSON.stringify(validationResult.error, null, 2));
           return res.status(400).json({
@@ -1772,17 +1477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Activity not found" });
         }
 
-        // Set the project ID to null since tasks are not directly linked to projects
-        taskData.projectId = null;
 
-        // Ensure dates are properly converted to Date objects for storage
-        if (typeof taskData.startDate === 'string' && taskData.startDate) {
-          taskData.startDate = new Date(taskData.startDate);
-        }
-
-        if (typeof taskData.endDate === 'string' && taskData.endDate) {
-          taskData.endDate = new Date(taskData.endDate);
-        }
 
         const task = await storage.createTask(taskData);
         res.status(201).json(task);
@@ -1801,34 +1496,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tasks = req.body.map((task: {
         activityId: number;
-        projectId: number;
         name: string;
         description?: string;
+        percentComplete?: number;
         startDate?: string;
         endDate?: string;
         duration?: number;
-        percentComplete?: number;
       }) => ({
         activityId: task.activityId,
-        projectId: task.projectId,
         name: task.name,
         description: task.description || "",
-        startDate: task.startDate ? new Date(task.startDate).toISOString() : null,
-        endDate: task.endDate ? new Date(task.endDate).toISOString() : null,
+        percentComplete: (task.percentComplete || 0).toString(),
+        startDate: task.startDate || null,
+        endDate: task.endDate || null,
         duration: task.duration || null,
-        percentComplete: (task.percentComplete || 0).toString()
       }));
 
       const createdTasks = await Promise.all(
         tasks.map((task: {
           activityId: number;
-          projectId: number;
           name: string;
           description: string;
-          startDate: string | null;
-          endDate: string | null;
-          duration: number | null;
           percentComplete: string;
+          startDate?: string;
+          endDate?: string;
+          duration?: number;
         }) => storage.createTask(task))
       );
 
@@ -1857,10 +1549,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId: z.number().optional(),
         name: z.string().optional(),
         description: z.string().nullable().optional(),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-        duration: z.number().optional(),
         percentComplete: z.number().min(0).max(100).optional(),
+        startDate: z.string().optional().nullable(),
+        endDate: z.string().optional().nullable(),
+        duration: z.number().optional().nullable(),
       }).parse(req.body);
 
       // If changing activity, check if it exists
@@ -1870,20 +1562,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Activity not found" });
         }
 
-        // Set project ID to null since tasks are not directly linked to projects
-        taskData.projectId = null;
+
       }
 
       // Create a properly typed object for the update
-      const taskDataWithDateConversion: Partial<Task> = {
+      const taskDataToSend: any = {
         ...taskData,
-        startDate: taskData.startDate ? new Date(taskData.startDate).toISOString() : null,
-        endDate: taskData.endDate ? new Date(taskData.endDate).toISOString() : null,
-        duration: taskData.duration || null,
-        percentComplete: taskData.percentComplete !== undefined ? taskData.percentComplete : null
+        percentComplete: taskData.percentComplete !== undefined ? taskData.percentComplete.toString() : undefined
       };
 
-      const updatedTask = await storage.updateTask(id, taskDataWithDateConversion);
+      const updatedTask = await storage.updateTask(id, taskDataToSend);
       res.json(updatedTask);
     } catch (err) {
       handleError(err, res);
@@ -2250,7 +1938,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new thread
   app.post("/api/collaboration/threads", async (req: Request, res: Response) => {
     try {
-      const threadData = insertCollaborationThreadSchema.parse(req.body);
+      const threadData = z.object({
+        title: z.string(),
+        type: z.enum(["issue", "info", "announcement", "awards"]),
+        createdById: z.string(),
+        createdByName: z.string(),
+        isClosed: z.boolean().default(false),
+        projectId: z.number().optional().nullable(),
+      }).parse(req.body);
 
       // If projectId is provided, validate that the project exists
       if (threadData.projectId) {
@@ -2368,10 +2063,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Thread not found" });
       }
 
-      const messageData = insertCollaborationMessageSchema.parse({
-        ...req.body,
-        threadId,
-      });
+      const messageData = z.object({
+        threadId: z.number(),
+        content: z.string(),
+        authorId: z.string(),
+        authorName: z.string(),
+      }).parse({ ...req.body, threadId });
 
       const [message] = await db
         .insert(collaborationMessages)
@@ -2490,10 +2187,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      const threadData = insertProjectCollaborationThreadSchema.parse({
-        ...req.body,
-        projectId,
-      });
+      const threadData = z.object({
+        projectId: z.number(),
+        title: z.string(),
+        type: z.enum(["issue", "info", "announcement", "awards"]),
+        createdById: z.string(),
+        createdByName: z.string(),
+        isClosed: z.boolean().default(false),
+      }).parse({ ...req.body, projectId });
 
       const [thread] = await db
         .insert(projectCollaborationThreads)
@@ -2591,10 +2292,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project or thread ID" });
       }
 
-      const messageData = insertProjectCollaborationMessageSchema.parse({
-        ...req.body,
-        threadId,
-      });
+      const messageData = z.object({
+        threadId: z.number(),
+        content: z.string(),
+        authorId: z.string(),
+        authorName: z.string(),
+      }).parse({ ...req.body, threadId });
 
       const [message] = await db
         .insert(projectCollaborationMessages)

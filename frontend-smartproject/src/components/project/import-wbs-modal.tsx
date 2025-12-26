@@ -30,13 +30,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileUp, FileX, Download, AlertTriangle } from "lucide-react";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow 
+  TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -81,20 +81,20 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
   // Handle file selection
   const handleFileChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    
+
     const file = files[0];
-    
+
     try {
       setCsvData([]);
       setParseErrors([]);
       setIsParsingComplete(false);
-      
+
       const { data, errors } = await parseCsvFile(file);
-      
+
       setCsvData(data);
       setParseErrors(errors);
       setIsParsingComplete(true);
-      
+
       if (errors.length > 0) {
         toast({
           title: "CSV Validation Errors",
@@ -136,25 +136,25 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
     },
     onError: (error: any) => {
       console.error("Import error details:", error);
-      
+
       let errorMessage = "Failed to import WBS items. Please check your CSV file.";
       let errorDetails: string[] = [];
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       if (error.errors && Array.isArray(error.errors)) {
         errorMessage = `${error.errors.length} validation errors found. Please check your CSV file.`;
         errorDetails = error.errors;
       }
-      
+
       toast({
         title: "Import Failed",
         description: errorMessage,
         variant: "destructive",
       });
-      
+
       if (errorDetails.length > 0) {
         setParseErrors(errorDetails);
         setIsParsingComplete(true);
@@ -172,7 +172,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
       });
       return;
     }
-    
+
     if (parseErrors.length > 0) {
       toast({
         title: "Validation Errors",
@@ -181,7 +181,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
       });
       return;
     }
-    
+
     importWbsItems.mutate(csvData);
   };
 
@@ -213,14 +213,12 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
           <AlertDescription>
             <p className="mb-1 font-semibold">Import Requirements:</p>
             <ul className="list-disc pl-5 text-sm space-y-1">
-              <li><strong>Required fields:</strong> wbsCode, wbsName, wbsType</li>
               <li><strong>WBS Type rules:</strong></li>
               <ul className="list-disc pl-5 text-xs space-y-1 mt-1">
-                <li><strong>Summary/WorkPackage:</strong> Must have budget amount, cannot have dates</li>
-                <li><strong>Activity:</strong> Must have dates (start/end or duration), cannot have budget</li>
+                <li><strong>Summary/WorkPackage:</strong> Must have budget amount</li>
+                <li><strong>Activity:</strong> Cannot have budget</li>
               </ul>
               <li>Existing WBS items with matching codes will be updated</li>
-              <li>Date format must be YYYY-MM-DD</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -286,7 +284,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
               <AlertDescription className="flex">
                 <AlertTriangle className="h-5 w-5 mr-2 text-amber-600 flex-shrink-0" />
                 <p className="text-sm">
-                  <strong>Important:</strong> The template includes example WBS items with different types. 
+                  <strong>Important:</strong> The template includes example WBS items with different types.
                   Make sure to follow the validation rules for each type.
                 </p>
               </AlertDescription>
@@ -316,15 +314,13 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
                         <TableHead>Name</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Start Date</TableHead>
-                        <TableHead>End Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {csvData.map((row, index) => {
                         // Check if this code already exists
                         const existingItem = wbsItems.find(item => item.code === row.wbsCode);
-                        
+
                         return (
                           <TableRow key={index}>
                             <TableCell>
@@ -338,8 +334,6 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
                             <TableCell className="text-right font-mono">
                               {row.amount ? `$${parseFloat(row.amount).toFixed(2)}` : '-'}
                             </TableCell>
-                            <TableCell>{row.startDate || '-'}</TableCell>
-                            <TableCell>{row.endDate || '-'}</TableCell>
                           </TableRow>
                         );
                       })}
@@ -357,7 +351,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 disabled={importWbsItems.isPending || csvData.length === 0 || parseErrors.length > 0}
               >

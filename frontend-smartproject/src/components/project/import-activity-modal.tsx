@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { WbsItem, wbsItemSchema } from "@shared/types";
+import { WbsItem } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { parseCsvFile } from "@/lib/csv";
 
@@ -30,13 +30,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileUp, FileX, Download, AlertTriangle } from "lucide-react";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow 
+  TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -71,10 +71,10 @@ type FormValues = z.infer<typeof formSchema>;
 // Function to download the activity template
 const downloadActivityTemplate = () => {
   const csvContent = [
-    "activityCode,activityName,description,startDate,duration,endDate,percentComplete",
-    "1.1.1,Design Phase,Initial design activities,2024-01-01,10,,0",
-    "1.1.2,Development Phase,Implementation work,2024-01-15,,2024-01-30,0",
-    "1.1.3,Testing Phase,Quality assurance,2024-02-01,5,,0"
+    "activityCode,activityName,description,percentComplete",
+    "1.1.1,Design Phase,Initial design activities,0",
+    "1.1.2,Development Phase,Implementation work,0",
+    "1.1.3,Testing Phase,Quality assurance,0"
   ].join("\n");
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -91,70 +91,70 @@ const downloadActivityTemplate = () => {
 const parseActivityCsvFile = async (file: File): Promise<{ data: any[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       const text = e.target?.result;
       if (typeof text !== "string") {
         return reject(new Error("Failed to read file as text"));
       }
-      
+
       try {
         // Remove Byte Order Mark (BOM) if present
         const cleanText = text.replace(/^\uFEFF/, '');
-        
+
         // Split by any line ending and filter empty lines
         const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== "");
-        
+
         if (lines.length === 0) {
           return resolve({
             data: [],
             errors: ["CSV file is empty or contains no valid data"]
           });
         }
-        
+
         const headers = lines[0].split(",").map(header => header.trim());
-        
+
         // Check if required activity columns exist
-        const requiredColumns = ["activityCode", "activityName", "startDate"];
+        const requiredColumns = ["activityCode", "activityName"];
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
-        
+
         if (missingColumns.length > 0) {
           return resolve({
             data: [],
             errors: [`Missing required activity columns: ${missingColumns.join(", ")}. Make sure you're using an activity CSV template, not a WBS template.`]
           });
         }
-        
+
         const data: Record<string, string>[] = [];
         const errors: string[] = [];
-        
+
         // Skip header row
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
-          
+
           const values = line.split(",").map(value => value.trim());
-          
+
           // Handle cases where values might contain commas inside quotes
           const row: Record<string, string> = {};
-          
+
           headers.forEach((header, index) => {
             row[header] = values[index] || "";
           });
-          
+
           data.push(row);
         }
-        
+
         resolve({ data, errors });
       } catch (error) {
         reject(error instanceof Error ? error : new Error("Unknown error parsing CSV"));
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error("Error reading file"));
     };
-    
+
     reader.readAsText(file);
   });
 };
@@ -182,8 +182,8 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
   const workPackages = wbsItems.filter(item => item.type === "WorkPackage");
 
   // Get parent Work Package
-  const parentWorkPackage = selectedPackageId 
-    ? wbsItems.find(item => item.id === selectedPackageId) 
+  const parentWorkPackage = selectedPackageId
+    ? wbsItems.find(item => item.id === selectedPackageId)
     : null;
 
   // Create form
@@ -197,17 +197,17 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
   // Handle file selection
   const handleFileChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    
+
     const file = files[0];
-    
+
     try {
       setCsvData([]);
       setParseErrors([]);
       setIsParsingComplete(false);
-      
+
       // Use our custom activity CSV parser
       const { data, errors } = await parseActivityCsvFile(file);
-      
+
       // Validate activities and add any specific errors
       const validationErrors: string[] = [];
       data.forEach((row, index) => {
@@ -217,18 +217,12 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
         if (!row.activityName) {
           validationErrors.push(`Row ${index + 1}: Missing required field 'activityName'`);
         }
-        if (!row.startDate) {
-          validationErrors.push(`Row ${index + 1}: Missing required field 'startDate'`);
-        }
-        if (!row.duration && !row.endDate) {
-          validationErrors.push(`Row ${index + 1}: Either 'duration' or 'endDate' must be provided`);
-        }
       });
-      
+
       setCsvData(data);
       setParseErrors([...errors, ...validationErrors]);
       setIsParsingComplete(true);
-      
+
       if (errors.length > 0 || validationErrors.length > 0) {
         toast({
           title: "CSV Validation Errors",
@@ -258,20 +252,17 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
           code: row.activityCode,
           name: row.activityName,
           description: row.description || "",
-          startDate: row.startDate,
-          endDate: row.endDate,
-          duration: row.duration ? Number(row.duration) : undefined,
           percentComplete: row.percentComplete ? Number(row.percentComplete) : 0,
           parentId: selectedPackageId,
           projectId: projectId
         }));
-        
+
         console.log('Sending import request with data:', {
           projectId,
           workPackageId: selectedPackageId,
           csvData: transformedData,
         });
-        
+
         try {
           // Try the detailed endpoint format first
           const response = await apiRequest("POST", `/api/projects/${projectId}/wbs/${selectedPackageId}/activities/import`, {
@@ -279,12 +270,12 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
             workPackageId: selectedPackageId,
             csvData: transformedData,
           });
-          
+
           console.log('Import response from detailed endpoint:', response);
           return response.json();
         } catch (apiError) {
           console.error('API request to detailed endpoint failed:', apiError);
-          
+
           // Try the project-level endpoint
           console.log('Trying project-level endpoint...');
           try {
@@ -293,12 +284,12 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
               workPackageId: selectedPackageId,
               csvData: transformedData,
             });
-            
+
             console.log('Import response from project endpoint:', projectResponse);
             return projectResponse.json();
           } catch (projectError) {
             console.error('API request to project endpoint failed:', projectError);
-            
+
             // Try the original endpoint as a last resort
             console.log('Trying original endpoint...');
             const fallbackResponse = await apiRequest("POST", "/api/wbs/activities/import", {
@@ -306,7 +297,7 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
               workPackageId: selectedPackageId,
               csvData: transformedData,
             });
-            
+
             console.log('Import response from original endpoint:', fallbackResponse);
             return fallbackResponse.json();
           }
@@ -328,30 +319,30 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
     },
     onError: (error: any) => {
       console.error("Import error details:", error);
-      
+
       let errorMessage = "Failed to import activities. Please check your CSV file and the API endpoint.";
       let errorDetails: string[] = [];
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       if (error.errors && Array.isArray(error.errors)) {
         errorMessage = `${error.errors.length} validation errors found. Please check your CSV file.`;
         errorDetails = error.errors;
       }
-      
+
       // Check for network errors
       if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
         errorMessage = "Network error: Could not connect to the server. Is the API server running?";
       }
-      
+
       toast({
         title: "Import Failed",
         description: errorMessage,
         variant: "destructive",
       });
-      
+
       if (errorDetails.length > 0) {
         setParseErrors(errorDetails);
         setIsParsingComplete(true);
@@ -378,7 +369,7 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
       });
       return;
     }
-    
+
     if (parseErrors.length > 0) {
       toast({
         title: "Validation Errors",
@@ -387,7 +378,7 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
       });
       return;
     }
-    
+
     importActivities.mutate(csvData);
   };
 
@@ -421,10 +412,8 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
           <AlertDescription>
             <p className="mb-1 font-semibold">Import Requirements:</p>
             <ul className="list-disc pl-5 text-sm space-y-1">
-              <li><strong>Required columns:</strong> activityCode, activityName, startDate, and either duration or endDate</li>
+              <li><strong>Required columns:</strong> activityCode, activityName</li>
               <li><strong>Optional columns:</strong> description, percentComplete</li>
-              <li>Date format must be YYYY-MM-DD</li>
-              <li>Duration should be a number of days</li>
               <li>Activities will be created as children of the selected Work Package</li>
               <li>Activities with existing codes will be updated instead of created</li>
               <li className="font-medium text-blue-600">Use the Download Template button to get the correct CSV format</li>
@@ -533,7 +522,7 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
                 <AlertTriangle className="h-5 w-5 mr-2 text-amber-600 flex-shrink-0" />
                 <p className="text-sm">
                   <strong>Important:</strong> All activities will be created as type "Activity" and added under the selected
-                  Work Package. Activities must have a start date and either a duration or end date.
+                  Work Package.
                 </p>
               </AlertDescription>
             </Alert>
@@ -569,9 +558,6 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
                       <TableRow>
                         <TableHead>Code</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Start Date</TableHead>
-                        <TableHead>End Date</TableHead>
-                        <TableHead>Duration</TableHead>
                         <TableHead>% Complete</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -579,30 +565,27 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
                     <TableBody>
                       {csvData.map((row, index) => {
                         // Find existing activity with matching code under this work package
-                        const existingActivity = wbsItems.find(item => 
-                          item.code === row.activityCode && 
+                        const existingActivity = wbsItems.find(item =>
+                          item.code === row.activityCode &&
                           item.type === "Activity" &&
                           (selectedPackageId ? item.parentId === selectedPackageId : true)
                         );
-                        
+
                         // Check for invalid data
                         const isValid = row.activityCode && row.activityName && row.startDate && (row.duration || row.endDate);
-                        
+
                         return (
-                          <TableRow 
-                            key={index} 
-                            className={!isValid 
-                              ? "bg-red-50" 
-                              : existingActivity 
-                                ? "bg-yellow-50" 
+                          <TableRow
+                            key={index}
+                            className={!isValid
+                              ? "bg-red-50"
+                              : existingActivity
+                                ? "bg-yellow-50"
                                 : undefined
                             }
                           >
                             <TableCell>{row.activityCode || '-'}</TableCell>
                             <TableCell>{row.activityName || '-'}</TableCell>
-                            <TableCell>{row.startDate || '-'}</TableCell>
-                            <TableCell>{row.endDate || '-'}</TableCell>
-                            <TableCell>{row.duration || '-'}</TableCell>
                             <TableCell>{row.percentComplete || '0'}</TableCell>
                             <TableCell>
                               {!isValid ? (
@@ -630,11 +613,11 @@ export function ImportActivityModal({ isOpen, onClose, projectId, workPackageId 
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 disabled={
-                  importActivities.isPending || 
-                  csvData.length === 0 || 
+                  importActivities.isPending ||
+                  csvData.length === 0 ||
                   parseErrors.length > 0 ||
                   hasDuplicateCodes() ||
                   !selectedPackageId

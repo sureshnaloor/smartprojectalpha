@@ -2,16 +2,15 @@ import { useParams } from "wouter";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Project, WbsItem, Dependency } from "@shared/types";
-import { Link, ArrowRight, PlusCircle, X, ArrowRightCircle, CalendarClock, ImportIcon, ListTodo, FileUp, GanttChartIcon } from "lucide-react";
+import { Project, WbsItem, Dependency, InsertDependency } from "@shared/schema";
+import { Link, ArrowRight, PlusCircle, X, ArrowRightCircle, ImportIcon, ListTodo, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { GanttChart } from "@/components/project/gantt-chart";
 import { AddWbsModal } from "@/components/project/add-wbs-modal";
 import { ImportActivityModal } from "@/components/project/import-activity-modal";
 import { ImportTaskModal } from "@/components/project/import-task-modal";
 import { AddTaskModal } from "@/components/project/add-task-modal";
-import { formatDate, formatShortDate, isValidDependency } from "@/lib/utils";
+import { formatCurrency, isValidDependency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -28,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
+import {
   Card,
   CardContent,
   CardHeader,
@@ -46,9 +45,6 @@ interface Task {
   projectId?: number;
   name: string;
   description?: string;
-  startDate?: string | null;
-  endDate?: string | null;
-  duration?: number;
   percentComplete?: number;
   dependencies?: { predecessorId: number; successorId: number; type: string; lag: number }[];
 }
@@ -67,10 +63,9 @@ export default function Schedule() {
   const [dependencyType, setDependencyType] = useState<string>("FS");
   const [lag, setLag] = useState<number>(0);
   const debuggedItems = useRef(false);
-  const [isProcessingSchedule, setIsProcessingSchedule] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -108,14 +103,14 @@ export default function Schedule() {
   useEffect(() => {
     // Skip if we've already debugged this set of items
     if (debuggedItems.current) return;
-    
+
     // Create a map of ID occurrences
     const idCount = new Map<number, number>();
     wbsItems.forEach(item => {
       const count = idCount.get(item.id) || 0;
       idCount.set(item.id, count + 1);
     });
-    
+
     // Find any IDs that appear more than once
     const duplicates = Array.from(idCount.entries())
       .filter(([id, count]) => count > 1)
@@ -123,14 +118,14 @@ export default function Schedule() {
         const items = wbsItems.filter(item => item.id === id);
         return { id, count, items };
       });
-    
+
     if (duplicates.length > 0) {
       console.warn('Duplicate WBS items detected in schedule.tsx:', duplicates);
     }
-    
+
     // Mark as debugged to prevent further checks on the same data
     debuggedItems.current = true;
-    
+
     // Reset debugged flag when component unmounts
     return () => {
       debuggedItems.current = false;
@@ -141,24 +136,24 @@ export default function Schedule() {
   const fetchDependenciesForItems = async () => {
     // Skip if no WBS items
     if (!wbsItems.length) return [];
-    
+
     try {
       // Try to fetch all dependencies for the project at once
       const response = await fetch(`/api/projects/${projectId}/dependencies`, {
         credentials: "include",
       });
-      
+
       if (response.ok) {
         return await response.json();
       }
     } catch (error) {
       console.error("Error fetching all dependencies:", error);
     }
-    
+
     // Fallback to fetching by activity if project-wide endpoint doesn't exist
     const allDependencies: Dependency[] = [];
     const activityItems = wbsItems.filter(item => item.type === "Activity");
-    
+
     for (const item of activityItems) {
       try {
         const response = await fetch(`/api/wbs/${item.id}/dependencies`, {
@@ -172,11 +167,11 @@ export default function Schedule() {
         console.error(`Error fetching dependencies for item ${item.id}:`, error);
       }
     }
-    
+
     // Deduplicate dependencies
     const uniqueDependenciesSet = new Set<string>();
     const uniqueDependencies: Dependency[] = [];
-    
+
     allDependencies.forEach(dep => {
       const depString = `${dep.predecessorId}-${dep.successorId}`;
       if (!uniqueDependenciesSet.has(depString)) {
@@ -184,7 +179,7 @@ export default function Schedule() {
         uniqueDependencies.push(dep);
       }
     });
-    
+
     return uniqueDependencies;
   };
 
@@ -309,55 +304,6 @@ export default function Schedule() {
     setIsAddActivityModalOpen(true);
   };
 
-  // Add finalize schedule mutation
-  const finalizeSchedule = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/projects/${projectId}/schedule/finalize`);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
-      toast({
-        title: "Schedule Finalized",
-        description: `${data.updatedCount} activities have been updated based on dependencies.`,
-        variant: "default",
-      });
-      
-      if (data.errorCount > 0) {
-        console.error("Errors during schedule finalization:", data.errors);
-        toast({
-          title: "Some Updates Failed",
-          description: `${data.errorCount} activities could not be updated. Check console for details.`,
-          variant: "destructive",
-        });
-      }
-      
-      setIsProcessingSchedule(false);
-    },
-    onError: (error) => {
-      setIsProcessingSchedule(false);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to finalize schedule. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleFinalizeSchedule = () => {
-    if (dependencies.length === 0) {
-      toast({
-        title: "No Dependencies",
-        description: "There are no dependencies to process. Add dependencies before finalizing the schedule.",
-        variant: "default",
-      });
-      return;
-    }
-    
-    setIsProcessingSchedule(true);
-    finalizeSchedule.mutate();
-  };
-
   // Handle adding a task to an activity
   const handleAddTask = (activityId: number) => {
     setSelectedActivityId(activityId);
@@ -368,12 +314,12 @@ export default function Schedule() {
   const createTask = useMutation({
     mutationFn: async (task: Task) => {
       const response = await apiRequest("POST", "/api/tasks", task);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to create task");
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -396,7 +342,7 @@ export default function Schedule() {
 
   const handleCreateTask = (task: Task) => {
     console.log("Handling create task:", task);
-    
+
     // Create a clean task object to avoid any unwanted properties
     const taskToCreate: Task = {
       activityId: task.activityId,
@@ -405,22 +351,7 @@ export default function Schedule() {
       description: task.description || "",
       percentComplete: task.percentComplete || 0,
     };
-    
-    // Only add startDate if it exists
-    if (task.startDate) {
-      taskToCreate.startDate = task.startDate;
-    }
-    
-    // Only add one of endDate or duration, not both
-    if (task.endDate) {
-      taskToCreate.endDate = task.endDate;
-    } else if (task.duration) {
-      taskToCreate.duration = task.duration;
-    } else if (task.startDate) {
-      // If we have a startDate but neither endDate nor duration, add a default duration
-      taskToCreate.duration = 1; // Default to 1 day
-    }
-    
+
     console.log("Sending task to API:", taskToCreate);
     createTask.mutate(taskToCreate);
     setIsAddTaskModalOpen(false);
@@ -459,7 +390,7 @@ export default function Schedule() {
         description: task.description || "",
         percentComplete: task.percentComplete || 0
       };
-      
+
       // Set projectId from the activity if available
       const activity = wbsItems.find(a => a.id === task.activityId);
       if (activity) {
@@ -467,23 +398,11 @@ export default function Schedule() {
       } else {
         processedTask.projectId = projectId; // Fall back to current project ID
       }
-      
-      // Only add startDate if it exists
-      if (task.startDate) {
-        processedTask.startDate = task.startDate;
-      }
-      
-      // Only add one of endDate or duration, not both
-      if (task.endDate) {
-        processedTask.endDate = task.endDate;
-      } else if (task.duration) {
-        processedTask.duration = task.duration;
-      }
-      
+
       console.log("Processed task for import:", processedTask);
       return processedTask;
     });
-    
+
     // Send the processed tasks to the API
     console.log("Importing tasks:", processedTasks);
     importTasks.mutate(processedTasks);
@@ -502,30 +421,6 @@ export default function Schedule() {
         const activityId = row.getValue("activityId") as number;
         const activity = wbsItems.find(item => item.id === activityId);
         return activity?.name || `Activity #${activityId}`;
-      },
-    },
-    {
-      accessorKey: "startDate",
-      header: "Start Date",
-      cell: ({ row }) => {
-        const startDate = row.getValue("startDate") as string | null;
-        return startDate ? formatDate(new Date(startDate)) : "-";
-      },
-    },
-    {
-      accessorKey: "endDate",
-      header: "End Date",
-      cell: ({ row }) => {
-        const endDate = row.getValue("endDate") as string | null;
-        return endDate ? formatDate(new Date(endDate)) : "-";
-      },
-    },
-    {
-      accessorKey: "duration",
-      header: "Duration (days)",
-      cell: ({ row }) => {
-        const duration = row.getValue("duration") as number | undefined;
-        return duration !== undefined ? duration : "-";
       },
     },
     {
@@ -578,7 +473,7 @@ export default function Schedule() {
       });
     },
   });
-  
+
   const handleDeleteTask = (taskId: number) => {
     if (confirm("Are you sure you want to delete this task?")) {
       deleteTask.mutate(taskId);
@@ -605,26 +500,25 @@ export default function Schedule() {
           >
             <div className="mb-4 md:mb-0">
               <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-                <CalendarClock className="mr-2 h-6 w-6 text-indigo-600" />
                 Project Schedule
               </h1>
               <p className="text-gray-600 mt-1">
-                Plan and track project activities, dependencies, and timelines
+                Plan and track project activities, dependencies, and progress
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="bg-white hover:bg-indigo-50 border-indigo-200"
                 onClick={() => setIsAddActivityModalOpen(true)}
               >
                 <PlusCircle className="mr-2 h-4 w-4 text-indigo-600" />
                 Add Activity
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="bg-white hover:bg-indigo-50 border-indigo-200"
                 onClick={() => setIsAddDependencyModalOpen(true)}
               >
@@ -641,21 +535,20 @@ export default function Schedule() {
         <div className="max-w-7xl mx-auto px-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mt-2 bg-white/70 border border-gray-200">
-              <TabsTrigger 
-                value="schedule" 
+              <TabsTrigger
+                value="schedule"
                 className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700"
               >
-                <GanttChartIcon className="mr-2 h-4 w-4" />
-                Gantt Chart
+                Schedule Tree
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="dependencies"
                 className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700"
               >
                 <Link className="mr-2 h-4 w-4" />
                 Dependencies
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="tasks"
                 className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700"
               >
@@ -663,7 +556,7 @@ export default function Schedule() {
                 Tasks
               </TabsTrigger>
             </TabsList>
-          
+
             {/* Content section moved inside the Tabs component */}
             <div className="bg-stone-50 min-h-[calc(100vh-200px)]">
               <div className="max-w-7xl mx-auto py-6 px-0 md:px-4">
@@ -676,27 +569,12 @@ export default function Schedule() {
                     <Card className="border-indigo-100 shadow-sm">
                       <CardHeader className="bg-white border-b border-indigo-100">
                         <div className="flex justify-between items-center">
-                          <CardTitle className="text-lg text-gray-900">Project Gantt Chart</CardTitle>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={handleFinalizeSchedule}
-                              disabled={isProcessingSchedule}
-                              className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
-                            >
-                              {isProcessingSchedule ? "Processing..." : "Generate Schedule"}
-                            </Button>
-                          </div>
+                          <CardTitle className="text-lg text-gray-900">Project Schedule Tree</CardTitle>
                         </div>
                       </CardHeader>
                       <CardContent className="p-4">
-                        <div className="rounded-lg border border-gray-200 bg-white p-1">
-                          <GanttChart 
-                            projectId={projectId}
-                            onAddActivity={handleAddActivity}
-                            onAddTask={handleAddTask}
-                          />
+                        <div className="rounded-lg border border-gray-200 bg-white p-4">
+                          <p className="text-gray-600 italic">Schedule tree view coming soon (Gantt chart removed)</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -713,8 +591,8 @@ export default function Schedule() {
                       <CardHeader className="bg-white border-b border-indigo-100">
                         <div className="flex justify-between items-center">
                           <CardTitle className="text-lg text-gray-900">Activity Dependencies</CardTitle>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => setIsAddDependencyModalOpen(true)}
                             className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
@@ -736,7 +614,7 @@ export default function Schedule() {
                             dependencies.map((dep) => {
                               const predecessor = wbsItems.find((item) => item.id === dep.predecessorId);
                               const successor = wbsItems.find((item) => item.id === dep.successorId);
-                              
+
                               return (
                                 <div key={`${dep.predecessorId}-${dep.successorId}`} className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
@@ -774,8 +652,8 @@ export default function Schedule() {
                         <div className="flex justify-between items-center">
                           <CardTitle className="text-lg text-gray-900">Task Management</CardTitle>
                           <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => setIsImportTasksModalOpen(true)}
                               className="bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200"
@@ -783,8 +661,8 @@ export default function Schedule() {
                               <ImportIcon className="mr-2 h-4 w-4" />
                               Import Tasks
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 if (wbsItems.filter(item => item.type === "Activity").length > 0) {
@@ -915,7 +793,7 @@ export default function Schedule() {
             <Button variant="outline" onClick={() => setIsAddDependencyModalOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (predecessorId && successorId) {
                   createDependency.mutate({
@@ -940,7 +818,6 @@ export default function Schedule() {
         onClose={() => setIsAddActivityModalOpen(false)}
         projectId={projectId}
         parentId={selectedParentId}
-        scheduleView={true}
       />
 
       {/* Add Task Modal */}

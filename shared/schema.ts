@@ -19,12 +19,12 @@ export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date").notNull(),
   budget: numeric("budget", { precision: 12, scale: 2 }).notNull(),
   currency: text("currency").default("USD").notNull(),
   projectType: text("project_type"), // Highway, Infrastructure, Power, Commercial, Petrochem, Oil&Gas
   status: text("status"), // concept, planning, active, in progress, aborted, on-hold, completed
+  startDate: date("start_date"),
+  endDate: date("end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -41,11 +41,6 @@ export const wbsItems = pgTable("wbs_items", {
   budgetedCost: numeric("budgeted_cost", { precision: 12, scale: 2 }).notNull(),
   actualCost: numeric("actual_cost", { precision: 12, scale: 2 }).default("0"),
   percentComplete: numeric("percent_complete", { precision: 5, scale: 2 }).default("0"),
-  startDate: date("start_date"),  // Now optional - only for Activities
-  endDate: date("end_date"),      // Now optional - only for Activities
-  duration: integer("duration"),  // Now optional - only for Activities
-  actualStartDate: date("actual_start_date"),
-  actualEndDate: date("actual_end_date"),
   isTopLevel: boolean("is_top_level").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -103,8 +98,10 @@ export const tasks = pgTable("tasks", {
   activityId: integer("activity_id").references(() => activities.id, { onDelete: "cascade" }), // Made nullable
   name: text("name").notNull(),
   description: text("description"),
-  duration: integer("duration").notNull(), // Duration in minutes
   status: text("status").default("pending").notNull(), // pending, in_progress, completed
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  duration: integer("duration"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -228,27 +225,25 @@ export const projectCollaborationMessages = pgTable("project_collaboration_messa
 export const insertProjectSchema = createInsertSchema(projects)
   .omit({ id: true, createdAt: true } as any)
   .extend({
+    name: z.string(),
+    description: z.string().optional().nullable(),
     budget: z.string().or(z.number()).transform(val => val.toString()),
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
     projectType: z.enum(["Highway", "Infrastructure", "Power", "Commercial", "Petrochem", "Oil&Gas"]).optional().nullable(),
     status: z.enum(["concept", "planning", "active", "in progress", "aborted", "on-hold", "completed"]).optional().nullable(),
     startDate: z.date().or(z.string()).transform(val => {
-      if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
-      }
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
       return val.toISOString().split('T')[0];
-    }),
+    }).optional().nullable(),
     endDate: z.date().or(z.string()).transform(val => {
-      if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
-      }
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
       return val.toISOString().split('T')[0];
-    }),
+    }).optional().nullable(),
   });
 
 // Base WBS schema - a simpler version without all the refinements
 export const baseWbsSchema = createInsertSchema(wbsItems)
-  .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true, actualStartDate: true, actualEndDate: true } as any)
+  .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true } as any)
   .extend({
     projectId: z.number(),
     parentId: z.number().nullable().optional(),
@@ -259,26 +254,6 @@ export const baseWbsSchema = createInsertSchema(wbsItems)
     isTopLevel: z.boolean().optional(),
     budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
     type: z.enum(["Summary", "WorkPackage", "WBS", "Activity"]),
-    startDate: z.date().or(z.string()).transform(val => {
-      if (val === undefined || val === null) return undefined;
-      if (typeof val === 'string') {
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
-      }
-      return val.toISOString().split('T')[0];
-    }).optional(),
-    endDate: z.date().or(z.string()).transform(val => {
-      if (val === undefined || val === null) return undefined;
-      if (typeof val === 'string') {
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
-      }
-      return val.toISOString().split('T')[0];
-    }).optional(),
-    duration: z.string().or(z.number()).transform(val => {
-      if (val === undefined || val === null) return undefined;
-      return typeof val === 'string' ? parseInt(val) : val;
-    }).optional(),
   });
 
 // Updated WBS schema with conditional validations
@@ -308,37 +283,6 @@ export const insertWbsItemSchema = baseWbsSchema
       message: "Activity types cannot have a budget",
       path: ["budgetedCost"],
     }
-  )
-  .refine(
-    (data) => {
-      // Activity types must have startDate, endDate and duration
-      if (data.type === "Activity") {
-        return (
-          data.startDate !== undefined &&
-          data.endDate !== undefined &&
-          data.duration !== undefined &&
-          data.duration > 0
-        );
-      }
-      return true;
-    },
-    {
-      message: "Activity types must have start date, end date, and duration",
-      path: ["startDate"],
-    }
-  )
-  .refine(
-    (data) => {
-      // Summary and WorkPackage should not have dates, but WBS can
-      if (data.type === "Summary" || data.type === "WorkPackage") {
-        return data.startDate === undefined && data.endDate === undefined;
-      }
-      return true;
-    },
-    {
-      message: "Summary and WorkPackage types cannot have dates",
-      path: ["startDate"],
-    }
   );
 
 export const insertDependencySchema = createInsertSchema(dependencies).omit({ id: true, createdAt: true } as any);
@@ -358,10 +302,18 @@ export const insertCostEntrySchema = createInsertSchema(costEntries)
 export const insertTaskSchema = createInsertSchema(tasks)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
-    duration: z.string().or(z.number()).transform(val => {
-      return typeof val === 'string' ? parseInt(val) : val;
-    }),
+    name: z.string(),
+    description: z.string().optional().nullable(),
     status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
+    startDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
+      return val.toISOString().split('T')[0];
+    }).optional().nullable(),
+    endDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
+      return val.toISOString().split('T')[0];
+    }).optional().nullable(),
+    duration: z.string().or(z.number()).transform(val => typeof val === 'string' ? parseInt(val) : val).optional().nullable(),
   });
 
 // Resource schema
@@ -385,6 +337,9 @@ export const insertTaskResourceSchema = createInsertSchema(taskResources)
 export const insertActivitySchema = createInsertSchema(activities)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
+    name: z.string(),
+    description: z.string().optional().nullable(),
+    unitOfMeasure: z.string(),
     unitRate: z.string().or(z.number()).transform(val => val.toString()),
   });
 
@@ -481,52 +436,11 @@ export const extendedInsertProjectSchema = insertProjectSchema.extend({
 // Extended validation for WBS Items - use the base schema for extension
 export const extendedInsertWbsItemSchema = baseWbsSchema.extend({
   name: z.string().min(3, "WBS item name must be at least 3 characters"),
-  duration: z.string().or(z.number()).transform(val => {
-    if (val === undefined || val === null) return undefined;
-    return typeof val === 'string' ? parseInt(val) : val;
-  }).optional(),
-})
-  .refine(
-    (data) => {
-      // Activity types must have startDate, endDate and duration
-      if (data.type === "Activity") {
-        return (
-          data.startDate !== undefined &&
-          data.endDate !== undefined &&
-          data.duration !== undefined &&
-          data.duration > 0
-        );
-      }
-      return true;
-    },
-    {
-      message: "Activity types must have start date, end date, and duration",
-      path: ["startDate"],
-    }
-  )
-  .refine(
-    (data) => {
-      // Summary and WorkPackage should not have dates
-      if (data.type === "Summary" || data.type === "WorkPackage") {
-        return (
-          data.startDate === undefined &&
-          data.endDate === undefined &&
-          data.duration === undefined
-        );
-      }
-      return true;
-    },
-    {
-      message: "Summary and WorkPackage types cannot have dates",
-      path: ["startDate"],
-    }
-  );
+});
 
 export const updateWbsProgressSchema = z.object({
   id: z.number(),
   percentComplete: z.string().or(z.number()).transform(val => val.toString()),
-  actualStartDate: z.date().optional(),
-  actualEndDate: z.date().optional(),
 });
 
 export const importCostsSchema = z.object({

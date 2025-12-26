@@ -2,13 +2,12 @@ import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Project, WbsItem } from "@/types";
-import { 
-  formatCurrency, 
-  formatDate, 
-  formatPercent, 
-  getStatusColor, 
-  calculateCPI, 
-  calculateSPI, 
+import {
+  formatCurrency,
+  formatPercent,
+  getStatusColor,
+  calculateCPI,
+  calculateSPI,
   getPerformanceStatus,
   calculateEarnedValue
 } from "@/lib/utils";
@@ -22,7 +21,6 @@ import {
   AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { GanttChart } from "@/components/project/gantt-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -49,7 +47,7 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
   // If projectId is provided as a prop, use it; otherwise get it from URL params
   const params = useParams();
   const projectId = propProjectId !== undefined ? propProjectId : (params.projectId ? parseInt(params.projectId) : 0);
-  
+
   const [wbsLevel, setWbsLevel] = useState<"level1" | "level2" | "all">("level1");
 
   // Fetch project data
@@ -73,41 +71,37 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
 
   // Calculate budget values correctly
   const projectBudget = project?.budget ? Number(project.budget) : 0;
-  
+
   // Get only work package budgets (no summary items)
   const workPackageBudget = wbsItems
     .filter(item => item.type === "WorkPackage")
     .reduce((sum, item) => sum + Number(item.budgetedCost), 0);
-  
+
   // Get total actual cost (from work packages only)
   const totalActualCost = wbsItems
     .filter(item => item.type === "WorkPackage")
     .reduce((sum, item) => sum + Number(item.actualCost), 0);
-  
+
   // Check if budget is finalized (sum of top-level summary items equals work package total)
   const topLevelSummaryBudget = wbsItems
     .filter(item => item.type === "Summary" && item.isTopLevel)
     .reduce((sum, item) => sum + Number(item.budgetedCost), 0);
-  
+
   const isBudgetFinalized = Math.abs(topLevelSummaryBudget - workPackageBudget) < 0.01;
-  
+
   // Calculate earned value based on work packages only
   const completedValue = wbsItems
     .filter(item => item.type === "WorkPackage")
     .reduce(
-    (sum, item) => sum + (Number(item.budgetedCost) * Number(item.percentComplete) / 100), 
-    0
-  );
-  
-  const overallProgress = workPackageBudget > 0 ? (completedValue / workPackageBudget) * 100 : 0;
-  const expectedProgress = 45; // This would normally be calculated based on current date vs. schedule
+      (sum, item) => sum + (Number(item.budgetedCost) * Number(item.percentComplete) / 100),
+      0
+    );
 
-  // Calculate earned value metrics
+  const overallProgress = workPackageBudget > 0 ? (completedValue / workPackageBudget) * 100 : 0;
   const earnedValue = {
     budgetedCost: workPackageBudget,
     actualCost: totalActualCost,
     earnedValue: completedValue,
-    plannedProgress: expectedProgress / 100,
     actualProgress: overallProgress / 100
   };
 
@@ -116,7 +110,7 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
   const schedulePerformanceIndex = calculateSPI(completedValue, workPackageBudget * 0.45);
 
   // Get status colors and text
-  const progressStatus = getStatusColor(expectedProgress, overallProgress);
+  const progressStatus = getStatusColor(0, overallProgress); // Using 0 as baseline since planned progress is removed
   const costStatus = getPerformanceStatus(costPerformanceIndex);
   const scheduleStatus = getPerformanceStatus(schedulePerformanceIndex);
 
@@ -169,15 +163,11 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
 
         <Card>
           <CardHeader>
-            <CardTitle>Schedule Status</CardTitle>
-            <CardDescription>Project timeline progress</CardDescription>
+            <CardTitle>Project Progress</CardTitle>
+            <CardDescription>Current completion status</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Planned Progress</span>
-                <span>{formatPercent(earnedValue.plannedProgress)}</span>
-              </div>
               <div className="flex justify-between">
                 <span>Actual Progress</span>
                 <span>{formatPercent(earnedValue.actualProgress)}</span>
@@ -229,11 +219,11 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
           </CardContent>
         </Card>
       </div>
-      
+
       {/* WBS Filter Dropdown */}
       <div className="flex justify-end mb-4">
         <div className="w-48">
-          <Select 
+          <Select
             value={wbsLevel}
             onValueChange={(value: any) => setWbsLevel(value)}
           >
@@ -248,23 +238,8 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
           </Select>
         </div>
       </div>
-      
-      {/* Gantt Chart */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle>Project Timeline</CardTitle>
-          <CardDescription>
-            Timeline view of work packages and activities
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            <GanttChart 
-              projectId={projectId}
-            />
-          </div>
-        </CardContent>
-      </Card>
+
+      {/* Timeline view removed */}
     </div>
   );
 }

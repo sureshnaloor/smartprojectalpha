@@ -46,7 +46,7 @@ export function EditWbsModal({ wbsId, isOpen, onOpenChange }: EditWbsModalProps)
   });
 
   // Form definition
-  const form = useForm({
+  const form = useForm<any>({
     resolver: zodResolver(insertWbsItemSchema as any),
     defaultValues: {
       projectId: 0,
@@ -57,8 +57,6 @@ export function EditWbsModal({ wbsId, isOpen, onOpenChange }: EditWbsModalProps)
       code: "",
       type: "Summary",
       budgetedCost: "0",
-      startDate: undefined as Date | undefined,
-      endDate: undefined as Date | undefined,
       isTopLevel: false,
     },
   });
@@ -75,8 +73,6 @@ export function EditWbsModal({ wbsId, isOpen, onOpenChange }: EditWbsModalProps)
         code: wbsItem.code,
         type: wbsItem.type as any,
         budgetedCost: wbsItem.budgetedCost.toString(),
-        startDate: wbsItem.startDate ? new Date(wbsItem.startDate) : undefined,
-        endDate: wbsItem.endDate ? new Date(wbsItem.endDate) : undefined,
         isTopLevel: !!wbsItem.isTopLevel,
       });
     }
@@ -215,45 +211,9 @@ export function EditWbsModal({ wbsId, isOpen, onOpenChange }: EditWbsModalProps)
               </FormItem>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-400 uppercase text-xs font-semibold tracking-wider">
-                      Start Date
-                    </FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        date={field.value}
-                        setDate={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Date fields - removed per user request */}
 
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-400 uppercase text-xs font-semibold tracking-wider">
-                      End Date
-                    </FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        date={field.value}
-                        setDate={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+
 
             <SheetFooter className="pt-6">
               <Button
@@ -279,6 +239,6 @@ export function EditWbsModal({ wbsId, isOpen, onOpenChange }: EditWbsModalProps)
           </form>
         </Form>
       </SheetContent>
-    </Sheet>
+    </Sheet >
   );
 }

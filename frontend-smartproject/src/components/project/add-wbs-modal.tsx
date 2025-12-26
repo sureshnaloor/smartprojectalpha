@@ -61,8 +61,6 @@ export function AddWbsModal({
       code: "", // Backend will generate this
       type: parentId ? "WBS" : "Summary",
       budgetedCost: "0",
-      startDate: undefined as Date | undefined,
-      endDate: undefined as Date | undefined,
       isTopLevel: !parentId,
     },
   });
@@ -79,8 +77,6 @@ export function AddWbsModal({
         code: "",
         type: parentId ? "WBS" : "Summary",
         budgetedCost: "0",
-        startDate: undefined,
-        endDate: undefined,
         isTopLevel: !parentId,
       });
     }
@@ -202,45 +198,7 @@ export function AddWbsModal({
               </FormItem>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-400 uppercase text-xs font-semibold tracking-wider">
-                      Start Date
-                    </FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        date={field.value}
-                        setDate={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-gray-400 uppercase text-xs font-semibold tracking-wider">
-                      End Date
-                    </FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        date={field.value}
-                        setDate={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
             <DialogFooter className="pt-6">
               <Button

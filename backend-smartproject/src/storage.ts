@@ -208,8 +208,6 @@ export class DatabaseStorage implements IStorage {
     return dbProjects.map(p => ({
       ...p,
       budget: p.budget,
-      startDate: p.startDate,
-      endDate: p.endDate,
       currency: p.currency as "USD" | "EUR" | "SAR"
     }));
   }
@@ -225,29 +223,19 @@ export class DatabaseStorage implements IStorage {
     return {
       ...project,
       budget: project.budget,
-      startDate: project.startDate,
-      endDate: project.endDate,
       currency: project.currency as "USD" | "EUR" | "SAR"
     };
   }
 
   async createProject(project: Omit<Project, "id" | "createdAt">): Promise<Project> {
-    // Handle both string and Date types for dates
-    const startDate = typeof project.startDate === 'string' ? project.startDate : project.startDate;
-    const endDate = typeof project.endDate === 'string' ? project.endDate : project.endDate;
-
     const [newProject] = await db.insert(projects).values({
       ...project,
       budget: project.budget.toString(),
-      startDate,
-      endDate
     }).returning();
 
     return {
       ...newProject,
       budget: newProject.budget,
-      startDate: newProject.startDate,
-      endDate: newProject.endDate,
       currency: newProject.currency as "USD" | "EUR" | "SAR"
     };
   }
@@ -257,16 +245,6 @@ export class DatabaseStorage implements IStorage {
 
     if (updatedValues.budget !== undefined) {
       updatedValues.budget = updatedValues.budget.toString();
-    }
-    if (updatedValues.startDate) {
-      updatedValues.startDate = typeof updatedValues.startDate === 'string'
-        ? updatedValues.startDate
-        : updatedValues.startDate;
-    }
-    if (updatedValues.endDate) {
-      updatedValues.endDate = typeof updatedValues.endDate === 'string'
-        ? updatedValues.endDate
-        : updatedValues.endDate;
     }
 
     const [updatedProject] = await db
@@ -280,8 +258,6 @@ export class DatabaseStorage implements IStorage {
     return {
       ...updatedProject,
       budget: updatedProject.budget,
-      startDate: updatedProject.startDate,
-      endDate: updatedProject.endDate,
       currency: updatedProject.currency as "USD" | "EUR" | "SAR"
     };
   }
@@ -307,10 +283,6 @@ export class DatabaseStorage implements IStorage {
       budgetedCost: item.budgetedCost,
       actualCost: item.actualCost,
       percentComplete: item.percentComplete,
-      startDate: item.startDate,
-      endDate: item.endDate,
-      actualStartDate: item.actualStartDate,
-      actualEndDate: item.actualEndDate,
     }));
   }
 
@@ -327,52 +299,24 @@ export class DatabaseStorage implements IStorage {
       budgetedCost: item.budgetedCost,
       actualCost: item.actualCost,
       percentComplete: item.percentComplete,
-      startDate: item.startDate,
-      endDate: item.endDate,
-      actualStartDate: item.actualStartDate,
-      actualEndDate: item.actualEndDate,
     };
   }
 
   async createWbsItem(wbsItem: Omit<WbsItem, "id" | "createdAt">): Promise<WbsItem> {
-    const insertData: any = { ...wbsItem };
-
-    // Handle date conversions
-    if (wbsItem.startDate) {
-      insertData.startDate = typeof wbsItem.startDate === 'string' ? wbsItem.startDate : wbsItem.startDate;
-    }
-    if (wbsItem.endDate) {
-      insertData.endDate = typeof wbsItem.endDate === 'string' ? wbsItem.endDate : wbsItem.endDate;
-    }
-
-    const [newWbsItem] = await db.insert(wbsItems).values(insertData).returning();
+    const [newWbsItem] = await db.insert(wbsItems).values(wbsItem).returning();
 
     return {
       ...newWbsItem,
       budgetedCost: newWbsItem.budgetedCost,
       actualCost: newWbsItem.actualCost,
       percentComplete: newWbsItem.percentComplete,
-      startDate: newWbsItem.startDate,
-      endDate: newWbsItem.endDate,
-      actualStartDate: newWbsItem.actualStartDate,
-      actualEndDate: newWbsItem.actualEndDate,
     };
   }
 
   async updateWbsItem(id: number, wbsItem: Partial<Omit<WbsItem, "id" | "createdAt">>): Promise<WbsItem | undefined> {
-    const updateData: any = { ...wbsItem };
-
-    // Handle date conversions
-    if (updateData.startDate) {
-      updateData.startDate = typeof updateData.startDate === 'string' ? updateData.startDate : updateData.startDate;
-    }
-    if (updateData.endDate) {
-      updateData.endDate = typeof updateData.endDate === 'string' ? updateData.endDate : updateData.endDate;
-    }
-
     const [updatedWbsItem] = await db
       .update(wbsItems)
-      .set(updateData)
+      .set(wbsItem)
       .where(eq(wbsItems.id, id))
       .returning();
 
@@ -383,10 +327,6 @@ export class DatabaseStorage implements IStorage {
       budgetedCost: updatedWbsItem.budgetedCost,
       actualCost: updatedWbsItem.actualCost,
       percentComplete: updatedWbsItem.percentComplete,
-      startDate: updatedWbsItem.startDate,
-      endDate: updatedWbsItem.endDate,
-      actualStartDate: updatedWbsItem.actualStartDate,
-      actualEndDate: updatedWbsItem.actualEndDate,
     };
   }
 
@@ -523,12 +463,12 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async createTask(data: any): Promise<Task> {
+  async createTask(data: InsertTask): Promise<Task> {
     const [result] = await db.insert(tasks).values(data).returning();
     return result;
   }
 
-  async updateTask(id: number, data: Partial<any>): Promise<Task | undefined> {
+  async updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined> {
     const [result] = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
     return result;
   }
@@ -548,7 +488,7 @@ export class DatabaseStorage implements IStorage {
     return activity;
   }
 
-  async createActivity(data: any): Promise<Activity> {
+  async createActivity(data: InsertActivity): Promise<Activity> {
     const [result] = await db.insert(activities).values(data).returning();
     return {
       ...result,
@@ -556,7 +496,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateActivity(id: number, data: Partial<any>): Promise<Activity | undefined> {
+  async updateActivity(id: number, data: Partial<InsertActivity>): Promise<Activity | undefined> {
     const [result] = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
     return result ? {
       ...result,

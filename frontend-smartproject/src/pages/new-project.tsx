@@ -48,9 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // Types for the hierarchical WBS tree used in the UI
-interface WbsTreeNode extends Omit<WbsItem, 'startDate' | 'endDate'> {
-    startDate: string | null;
-    endDate: string | null;
+interface WbsTreeNode extends WbsItem {
     expanded: boolean;
     children: WbsTreeNode[];
     progress?: number;
@@ -203,7 +201,6 @@ export default function NewProject() {
                             <div class="px-2 py-1">
                                 <div class="font-bold border-b border-slate-200 mb-1">${activity.name}</div>
                                 <div class="text-xs text-slate-500">Progress: ${activity.percentComplete}%</div>
-                                <div class="text-xs text-slate-500">Duration: ${activity.duration} days</div>
                             </div>
                         `;
                     }
@@ -264,94 +261,7 @@ export default function NewProject() {
         }]
     };
 
-    const getGanttOption = () => {
-        const sortedActivities = [...activities].reverse();
-        const categories = sortedActivities.map(act => act.name);
 
-        const data = sortedActivities.map((act, idx) => {
-            const start = act.startDate ? new Date(act.startDate).getTime() : Date.now();
-            const end = act.endDate ? new Date(act.endDate).getTime() : start + (act.duration || 1) * 24 * 60 * 60 * 1000;
-            return {
-                name: act.name,
-                value: [idx, start, end, end - start],
-                itemStyle: {
-                    color: getStatusColor(Number(act.percentComplete) === 100 ? 'completed' : 'in-progress'),
-                    borderRadius: 4
-                }
-            };
-        });
-
-        const now = project?.startDate ? new Date(project.startDate).getTime() : Date.now();
-        let minDate, maxDate;
-
-        if (timelineView === 'week') {
-            minDate = now;
-            maxDate = now + 14 * 24 * 60 * 60 * 1000;
-        } else if (timelineView === 'month') {
-            minDate = now;
-            maxDate = now + 45 * 24 * 60 * 60 * 1000;
-        } else {
-            minDate = now;
-            maxDate = now + 120 * 24 * 60 * 60 * 1000;
-        }
-
-        return {
-            tooltip: {
-                formatter: (params: any) => {
-                    const start = new Date(params.value[1]).toLocaleDateString();
-                    const end = new Date(params.value[2]).toLocaleDateString();
-                    return `<b>${params.name}</b><br/>${start} - ${end}`;
-                }
-            },
-            grid: {
-                left: '150',
-                right: '40',
-                top: '20',
-                bottom: '40',
-                containLabel: false
-            },
-            xAxis: {
-                type: 'time',
-                position: 'bottom',
-                min: minDate,
-                max: maxDate,
-                axisLine: { show: true, lineStyle: { color: '#e2e8f0' } },
-                splitLine: { show: true, lineStyle: { color: '#f1f5f9', type: 'dashed' } },
-                axisLabel: { color: '#64748b', fontSize: 10 }
-            },
-            yAxis: {
-                type: 'category',
-                data: categories,
-                axisTick: { show: false },
-                axisLine: { show: true, lineStyle: { color: '#e2e8f0' } },
-                axisLabel: { color: '#475569', fontSize: 11, fontWeight: 'medium' }
-            },
-            series: [{
-                type: 'custom',
-                renderItem: (params: any, api: any) => {
-                    const categoryIndex = api.value(0);
-                    const coordStart = api.coord([api.value(1), categoryIndex]);
-                    const coordEnd = api.coord([api.value(2), categoryIndex]);
-                    const height = api.size([0, 1])[1] * 0.4;
-                    const width = Math.max(coordEnd[0] - coordStart[0], 5);
-
-                    return {
-                        type: 'rect',
-                        shape: {
-                            x: coordStart[0],
-                            y: coordStart[1] - height / 2,
-                            width: width,
-                            height: height,
-                            r: 4
-                        },
-                        style: api.style()
-                    };
-                },
-                encode: { x: [1, 2], y: 0 },
-                data: data
-            }]
-        };
-    };
 
     const renderWbsTree = (items: WbsTreeNode[], level = 0) => {
         return items.map(item => (
@@ -584,44 +494,7 @@ export default function NewProject() {
                             </div>
                         </div>
 
-                        {/* Activity Timeline (Gantt) */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                    <Calendar className="w-5 h-5 text-emerald-500" />
-                                    Activity Timeline
-                                </h3>
-                                <div className="flex bg-slate-100 p-1 rounded-xl">
-                                    {['Week', 'Month', 'Quarter'].map((v) => (
-                                        <button
-                                            key={v}
-                                            onClick={() => setTimelineView(v.toLowerCase() as any)}
-                                            className={cn(
-                                                "px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all",
-                                                timelineView === v.toLowerCase()
-                                                    ? "bg-white text-blue-600 shadow-sm"
-                                                    : "text-slate-500 hover:text-slate-700"
-                                            )}
-                                        >
-                                            {v}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="p-6 h-[400px]">
-                                {activities.length > 0 ? (
-                                    <ReactECharts
-                                        option={getGanttOption()}
-                                        style={{ height: '100%' }}
-                                        notMerge={true}
-                                    />
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-slate-400 font-medium">
-                                        No activities to display on timeline
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+
                     </div>
 
                     <div className="space-y-8">

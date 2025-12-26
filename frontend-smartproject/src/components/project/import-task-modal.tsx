@@ -27,13 +27,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileUp, FileX, Download, AlertTriangle, X, AlertCircle } from "lucide-react";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow 
+  TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -66,10 +66,10 @@ type FormValues = z.infer<typeof formSchema>;
 // Function to download the activity template
 const downloadActivityTemplate = () => {
   const csvContent = [
-    "activityCode,activityName,description,startDate,duration,endDate,percentComplete",
-    "1.1.1,Design Phase,Initial design activities,2024-01-01,10,,0",
-    "1.1.2,Development Phase,Implementation work,2024-01-15,,2024-01-30,0",
-    "1.1.3,Testing Phase,Quality assurance,2024-02-01,5,,0"
+    "activityCode,activityName,description,percentComplete",
+    "1.1.1,Design Phase,Initial design activities,0",
+    "1.1.2,Development Phase,Implementation work,0",
+    "1.1.3,Testing Phase,Quality assurance,0"
   ].join("\n");
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -86,70 +86,70 @@ const downloadActivityTemplate = () => {
 const parseActivityCsvFile = async (file: File): Promise<{ data: any[]; errors: string[] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       const text = e.target?.result;
       if (typeof text !== "string") {
         return reject(new Error("Failed to read file as text"));
       }
-      
+
       try {
         // Remove Byte Order Mark (BOM) if present
         const cleanText = text.replace(/^\uFEFF/, '');
-        
+
         // Split by any line ending and filter empty lines
         const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== "");
-        
+
         if (lines.length === 0) {
           return resolve({
             data: [],
             errors: ["CSV file is empty or contains no valid data"]
           });
         }
-        
+
         const headers = lines[0].split(",").map(header => header.trim());
-        
+
         // Check if required activity columns exist
         const requiredColumns = ["activityCode", "activityName", "startDate"];
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
-        
+
         if (missingColumns.length > 0) {
           return resolve({
             data: [],
             errors: [`Missing required activity columns: ${missingColumns.join(", ")}. Make sure you're using an activity CSV template, not a WBS template.`]
           });
         }
-        
+
         const data: Record<string, string>[] = [];
         const errors: string[] = [];
-        
+
         // Skip header row
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
-          
+
           const values = line.split(",").map(value => value.trim());
-          
+
           // Handle cases where values might contain commas inside quotes
           const row: Record<string, string> = {};
-          
+
           headers.forEach((header, index) => {
             row[header] = values[index] || "";
           });
-          
+
           data.push(row);
         }
-        
+
         resolve({ data, errors });
       } catch (error) {
         reject(error instanceof Error ? error : new Error("Unknown error parsing CSV"));
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error("Error reading file"));
     };
-    
+
     reader.readAsText(file);
   });
 };
@@ -157,12 +157,13 @@ const parseActivityCsvFile = async (file: File): Promise<{ data: any[]; errors: 
 interface Task {
   id?: number;
   activityId: number;
+  projectId?: number;
   name: string;
   description?: string;
-  startDate?: string | null;
-  endDate?: string | null;
-  duration?: number;
   percentComplete?: number;
+  startDate?: string;
+  endDate?: string;
+  duration?: number;
   dependencies?: { predecessorId: number; successorId: number; type: string; lag: number }[];
 }
 
@@ -195,10 +196,10 @@ export function ImportTaskModal({ isOpen, onClose, onImport, activities }: Impor
       setFile(null);
       return;
     }
-    
+
     setFile(selectedFile);
     setError(null);
-    
+
     // Parse the CSV file
     parseTaskCsvFile(selectedFile, activities)
       .then(result => {
@@ -219,9 +220,9 @@ export function ImportTaskModal({ isOpen, onClose, onImport, activities }: Impor
       setError('No valid data to import. Please check your CSV file.');
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       // In a real implementation, you might want to call an API here
       onImport(parsedData);
@@ -243,11 +244,11 @@ export function ImportTaskModal({ isOpen, onClose, onImport, activities }: Impor
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
       setFile(droppedFile);
-      
+
       // Parse the CSV file
       parseTaskCsvFile(droppedFile, activities)
         .then(result => {
@@ -272,26 +273,26 @@ export function ImportTaskModal({ isOpen, onClose, onImport, activities }: Impor
       .join('\n');
 
     // Standard headers
-    const headers = 'name,description,activityId,startDate,endDate,duration,percentComplete';
-    
+    const headers = 'name,description,activityId,percentComplete,startDate,endDate,duration';
+
     // Create sample data with the first valid activity ID, or fallback to a placeholder
     const firstActivityId = activities.find(a => a.type === "Activity")?.id || "[ACTIVITY_ID]";
-    
-    // Sample data showing both options: with endDate or with duration
-    const sampleData = 
-`Task 1,Sample task description 1,${firstActivityId},2023-05-01,2023-05-10,,0
-Task 2,Sample task description 2,${firstActivityId},2023-05-11,,10,50
-Task 3,Sample task description 3,${firstActivityId},2023-05-21,2023-05-30,,100`;
-    
+
+    // Sample data
+    const sampleData =
+      `Task 1,Sample task description 1,${firstActivityId},0,,,5
+Task 2,Sample task description 2,${firstActivityId},50,2023-01-01,2023-01-05,
+Task 3,Sample task description 3,${firstActivityId},100,,,3`;
+
     // Complete CSV content
     const csvContent = `${headers}\n${sampleData}`;
-    
+
     // Add activity reference as a comment
     const activityOptionsNote = `\n\n# Available Activities (reference only, do not include in import):\n# ID,Name\n${activityOptionsContent}`;
-    
+
     // Combine everything
     const fullContent = csvContent + activityOptionsNote;
-    
+
     // Create and trigger download
     const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -310,7 +311,7 @@ Task 3,Sample task description 3,${firstActivityId},2023-05-21,2023-05-30,,100`;
         <DialogHeader>
           <DialogTitle>Import Tasks</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with task data to import multiple tasks at once. 
+            Upload a CSV file with task data to import multiple tasks at once.
           </DialogDescription>
         </DialogHeader>
 
@@ -322,7 +323,7 @@ Task 3,Sample task description 3,${firstActivityId},2023-05-21,2023-05-30,,100`;
           </Alert>
         )}
 
-        <div 
+        <div
           className="grid grid-cols-1 gap-4"
           onDragOver={handleDragOver}
           onDrop={handleDrop}
@@ -378,8 +379,6 @@ Task 3,Sample task description 3,${firstActivityId},2023-05-21,2023-05-30,,100`;
             <ul className="list-disc pl-5">
               <li>name - Name of the task</li>
               <li>activityId - The ID of the activity this task belongs to</li>
-              <li>startDate - Start date in YYYY-MM-DD format</li>
-              <li>Either duration (in days) or endDate must be provided</li>
             </ul>
             <p className="mt-2">Need help? Download a template to get started:</p>
             <Button variant="outline" size="sm" className="mt-1" onClick={downloadTaskTemplate}>
@@ -393,8 +392,8 @@ Task 3,Sample task description 3,${firstActivityId},2023-05-21,2023-05-30,,100`;
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleImport} 
+          <Button
+            onClick={handleImport}
             disabled={!file || isLoading || !parsedData.length}
             className={isLoading ? 'opacity-50 cursor-not-allowed' : ''}
           >
@@ -411,60 +410,60 @@ async function parseTaskCsvFile(file: File, activities: WbsItem[]): Promise<{ da
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     const result: { data: Task[], errors: string[] } = { data: [], errors: [] };
-    
+
     reader.onload = (e) => {
       try {
         const contents = e.target?.result as string;
-        
+
         // Handle UTF-8 BOM
         const cleanContents = contents.replace(/^\uFEFF/, '');
-        
+
         // Split by line breaks
         const lines = cleanContents.split(/\r\n|\n/).filter(line => line.trim() !== '');
-        
+
         if (lines.length < 2) {
           result.errors.push('CSV file must contain a header row and at least one data row');
           resolve(result);
           return;
         }
-        
+
         // Extract headers and convert to lowercase
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        
+
         // Check required columns
         const requiredColumns = ['name', 'activityid'];
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
-        
+
         if (missingColumns.length > 0) {
           result.errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
           resolve(result);
           return;
         }
-        
+
         // Process data rows
         const activityIds = activities.map(a => a.id);
-        
+
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i];
           if (line.trim() === '' || line.startsWith('#')) continue; // Skip empty lines or comments
-          
+
           const values = line.split(',');
           if (values.length !== headers.length) {
             result.errors.push(`Line ${i + 1} has ${values.length} columns, but header has ${headers.length} columns`);
             continue;
           }
-          
+
           const rowData: any = {};
           headers.forEach((header, index) => {
             rowData[header] = values[index]?.trim() || '';
           });
-          
+
           // Validate required fields
           if (!rowData.name) {
             result.errors.push(`Line ${i + 1}: Missing task name`);
             continue;
           }
-          
+
           // Ensure activityId is correctly parsed as a number
           let activityId: number;
           try {
@@ -477,12 +476,12 @@ async function parseTaskCsvFile(file: File, activities: WbsItem[]): Promise<{ da
             result.errors.push(`Line ${i + 1}: Invalid activityId format`);
             continue;
           }
-          
+
           if (!activityIds.includes(activityId)) {
             result.errors.push(`Line ${i + 1}: Activity ID ${activityId} not found in project`);
             continue;
           }
-          
+
           // Ensure numeric fields are properly parsed
           let duration: number | undefined = undefined;
           if (rowData.duration && rowData.duration.trim() !== '') {
@@ -492,7 +491,7 @@ async function parseTaskCsvFile(file: File, activities: WbsItem[]): Promise<{ da
               continue;
             }
           }
-          
+
           let percentComplete = 0;
           if (rowData.percentcomplete && rowData.percentcomplete.trim() !== '') {
             percentComplete = parseInt(rowData.percentcomplete);
@@ -501,43 +500,44 @@ async function parseTaskCsvFile(file: File, activities: WbsItem[]): Promise<{ da
               continue;
             }
           }
-          
+
           // Validate that either duration or endDate is provided if startDate is provided
           if (rowData.startdate && !duration && !rowData.enddate) {
             result.errors.push(`Line ${i + 1}: Either duration or endDate must be provided when startDate is set`);
             continue;
           }
-          
+
+          // Convert values to appropriate types for the Task interface
           // Convert values to appropriate types for the Task interface
           const task: Task = {
             name: rowData.name,
             activityId: activityId,
             description: rowData.description || '',
-            startDate: rowData.startdate || null,
-            endDate: rowData.enddate || null,
-            duration: duration,
-            percentComplete: percentComplete
+            percentComplete: percentComplete,
+            startDate: rowData.startdate ? rowData.startdate : undefined,
+            endDate: rowData.enddate ? rowData.enddate : undefined,
+            duration: duration
           };
-          
+
           // Set projectId from the matching activity
           const activity = activities.find(a => a.id === activityId);
           if (activity) {
             task.projectId = activity.projectId;
           }
-          
+
           result.data.push(task);
         }
-        
+
         resolve(result);
       } catch (error) {
         reject(error);
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error('Failed to read file'));
     };
-    
+
     reader.readAsText(file);
   });
 } 

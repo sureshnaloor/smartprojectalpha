@@ -102,40 +102,7 @@ export function WbsDetailsSheet({ wbsId, isOpen, onOpenChange }: WbsDetailsSheet
 
                         <Separator className="bg-slate-800" />
 
-                        {/* Dates */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-slate-300 font-medium">
-                                <Calendar size={18} className="text-blue-500" />
-                                <span>Schedule Selection</span>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4 pl-7">
-                                <div className="space-y-1">
-                                    <span className="text-xs text-slate-500">Planned Start</span>
-                                    <p className="text-sm text-slate-300">
-                                        {wbsItem.startDate ? format(new Date(wbsItem.startDate), "PPP") : "N/A"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-xs text-slate-500">Planned End</span>
-                                    <p className="text-sm text-slate-300">
-                                        {wbsItem.endDate ? format(new Date(wbsItem.endDate), "PPP") : "N/A"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-xs text-slate-500">Actual Start</span>
-                                    <p className="text-sm text-slate-300">
-                                        {wbsItem.actualStartDate ? format(new Date(wbsItem.actualStartDate), "PPP") : "--"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-xs text-slate-500">Actual End</span>
-                                    <p className="text-sm text-slate-300">
-                                        {wbsItem.actualEndDate ? format(new Date(wbsItem.actualEndDate), "PPP") : "--"}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
 
                         {/* Description */}
                         <div className="space-y-2">
