@@ -65,6 +65,23 @@ export const costEntries = pgTable("cost_entries", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Work Packages Table
+export const workPackages = pgTable("work_packages", {
+  id: serial("id").primaryKey(),
+  wbsItemId: integer("wbs_item_id").notNull().references(() => wbsItems.id, { onDelete: "cascade" }),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  code: text("code").notNull(), // e.g. 1.2.1.1.1, 1.2.1.1.2 (WBS code + sequential index)
+  budgetedCost: numeric("budgeted_cost", { precision: 12, scale: 2 }).notNull(),
+  actualCost: numeric("actual_cost", { precision: 12, scale: 2 }).default("0"),
+  percentComplete: numeric("percent_complete", { precision: 5, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  // Unique constraint: code must be unique within a project
+  projectCodeUnique: uniqueIndex("work_packages_project_id_code_unique").on(table.projectId, table.code),
+}));
+
 // Activities Table
 export const activities = pgTable("activities", {
   id: serial("id").primaryKey(),
@@ -298,6 +315,18 @@ export const insertCostEntrySchema = createInsertSchema(costEntries)
     }),
   });
 
+// Work Package schema
+export const insertWorkPackageSchema = createInsertSchema(workPackages)
+  .omit({ id: true, createdAt: true, actualCost: true, percentComplete: true } as any)
+  .extend({
+    wbsItemId: z.number(),
+    projectId: z.number(),
+    name: z.string().min(1, "Work package name is required"),
+    description: z.string().nullable().optional(),
+    code: z.string().optional(), // Will be auto-generated if not provided
+    budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
+  });
+
 // Task schema
 export const insertTaskSchema = createInsertSchema(tasks)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
@@ -392,6 +421,9 @@ export type InsertDependency = z.infer<typeof insertDependencySchema>;
 
 export type CostEntry = typeof costEntries.$inferSelect;
 export type InsertCostEntry = z.infer<typeof insertCostEntrySchema>;
+
+export type WorkPackage = typeof workPackages.$inferSelect;
+export type InsertWorkPackage = z.infer<typeof insertWorkPackageSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;

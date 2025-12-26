@@ -10,6 +10,8 @@ export type {
   InsertCostEntry,
   Task,
   InsertTask,
+  WorkPackage,
+  InsertWorkPackage,
   UpdateWbsProgress,
   ImportCosts,
   CsvImportData
@@ -22,6 +24,7 @@ export {
   insertDependencySchema,
   insertCostEntrySchema,
   insertTaskSchema,
+  insertWorkPackageSchema,
   csvImportSchema
 } from '@shared/schema';
 

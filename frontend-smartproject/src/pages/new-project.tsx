@@ -30,14 +30,18 @@ import {
     Layers,
     DollarSign,
     Maximize2,
-    Minimize2
+    Minimize2,
+    Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Project, WbsItem, Dependency } from "@shared/schema";
+import { Project, WbsItem, Dependency, WorkPackage } from "@shared/schema";
 import { AddWbsModal } from "@/components/project/add-wbs-modal";
 import { EditWbsModal } from "@/components/project/edit-wbs-modal";
 import { WbsDetailsSheet } from "@/components/project/wbs-details-sheet";
+import { AddWorkPackageModal } from "@/components/project/add-work-package-modal";
+import { EditWorkPackageModal } from "@/components/project/edit-work-package-modal";
+import { WbsItemWithWorkPackages } from "@/components/project/wbs-item-with-work-packages";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -73,6 +77,10 @@ export default function NewProject() {
     const [editWbsId, setEditWbsId] = useState<number | null>(null);
     const [isDetailsSheetOpen, setIsDetailsSheetOpen] = useState(false);
     const [detailsWbsId, setDetailsWbsId] = useState<number | null>(null);
+    const [isAddWorkPackageModalOpen, setIsAddWorkPackageModalOpen] = useState(false);
+    const [isEditWorkPackageModalOpen, setIsEditWorkPackageModalOpen] = useState(false);
+    const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<number | null>(null);
+    const [selectedWbsForWorkPackage, setSelectedWbsForWorkPackage] = useState<{ id: number; name: string } | null>(null);
 
     // Fetch Project Details
     const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
@@ -91,6 +99,102 @@ export default function NewProject() {
         queryKey: [`/api/projects/${projectId}/dependencies`],
         enabled: !!projectId,
     });
+
+    // Helper component to check if WBS has work packages (for disabling Add Child WBS)
+    const WbsItemActions = ({ item, level }: { item: WbsTreeNode; level: number }) => {
+        const { data: workPackages = [] } = useQuery<WorkPackage[]>({
+            queryKey: [`/api/wbs/${item.id}/work-packages`],
+            queryFn: async () => {
+                try {
+                    const response = await fetch(`/api/wbs/${item.id}/work-packages`);
+                    if (!response.ok) return [];
+                    return await response.json();
+                } catch {
+                    return [];
+                }
+            },
+            enabled: !item.isTopLevel,
+        });
+
+        const hasWorkPackages = workPackages.length > 0;
+
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        className="p-1.5 hover:bg-slate-200 rounded-lg transition-all text-slate-400 hover:text-blue-500"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="6" cy="4" r="1.2" fill="currentColor" />
+                            <circle cx="6" cy="8" r="1.2" fill="currentColor" />
+                        </svg>
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-white border-slate-200 shadow-xl min-w-40">
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400 px-3 py-2">Actions</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailsWbsId(item.id);
+                            setIsDetailsSheetOpen(true);
+                        }}
+                        className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
+                    >
+                        <Info size={14} className="mr-2" />
+                        View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedWbsItem({ id: item.id, name: item.name, level: item.level });
+                            setIsAddModalOpen(true);
+                        }}
+                        disabled={item.level >= 3 || hasWorkPackages}
+                        className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Plus size={14} className="mr-2" />
+                        Add Child WBS
+                    </DropdownMenuItem>
+                    {!item.isTopLevel && (
+                        <DropdownMenuItem
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedWbsForWorkPackage({ id: item.id, name: item.name });
+                                setIsAddWorkPackageModalOpen(true);
+                            }}
+                            className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
+                        >
+                            <Package size={14} className="mr-2" />
+                            Add Work Package
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setEditWbsId(item.id);
+                            setIsEditModalOpen(true);
+                        }}
+                        className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
+                    >
+                        <Edit2 size={14} className="mr-2" />
+                        Edit Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteWbs(item.id);
+                        }}
+                        className="text-xs font-semibold text-red-600 focus:bg-red-50 cursor-pointer px-3 py-2"
+                    >
+                        <Trash2 size={14} className="mr-2" />
+                        Delete Item
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        );
+    };
 
     // Reset initialization when project changes
     useEffect(() => {
@@ -211,6 +315,34 @@ export default function NewProject() {
         }
     };
 
+    // Delete Work Package mutation
+    const deleteWorkPackageMutation = useMutation({
+        mutationFn: async (id: number) => {
+            await apiRequest("DELETE", `/api/work-packages/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+            toast({
+                title: "Deleted",
+                description: "Work Package removed",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to delete work package",
+                variant: "destructive",
+            });
+        }
+    });
+
+    const handleDeleteWorkPackage = (id: number) => {
+        if (confirm("Are you sure you want to delete this Work Package?")) {
+            deleteWorkPackageMutation.mutate(id);
+        }
+    };
+
     const networkOption = {
         tooltip: {
             trigger: 'item',
@@ -316,71 +448,27 @@ export default function NewProject() {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button
-                                    className="p-1.5 hover:bg-slate-200 rounded-lg transition-all text-slate-400 hover:text-blue-500"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {/* 2 Dots Vertical Icon (::) */}
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="6" cy="4" r="1.2" fill="currentColor" />
-                                        <circle cx="6" cy="8" r="1.2" fill="currentColor" />
-                                    </svg>
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="bg-white border-slate-200 shadow-xl min-w-40">
-                                <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400 px-3 py-2">Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDetailsWbsId(item.id);
-                                        setIsDetailsSheetOpen(true);
-                                    }}
-                                    className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
-                                >
-                                    <Info size={14} className="mr-2" />
-                                    View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedWbsItem({ id: item.id, name: item.name, level: item.level });
-                                        setIsAddModalOpen(true);
-                                    }}
-                                    disabled={item.level >= 3}
-                                    className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
-                                >
-                                    <Plus size={14} className="mr-2" />
-                                    Add Child WBS
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditWbsId(item.id);
-                                        setIsEditModalOpen(true);
-                                    }}
-                                    className="text-xs font-semibold text-slate-700 focus:bg-slate-50 cursor-pointer px-3 py-2"
-                                >
-                                    <Edit2 size={14} className="mr-2" />
-                                    Edit Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteWbs(item.id);
-                                    }}
-                                    className="text-xs font-semibold text-red-600 focus:bg-red-50 cursor-pointer px-3 py-2"
-                                >
-                                    <Trash2 size={14} className="mr-2" />
-                                    Delete Item
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <WbsItemActions item={item} level={level} />
                     </div>
                 </div>
-                {item.expanded && item.children && renderWbsTree(item.children, level + 1)}
+                {item.expanded && (
+                    <>
+                        {item.children && renderWbsTree(item.children, level + 1)}
+                        {/* Display Work Packages */}
+                        {!item.isTopLevel && (
+                            <WbsItemWithWorkPackages
+                                wbsItemId={item.id}
+                                level={level}
+                                isExpanded={item.expanded}
+                                onEditWorkPackage={(id) => {
+                                    setSelectedWorkPackageId(id);
+                                    setIsEditWorkPackageModalOpen(true);
+                                }}
+                                onDeleteWorkPackage={handleDeleteWorkPackage}
+                            />
+                        )}
+                    </>
+                )}
             </div>
         ));
     };
@@ -634,6 +722,36 @@ export default function NewProject() {
                 isOpen={isDetailsSheetOpen}
                 onOpenChange={setIsDetailsSheetOpen}
                 wbsId={detailsWbsId}
+            />
+
+            {selectedWbsForWorkPackage && (
+                <AddWorkPackageModal
+                    isOpen={isAddWorkPackageModalOpen}
+                    onClose={() => {
+                        setIsAddWorkPackageModalOpen(false);
+                        setSelectedWbsForWorkPackage(null);
+                    }}
+                    projectId={project.id}
+                    wbsItemId={selectedWbsForWorkPackage.id}
+                    wbsItemName={selectedWbsForWorkPackage.name}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
+                        queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+                    }}
+                />
+            )}
+
+            <EditWorkPackageModal
+                workPackageId={selectedWorkPackageId}
+                isOpen={isEditWorkPackageModalOpen}
+                onOpenChange={(open) => {
+                    setIsEditWorkPackageModalOpen(open);
+                    if (!open) setSelectedWorkPackageId(null);
+                }}
+                onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+                }}
             />
         </MasterLayout>
     );

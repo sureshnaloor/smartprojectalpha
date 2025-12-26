@@ -40,11 +40,13 @@ import {
   type PlannedActivity,
   type InsertPlannedActivity,
   type PlannedActivityTask,
-  type InsertPlannedActivityTask
+  type InsertPlannedActivityTask,
+  type WorkPackage,
+  type InsertWorkPackage
 } from "./schema";
 import { db } from "./db";
 import { and, eq, or, inArray, sql, gte, lte } from "drizzle-orm";
-import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources, dailyProgress, resourcePlans, riskRegister, lessonLearntRegister, directManpowerPositions, directManpowerEntries, indirectManpowerPositions, indirectManpowerEntries, plannedActivities, plannedActivityTasks } from "./schema";
+import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources, dailyProgress, resourcePlans, riskRegister, lessonLearntRegister, directManpowerPositions, directManpowerEntries, indirectManpowerPositions, indirectManpowerEntries, plannedActivities, plannedActivityTasks, workPackages } from "./schema";
 
 // Storage interface
 export interface IStorage {
@@ -61,6 +63,14 @@ export interface IStorage {
   createWbsItem(wbsItem: Omit<WbsItem, "id" | "createdAt">): Promise<WbsItem>;
   updateWbsItem(id: number, wbsItem: Partial<Omit<WbsItem, "id" | "createdAt">>): Promise<WbsItem | undefined>;
   deleteWbsItem(id: number): Promise<void>;
+
+  // Work Package methods
+  getWorkPackages(wbsItemId: number): Promise<WorkPackage[]>;
+  getWorkPackagesByProject(projectId: number): Promise<WorkPackage[]>;
+  getWorkPackage(id: number): Promise<WorkPackage | undefined>;
+  createWorkPackage(workPackage: Omit<WorkPackage, "id" | "createdAt">): Promise<WorkPackage>;
+  updateWorkPackage(id: number, workPackage: Partial<Omit<WorkPackage, "id" | "createdAt">>): Promise<WorkPackage | undefined>;
+  deleteWorkPackage(id: number): Promise<void>;
 
   // Dependency methods
   getDependencies(projectId: number): Promise<Dependency[]>;
@@ -338,6 +348,85 @@ export class DatabaseStorage implements IStorage {
     }
     // Finally delete the item itself
     await db.delete(wbsItems).where(eq(wbsItems.id, id));
+  }
+
+  // Work Package methods
+  async getWorkPackages(wbsItemId: number): Promise<WorkPackage[]> {
+    const dbItems = await db
+      .select()
+      .from(workPackages)
+      .where(eq(workPackages.wbsItemId, wbsItemId))
+      .orderBy(workPackages.code);
+
+    return dbItems.map(item => ({
+      ...item,
+      budgetedCost: item.budgetedCost,
+      actualCost: item.actualCost,
+      percentComplete: item.percentComplete,
+    }));
+  }
+
+  async getWorkPackagesByProject(projectId: number): Promise<WorkPackage[]> {
+    const dbItems = await db
+      .select()
+      .from(workPackages)
+      .where(eq(workPackages.projectId, projectId))
+      .orderBy(workPackages.code);
+
+    return dbItems.map(item => ({
+      ...item,
+      budgetedCost: item.budgetedCost,
+      actualCost: item.actualCost,
+      percentComplete: item.percentComplete,
+    }));
+  }
+
+  async getWorkPackage(id: number): Promise<WorkPackage | undefined> {
+    const [workPackage] = await db
+      .select()
+      .from(workPackages)
+      .where(eq(workPackages.id, id));
+
+    if (!workPackage) return undefined;
+
+    return {
+      ...workPackage,
+      budgetedCost: workPackage.budgetedCost,
+      actualCost: workPackage.actualCost,
+      percentComplete: workPackage.percentComplete,
+    };
+  }
+
+  async createWorkPackage(workPackage: Omit<WorkPackage, "id" | "createdAt">): Promise<WorkPackage> {
+    const [newWorkPackage] = await db.insert(workPackages).values(workPackage).returning();
+
+    return {
+      ...newWorkPackage,
+      budgetedCost: newWorkPackage.budgetedCost,
+      actualCost: newWorkPackage.actualCost,
+      percentComplete: newWorkPackage.percentComplete,
+    };
+  }
+
+  async updateWorkPackage(id: number, workPackage: Partial<Omit<WorkPackage, "id" | "createdAt">>): Promise<WorkPackage | undefined> {
+    const [updatedWorkPackage] = await db
+      .update(workPackages)
+      .set(workPackage)
+      .where(eq(workPackages.id, id))
+      .returning();
+
+    if (!updatedWorkPackage) return undefined;
+
+    return {
+      ...updatedWorkPackage,
+      budgetedCost: updatedWorkPackage.budgetedCost,
+      actualCost: updatedWorkPackage.actualCost,
+      percentComplete: updatedWorkPackage.percentComplete,
+    };
+  }
+
+  async deleteWorkPackage(id: number): Promise<void> {
+    await db.delete(workPackages).where(eq(workPackages.id, id));
   }
 
   // Dependency methods

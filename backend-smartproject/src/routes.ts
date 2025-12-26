@@ -43,7 +43,8 @@ import {
   insertIndirectManpowerPositionSchema,
   insertIndirectManpowerEntrySchema,
   insertPlannedActivitySchema,
-  insertPlannedActivityTaskSchema
+  insertPlannedActivityTaskSchema,
+  insertWorkPackageSchema
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -838,6 +839,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.deleteWbsItem(id);
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Work Package routes
+  app.get("/api/wbs/:wbsItemId/work-packages", async (req: Request, res: Response) => {
+    try {
+      const wbsItemId = parseInt(req.params.wbsItemId);
+      if (isNaN(wbsItemId)) {
+        return res.status(400).json({ message: "Invalid WBS item ID" });
+      }
+
+      const wbsItem = await storage.getWbsItem(wbsItemId);
+      if (!wbsItem) {
+        return res.status(404).json({ message: "WBS item not found" });
+      }
+
+      // Don't allow work packages for root level WBS
+      if (wbsItem.isTopLevel) {
+        return res.status(400).json({ message: "Cannot add work packages to root level WBS" });
+      }
+
+      const workPackages = await storage.getWorkPackages(wbsItemId);
+      res.json(workPackages);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/work-packages/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(id);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      res.json(workPackage);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/work-packages", async (req: Request, res: Response) => {
+    try {
+      const workPackageData = insertWorkPackageSchema.parse(req.body);
+
+      // Validate that the WBS item exists
+      const wbsItem = await storage.getWbsItem(workPackageData.wbsItemId);
+      if (!wbsItem) {
+        return res.status(404).json({ message: "WBS item not found" });
+      }
+
+      // Don't allow work packages for root level WBS
+      if (wbsItem.isTopLevel) {
+        return res.status(400).json({ message: "Cannot add work packages to root level WBS" });
+      }
+
+      // Validate that the project exists
+      const project = await storage.getProject(workPackageData.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Generate code based on WBS code + sequential index
+      let code = workPackageData.code;
+      if (!code) {
+        const existingWorkPackages = await storage.getWorkPackages(workPackageData.wbsItemId);
+        const sequentialIndex = existingWorkPackages.length + 1;
+        // Code format: {wbsCode}.{sequentialIndex}
+        // e.g., if WBS code is "1.2.1.1", WP codes will be "1.2.1.1.1", "1.2.1.1.2", etc.
+        code = `${wbsItem.code}.${sequentialIndex}`;
+      } else {
+        // Validate code uniqueness within project
+        const allProjectWorkPackages = await storage.getWorkPackagesByProject(workPackageData.projectId);
+        const codeExists = allProjectWorkPackages.some(wp => wp.code === code);
+        if (codeExists) {
+          return res.status(400).json({
+            message: `Work Package code "${code}" already exists in this project. Code must be unique within a project.`
+          });
+        }
+      }
+
+      // Budget validation - check against parent WBS budget
+      if (Number(workPackageData.budgetedCost) > Number(wbsItem.budgetedCost)) {
+        return res.status(400).json({
+          message: `Budget cannot exceed parent WBS budget of ${wbsItem.budgetedCost}`
+        });
+      }
+
+      // Check sum of existing work packages
+      const existingWorkPackages = await storage.getWorkPackages(workPackageData.wbsItemId);
+      const totalBudget = existingWorkPackages.reduce((sum, wp) => sum + Number(wp.budgetedCost), 0);
+      if ((totalBudget + Number(workPackageData.budgetedCost)) > Number(wbsItem.budgetedCost)) {
+        return res.status(400).json({
+          message: `Sum of all work package budgets (${totalBudget + Number(workPackageData.budgetedCost)}) cannot exceed parent WBS budget (${wbsItem.budgetedCost})`
+        });
+      }
+
+      const finalWorkPackageData = {
+        ...workPackageData,
+        code,
+        actualCost: "0",
+        percentComplete: "0",
+      };
+
+      const workPackage = await storage.createWorkPackage(finalWorkPackageData as any);
+      res.status(201).json(workPackage);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/work-packages/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(id);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      const partialWorkPackageSchema = insertWorkPackageSchema.partial();
+      const workPackageData = partialWorkPackageSchema.parse(req.body);
+
+      // Code uniqueness validation if code is being changed
+      if (workPackageData.code && workPackageData.code !== workPackage.code) {
+        const allProjectWorkPackages = await storage.getWorkPackagesByProject(workPackage.projectId);
+        const codeExists = allProjectWorkPackages.some(wp => wp.code === workPackageData.code && wp.id !== id);
+        if (codeExists) {
+          return res.status(400).json({
+            message: `Work Package code "${workPackageData.code}" already exists in this project. Code must be unique within a project.`
+          });
+        }
+      }
+
+      // Budget validation
+      if (workPackageData.budgetedCost !== undefined) {
+        const wbsItem = await storage.getWbsItem(workPackage.wbsItemId);
+        if (wbsItem) {
+          // Check against parent WBS budget
+          if (Number(workPackageData.budgetedCost) > Number(wbsItem.budgetedCost)) {
+            return res.status(400).json({
+              message: `Budget cannot exceed parent WBS budget of ${wbsItem.budgetedCost}`
+            });
+          }
+
+          // Check sum of other work packages
+          const allWorkPackages = await storage.getWorkPackages(workPackage.wbsItemId);
+          const otherWorkPackagesTotal = allWorkPackages
+            .filter(wp => wp.id !== id)
+            .reduce((sum, wp) => sum + Number(wp.budgetedCost), 0);
+          
+          if ((otherWorkPackagesTotal + Number(workPackageData.budgetedCost)) > Number(wbsItem.budgetedCost)) {
+            return res.status(400).json({
+              message: `Sum of all work package budgets (${otherWorkPackagesTotal + Number(workPackageData.budgetedCost)}) cannot exceed parent WBS budget (${wbsItem.budgetedCost})`
+            });
+          }
+        }
+      }
+
+      const updatedWorkPackage = await storage.updateWorkPackage(id, workPackageData);
+      if (!updatedWorkPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      res.json(updatedWorkPackage);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/work-packages/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(id);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      await storage.deleteWorkPackage(id);
       res.status(204).end();
     } catch (err) {
       handleError(err, res);

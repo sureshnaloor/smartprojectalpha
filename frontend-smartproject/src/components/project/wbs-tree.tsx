@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { WbsItem, UpdateWbsProgress } from "@shared/schema";
+import { WbsItem, UpdateWbsProgress, WorkPackage } from "@shared/schema";
 import { formatCurrency, formatDate, formatPercent, formatShortDate, buildWbsHierarchy } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronDown, ChevronRight, Edit, Trash2, Plus, Clipboard, PencilIcon, DollarSign, AlertCircle, CheckCircle, Loader2, FileUp } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Edit, Trash2, Plus, Clipboard, PencilIcon, DollarSign, AlertCircle, CheckCircle, Loader2, FileUp, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AddWbsModal } from "./add-wbs-modal";
 import { EditWbsModal } from "./edit-wbs-modal";
+import { AddWorkPackageModal } from "./add-work-package-modal";
+import { EditWorkPackageModal } from "./edit-work-package-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -376,6 +378,30 @@ export function WbsTree({ projectId }: WbsTreeProps) {
     setIsEditModalOpen(true);
   };
 
+  // Expand all WBS items recursively
+  const expandAll = () => {
+    const allExpanded: Record<number, boolean> = {};
+    
+    // Recursively collect all WBS item IDs
+    const collectAllIds = (items: WbsItem[]) => {
+      items.forEach(item => {
+        allExpanded[item.id] = true;
+        const children = wbsItems.filter(child => child.parentId === item.id);
+        if (children.length > 0) {
+          collectAllIds(children);
+        }
+      });
+    };
+    
+    collectAllIds(rootItems);
+    setExpandedItems(allExpanded);
+  };
+
+  // Collapse all WBS items
+  const collapseAll = () => {
+    setExpandedItems({});
+  };
+
   // Add a check to determine if budget is finalized
   const isBudgetFinalized = Math.abs(budgetUsage.workPackageTotal - budgetUsage.topLevelAllocated) < 0.01 && 
                           budgetUsage.workPackageTotal > 0;
@@ -424,6 +450,26 @@ export function WbsTree({ projectId }: WbsTreeProps) {
           )}
         </div>
         <div className="flex space-x-1">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="text-xs px-2 py-1 h-7"
+            onClick={expandAll}
+            disabled={isLoading || wbsItems.length === 0}
+          >
+            <ChevronDown className="h-3.5 w-3.5 mr-1" />
+            Expand All
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="text-xs px-2 py-1 h-7"
+            onClick={collapseAll}
+            disabled={isLoading || Object.keys(expandedItems).length === 0}
+          >
+            <ChevronUp className="h-3.5 w-3.5 mr-1" />
+            Collapse All
+          </Button>
           <Button 
             variant="outline" 
             size="sm"
@@ -697,6 +743,9 @@ function TreeItem({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
   const [isImportActivityModalOpen, setIsImportActivityModalOpen] = useState(false);
+  const [isAddWorkPackageModalOpen, setIsAddWorkPackageModalOpen] = useState(false);
+  const [isEditWorkPackageModalOpen, setIsEditWorkPackageModalOpen] = useState(false);
+  const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<number | null>(null);
   const [progress, setProgress] = useState(Number(item.percentComplete) || 0);
   const [actualCost, setActualCost] = useState(Number(item.actualCost) || 0);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
@@ -726,6 +775,20 @@ function TreeItem({
     },
     enabled: isExpanded,
   });
+
+  // Fetch work packages for this WBS item (only if not root level)
+  const { data: workPackages = [] } = useQuery<WorkPackage[]>({
+    queryKey: [`/api/wbs/${item.id}/work-packages`],
+    queryFn: async () => {
+      const response = await fetch(`/api/wbs/${item.id}/work-packages`);
+      if (!response.ok) throw new Error("Failed to fetch work packages");
+      return response.json();
+    },
+    enabled: isExpanded && !item.isTopLevel,
+  });
+
+  // Check if work packages exist (to disable Add Child WBS)
+  const hasWorkPackages = workPackages.length > 0;
 
   // Delete WBS item mutation
   const deleteWbsItem = useMutation({
@@ -801,7 +864,8 @@ function TreeItem({
     return Array(level).fill('—').join('');
   };
 
-  const canHaveChildren = item.type !== "Activity";
+  const canHaveChildren = item.type !== "Activity" && !hasWorkPackages;
+  const canAddWorkPackage = !item.isTopLevel && !isBudgetFinalized;
   
   // Get budget info for Summary or for parent of WorkPackage
   const getBudgetDisplay = () => {
@@ -975,12 +1039,33 @@ function TreeItem({
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => onAddChild(item.id)}
+                        disabled={hasWorkPackages}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Add Child Item</p>
+                      <p>{hasWorkPackages ? "Cannot add child WBS when work packages exist" : "Add Child WBS"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              
+              {canAddWorkPackage && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setIsAddWorkPackageModalOpen(true)}
+                      >
+                        <Package className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Add Work Package</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -1012,7 +1097,7 @@ function TreeItem({
       </div>
       
       {/* Child items with smooth transitions */}
-      {isExpanded && childItems && (
+      {isExpanded && (
         <div className="transition-all duration-300 ease-in-out overflow-hidden"
              style={{ 
                opacity: isLoading ? 0 : 1,
@@ -1042,7 +1127,45 @@ function TreeItem({
             </div>
           ) : (
             <div className="animate-fadeIn">
-              {childItems.length > 0 ? (
+              {/* Work Packages Display - Show FIRST, directly under parent WBS */}
+              {workPackages.length > 0 && (
+                <div className="space-y-1">
+                  {workPackages.map((wp) => (
+                    <WorkPackageItem
+                      key={wp.id}
+                      workPackage={wp}
+                      projectId={projectId}
+                      level={level + 1}
+                      projectCurrency={projectCurrency}
+                      onEdit={() => {
+                        setSelectedWorkPackageId(wp.id);
+                        setIsEditWorkPackageModalOpen(true);
+                      }}
+                      onDelete={async () => {
+                        try {
+                          await apiRequest("DELETE", `/api/work-packages/${wp.id}`);
+                          queryClient.invalidateQueries({ queryKey: [`/api/wbs/${item.id}/work-packages`] });
+                          queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+                          toast({
+                            title: "Work Package Deleted",
+                            description: "The work package has been deleted successfully.",
+                          });
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message || "Failed to delete work package.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      isBudgetFinalized={isBudgetFinalized}
+                    />
+                  ))}
+                </div>
+              )}
+              
+              {/* Child WBS Items - Show AFTER work packages */}
+              {childItems.length > 0 && (
                 childItems.map(childItem => (
                   <TreeItem
                     key={childItem.id}
@@ -1061,7 +1184,10 @@ function TreeItem({
                     expandedItems={expandedItems}
                   />
                 ))
-              ) : (
+              )}
+              
+              {/* Show message only if no children and no work packages */}
+              {childItems.length === 0 && workPackages.length === 0 && (
                 <div className="text-sm text-gray-500 py-2 px-4 pl-12" style={{ paddingLeft: `${(level + 2) * 16 + 24}px` }}>
                   No child items found. Click the + button to add one.
                 </div>
@@ -1165,6 +1291,170 @@ function TreeItem({
         projectId={projectId}
         workPackageId={item.id}
       />
+
+      {/* Add Work Package Modal */}
+      <AddWorkPackageModal
+        isOpen={isAddWorkPackageModalOpen}
+        onClose={() => setIsAddWorkPackageModalOpen(false)}
+        projectId={projectId}
+        wbsItemId={item.id}
+        wbsItemName={item.name}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/wbs/${item.id}/work-packages`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+          onRefresh();
+        }}
+      />
+
+      {/* Edit Work Package Modal */}
+      <EditWorkPackageModal
+        workPackageId={selectedWorkPackageId}
+        isOpen={isEditWorkPackageModalOpen}
+        onOpenChange={(open) => {
+          setIsEditWorkPackageModalOpen(open);
+          if (!open) setSelectedWorkPackageId(null);
+        }}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/wbs/${item.id}/work-packages`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+          onRefresh();
+        }}
+      />
+    </>
+  );
+}
+
+// Work Package Item Component
+interface WorkPackageItemProps {
+  workPackage: WorkPackage;
+  projectId: number;
+  level: number;
+  projectCurrency: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  isBudgetFinalized: boolean;
+}
+
+function WorkPackageItem({
+  workPackage,
+  projectId,
+  level,
+  projectCurrency,
+  onEdit,
+  onDelete,
+  isBudgetFinalized
+}: WorkPackageItemProps) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  return (
+    <>
+      <div className="grid grid-cols-[minmax(250px,_1fr)_repeat(6,_minmax(100px,_1fr))] px-4 py-2 hover:bg-blue-100/50 border-b border-gray-200 bg-blue-50/50 rounded-md mx-2 my-1 shadow-sm">
+        <div className="flex items-center">
+          <div className="ml-1" style={{ marginLeft: `${level * 16}px` }}>
+            <div className="font-semibold text-xs uppercase tracking-wider text-gray-800" style={{ letterSpacing: '0.1em' }}>
+              {workPackage.name.toUpperCase()}
+            </div>
+            {workPackage.description && (
+              <div className="text-xs text-gray-600 mt-0.5">{workPackage.description}</div>
+            )}
+          </div>
+        </div>
+        
+        <div className="text-xs">
+          {workPackage.code}
+        </div>
+        
+        <div className="text-xs">
+          <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 uppercase">
+            WP
+          </span>
+        </div>
+        
+        <div className="text-xs">
+          {formatCurrency(workPackage.budgetedCost, projectCurrency)}
+        </div>
+        
+        <div className="text-xs">
+          {formatCurrency(workPackage.actualCost, projectCurrency)}
+        </div>
+        
+        <div className="text-xs">
+          <div className="flex items-center">
+            <div className="w-full bg-gray-200 rounded-full h-1.5 mr-2">
+              <div 
+                className="bg-blue-600 h-1.5 rounded-full" 
+                style={{ width: `${Math.min(100, Number(workPackage.percentComplete))}%` }}
+              ></div>
+            </div>
+            <span className="whitespace-nowrap text-xs">{formatPercent(workPackage.percentComplete)}</span>
+          </div>
+        </div>
+        
+        <div className="flex space-x-1">
+          {!isBudgetFinalized && (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={onEdit}
+                    >
+                      <PencilIcon className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Edit Work Package</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-red-600"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Delete Work Package</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
+          )}
+        </div>
+      </div>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the Work Package "{workPackage.name}". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                onDelete();
+                setIsDeleteDialogOpen(false);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

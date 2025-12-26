@@ -101,7 +101,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
         <div className="h-full flex flex-col">
           <div className="px-4 py-4 border-b border-gray-300 bg-white shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-extrabold text-gray-800 uppercase tracking-widest" style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', letterSpacing: '0.1em' }}>PROJECTS</h2>
+              <h2 className="text-xs font-extrabold text-gray-800 uppercase tracking-widest" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.2em' }}>PROJECTS</h2>
               <button
                 className="text-primary-600 hover:text-primary-800 transition-all hover:scale-110"
                 onClick={() => setIsAddProjectModalOpen(true)}
@@ -138,13 +138,13 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                     <li key={project.id}>
                       <Link href={`/projects/${project.id}`}>
                         <a className={cn(
-                          "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                          "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                           currentProjectId === project.id && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                        )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: currentProjectId === project.id ? 600 : 500, letterSpacing: '0.01em' }}>
+                        )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: currentProjectId === project.id ? 600 : 500, letterSpacing: '0.12em' }}>
                           {currentProjectId === project.id ? (
-                            <Building2 className="mr-3 h-5 w-5" />
+                            <Building2 className="mr-3 h-4 w-4" />
                           ) : (
-                            <Building className="mr-3 h-5 w-5" />
+                            <Building className="mr-3 h-4 w-4" />
                           )}
                           <span className="truncate">{project.name}</span>
                         </a>
@@ -157,7 +157,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                 {currentProjectId && (
                   <>
                     <div className="px-4 py-3 border-t border-gray-300 bg-white">
-                      <h2 className="text-xs font-extrabold text-gray-800 uppercase tracking-widest" style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', letterSpacing: '0.1em' }}>
+                      <h2 className="text-xs font-extrabold text-blue-600 uppercase tracking-widest" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.2em' }}>
                         Project Tools
                       </h2>
                     </div>
@@ -165,10 +165,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       <li>
                         <Link href={`/projects/${currentProjectId}/collab`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                             isActive('/collab') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                          )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/collab') ? 600 : 500, letterSpacing: '0.01em' }}>
-                            <MessageSquareTextIcon className="mr-3 h-5 w-5" />
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/collab') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <MessageSquareTextIcon className="mr-3 h-4 w-4" />
                             <span>Collaboration Hub</span>
                           </a>
                         </Link>
@@ -176,10 +176,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       <li>
                         <Link href={`/projects/${currentProjectId}/activities`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                             isActive('/activities') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                          )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/activities') ? 600 : 500, letterSpacing: '0.01em' }}>
-                            <Activity className="mr-3 h-5 w-5" />
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/activities') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <Activity className="mr-3 h-4 w-4" />
                             <span>Activities</span>
                           </a>
                         </Link>
@@ -187,10 +187,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       <li>
                         <Link href={`/projects/${currentProjectId}/tasks`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                             isActive('/tasks') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                          )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/tasks') ? 600 : 500, letterSpacing: '0.01em' }}>
-                            <ListTodo className="mr-3 h-5 w-5" />
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/tasks') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <ListTodo className="mr-3 h-4 w-4" />
                             <span>Tasks</span>
                           </a>
                         </Link>
@@ -198,10 +198,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       <li>
                         <Link href={`/projects/${currentProjectId}/resources`}>
                           <a className={cn(
-                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                             isActive('/resources') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                          )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/resources') ? 600 : 500, letterSpacing: '0.01em' }}>
-                            <Users className="mr-3 h-5 w-5" />
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/resources') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <Users className="mr-3 h-4 w-4" />
                             <span>Resources</span>
                           </a>
                         </Link>
@@ -212,13 +212,13 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         <button
                           onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
                           className={cn(
-                            "flex items-center justify-between w-full px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                            "flex items-center justify-between w-full px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                             isActive('/documents') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                           )}
-                          style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/documents') ? 600 : 500, letterSpacing: '0.01em' }}
+                          style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/documents') ? 600 : 500, letterSpacing: '0.12em' }}
                         >
                           <div className="flex items-center">
-                            <FolderOpen className="mr-3 h-5 w-5" />
+                            <FolderOpen className="mr-3 h-4 w-4" />
                             <span>Project Documents</span>
                           </div>
                           {isDocumentsExpanded ? (
@@ -234,10 +234,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/ProjectDrawings`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                                   isActive('/project-drawings') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                                )}>
-                                  <FileImage className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-drawings') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <FileImage className="mr-3 h-3.5 w-3.5" />
                                   <span>Project Drawings</span>
                                 </a>
                               </Link>
@@ -245,10 +245,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/ProjectBOQ`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/project-boq') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <FileSpreadsheet className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-boq') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <FileSpreadsheet className="mr-3 h-3.5 w-3.5" />
                                   <span>Project BOQ</span>
                                 </a>
                               </Link>
@@ -256,10 +256,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/ProjectScope`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/project-scope') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <FileTextIcon className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-scope') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <FileTextIcon className="mr-3 h-3.5 w-3.5" />
                                   <span>Project Scope Document (PTS)</span>
                                 </a>
                               </Link>
@@ -267,12 +267,12 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/EquipmentCatalogue`}>
                                 <a className={cn(
-                                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all hover:text-primary",
+                                  "flex items-center gap-3 rounded-lg px-3 py-2 font-medium transition-all hover:text-primary uppercase",
                                   location.includes('/under-construction/EquipmentCatalogue')
                                     ? "bg-muted text-primary"
                                     : "text-muted-foreground"
-                                )}>
-                                  <FolderOpen className="h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', letterSpacing: '0.12em' }}>
+                                  <FolderOpen className="h-3.5 w-3.5" />
                                   <span>Equipment Catalogue</span>
                                 </a>
                               </Link>
@@ -280,10 +280,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/ClientCorrespondence`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/client-correspondence') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <MessageSquare className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/client-correspondence') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <MessageSquare className="mr-3 h-3.5 w-3.5" />
                                   <span>Client Correspondence</span>
                                 </a>
                               </Link>
@@ -291,10 +291,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/SupplierCorrespondence`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/supplier-correspondence') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <MessageCircle className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/supplier-correspondence') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <MessageCircle className="mr-3 h-3.5 w-3.5" />
                                   <span>Supplier Correspondence</span>
                                 </a>
                               </Link>
@@ -302,10 +302,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/SubcontractCorrespondence`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/subcontract-correspondence') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <MessageSquareText className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/subcontract-correspondence') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <MessageSquareText className="mr-3 h-3.5 w-3.5" />
                                   <span>Subcontract Correspondence</span>
                                 </a>
                               </Link>
@@ -313,10 +313,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/RequestForInspection`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/request-for-inspection') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <ClipboardCheck className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/request-for-inspection') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <ClipboardCheck className="mr-3 h-3.5 w-3.5" />
                                   <span>Request for Inspection</span>
                                 </a>
                               </Link>
@@ -324,10 +324,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/ITPAndReports`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/itp-and-reports') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <FileCheck className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/itp-and-reports') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <FileCheck className="mr-3 h-3.5 w-3.5" />
                                   <span>ITP and Reports</span>
                                 </a>
                               </Link>
@@ -335,10 +335,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/OtherDocuments`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/other-documents') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <FolderOpenIcon className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/other-documents') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <FolderOpenIcon className="mr-3 h-3.5 w-3.5" />
                                   <span>Others</span>
                                 </a>
                               </Link>
@@ -352,12 +352,13 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         <button
                           onClick={() => setIsWikiExpanded(!isWikiExpanded)}
                           className={cn(
-                            "flex items-center justify-between w-full px-4 py-2 text-gray-600 hover:bg-gray-50",
+                            "flex items-center justify-between w-full px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                             isActive('/wiki') && "text-teal-600 font-medium bg-teal-50"
                           )}
+                          style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/wiki') ? 600 : 500, letterSpacing: '0.12em' }}
                         >
                           <div className="flex items-center">
-                            <BookOpen className="mr-3 h-5 w-5" />
+                            <BookOpen className="mr-3 h-4 w-4" />
                             <span>Project Wiki</span>
                           </div>
                           {isWikiExpanded ? (
@@ -373,10 +374,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/project-daily-progress`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/project-daily-progress') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <Calendar className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-daily-progress') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <Calendar className="mr-3 h-3.5 w-3.5" />
                                   <span>Project Daily Progress</span>
                                 </a>
                               </Link>
@@ -384,10 +385,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/resource-plan`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/resource-plan') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <UserCheck className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/resource-plan') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <UserCheck className="mr-3 h-3.5 w-3.5" />
                                   <span>Resource Plan</span>
                                 </a>
                               </Link>
@@ -395,10 +396,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/risk-register`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/risk-register') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <AlertTriangle className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/risk-register') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <AlertTriangle className="mr-3 h-3.5 w-3.5" />
                                   <span>Risk Register</span>
                                 </a>
                               </Link>
@@ -406,10 +407,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/lesson-learnt-register`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/lesson-learnt-register') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <Lightbulb className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/lesson-learnt-register') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <Lightbulb className="mr-3 h-3.5 w-3.5" />
                                   <span>Lesson Learnt Register</span>
                                 </a>
                               </Link>
@@ -417,10 +418,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/direct-manpower-list`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/direct-manpower-list') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <User className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/direct-manpower-list') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <User className="mr-3 h-3.5 w-3.5" />
                                   <span>Direct Manpower List</span>
                                 </a>
                               </Link>
@@ -428,10 +429,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/indirect-manpower-list`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/indirect-manpower-list') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <UserPlus className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/indirect-manpower-list') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <UserPlus className="mr-3 h-3.5 w-3.5" />
                                   <span>Indirect Manpower List</span>
                                 </a>
                               </Link>
@@ -439,10 +440,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/planned-activity-tasks`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/planned-activity-tasks') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <ClipboardList className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/planned-activity-tasks') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <ClipboardList className="mr-3 h-3.5 w-3.5" />
                                   <span>Daily Activity/Tasks Planned</span>
                                 </a>
                               </Link>
@@ -450,10 +451,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             <li>
                               <Link href={`/projects/${currentProjectId}/under-construction/OtherWiki`}>
                                 <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 text-sm",
+                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
                                   isActive('/other-wiki') && "text-teal-600 font-medium bg-teal-50"
-                                )}>
-                                  <MoreHorizontal className="mr-3 h-4 w-4" />
+                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/other-wiki') ? 600 : 500, letterSpacing: '0.12em' }}>
+                                  <MoreHorizontal className="mr-3 h-3.5 w-3.5" />
                                   <span>Others</span>
                                 </a>
                               </Link>
@@ -467,7 +468,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
 
                 {/* Global tools, always visible */}
                 <div className="px-4 py-3 border-t border-gray-300 bg-white">
-                  <h2 className="text-xs font-extrabold text-gray-800 uppercase tracking-widest" style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', letterSpacing: '0.1em' }}>
+                  <h2 className="text-xs font-extrabold text-emerald-600 uppercase tracking-widest" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.2em' }}>
                     Global Tools
                   </h2>
                 </div>
@@ -475,10 +476,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href="/collab">
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/collab') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/collab') ? 600 : 500, letterSpacing: '0.01em' }}>
-                        <MessageSquareTextIcon className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/collab') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <MessageSquareTextIcon className="mr-3 h-4 w-4" />
                         <span>Collaboration Hub</span>
                       </a>
                     </Link>
@@ -486,10 +487,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/activity-master`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/activity-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/activity-master') ? 600 : 500, letterSpacing: '0.01em' }}>
-                        <Activity className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/activity-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Activity className="mr-3 h-4 w-4" />
                         <span>Activity Master</span>
                       </a>
                     </Link>
@@ -497,10 +498,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/task-master`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/task-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/task-master') ? 600 : 500, letterSpacing: '0.01em' }}>
-                        <ListTodo className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/task-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <ListTodo className="mr-3 h-4 w-4" />
                         <span>Task Master</span>
                       </a>
                     </Link>
@@ -508,10 +509,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/resource-master`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/resource-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )}>
-                        <Users className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/resource-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Users className="mr-3 h-4 w-4" />
                         <span>Resource Master</span>
                       </a>
                     </Link>
@@ -519,10 +520,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href="/newlanding">
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/newlanding') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/newlanding') ? 600 : 500, letterSpacing: '0.01em' }}>
-                        <LayoutDashboard className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/newlanding') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <LayoutDashboard className="mr-3 h-4 w-4" />
                         <span>New Landing</span>
                       </a>
                     </Link>
@@ -530,10 +531,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={currentProjectId ? `/newproject/${currentProjectId}` : "/newlanding"}>
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/newproject') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )} style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontSize: '0.9375rem', fontWeight: isActive('/newproject') ? 600 : 500, letterSpacing: '0.01em' }}>
-                        <Briefcase className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/newproject') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Briefcase className="mr-3 h-4 w-4" />
                         <span>New Project Detail</span>
                       </a>
                     </Link>
@@ -542,18 +543,18 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
 
                 {/* Reports & Analytics */}
                 <div className="px-4 py-3 border-t border-gray-300 bg-white">
-                  <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Reports & Analytics
+                  <h2 className="text-xs font-extrabold text-violet-600 uppercase tracking-widest" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.2em' }}>
+                    Charts & Analytics
                   </h2>
                 </div>
                 <ul className="py-1">
                   <li>
                     <Link href={`/under-construction/Charts`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/under-construction/Charts') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )}>
-                        <PieChart className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/under-construction/Charts') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <PieChart className="mr-3 h-4 w-4" />
                         <span>Charts</span>
                       </a>
                     </Link>
@@ -561,10 +562,10 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                   <li>
                     <Link href={`/under-construction/Reports`}>
                       <a className={cn(
-                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200",
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
                         isActive('/under-construction/Reports') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                      )}>
-                        <FileText className="mr-3 h-5 w-5" />
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/under-construction/Reports') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <FileText className="mr-3 h-4 w-4" />
                         <span>Reports</span>
                       </a>
                     </Link>
