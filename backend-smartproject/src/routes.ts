@@ -349,6 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Activity routes
+  // Get all activities for a project (grouped by work package)
   app.get("/api/projects/:projectId/activities", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -368,6 +369,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get activities for a specific work package
+  app.get("/api/work-packages/:wpId/activities", async (req: Request, res: Response) => {
+    try {
+      const wpId = parseInt(req.params.wpId);
+      if (isNaN(wpId)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(wpId);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      const activities = await storage.getProjectActivitiesByWorkPackage(wpId);
+      res.json(activities);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   app.post("/api/projects/:projectId/activities", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -380,9 +401,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Validate wpId is provided
+      if (!req.body.wpId) {
+        return res.status(400).json({ message: "Work Package ID (wpId) is required" });
+      }
+
+      const wpId = parseInt(req.body.wpId);
+      if (isNaN(wpId)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      // Verify the work package exists and belongs to the project
+      const workPackage = await storage.getWorkPackage(wpId);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+      if (workPackage.projectId !== projectId) {
+        return res.status(400).json({ message: "Work package does not belong to this project" });
+      }
+
       const activityData = insertProjectActivitySchema.parse({
         ...req.body,
-        projectId
+        projectId,
+        wpId
       });
 
       const activity = await storage.createProjectActivity(activityData);

@@ -116,6 +116,7 @@ export interface IStorage {
 
   // Project Activity methods
   getProjectActivities(projectId: number): Promise<ProjectActivity[]>;
+  getProjectActivitiesByWorkPackage(wpId: number): Promise<ProjectActivity[]>;
   getProjectActivity(id: number): Promise<ProjectActivity | undefined>;
   createProjectActivity(data: InsertProjectActivity): Promise<ProjectActivity>;
   updateProjectActivity(id: number, data: InsertProjectActivity): Promise<ProjectActivity | undefined>;
@@ -664,6 +665,11 @@ export class DatabaseStorage implements IStorage {
   // Project Activity methods
   async getProjectActivities(projectId: number): Promise<ProjectActivity[]> {
     const dbActivities = await db.select().from(projectActivities).where(eq(projectActivities.projectId, projectId));
+    return dbActivities;
+  }
+
+  async getProjectActivitiesByWorkPackage(wpId: number): Promise<ProjectActivity[]> {
+    const dbActivities = await db.select().from(projectActivities).where(eq(projectActivities.wpId, wpId));
     return dbActivities;
   }
 

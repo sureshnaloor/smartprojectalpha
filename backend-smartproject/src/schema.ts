@@ -180,6 +180,7 @@ export const taskResources = pgTable("task_resources", {
 export const projectActivities = pgTable("project_activities", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  wpId: integer("wp_id").notNull().references(() => workPackages.id, { onDelete: "cascade" }), // Work Package ID - required
   globalActivityId: integer("global_activity_id").references(() => activities.id, { onDelete: "set null" }), // nullable for project-specific activities
   name: text("name").notNull(),
   description: text("description"),
@@ -187,6 +188,13 @@ export const projectActivities = pgTable("project_activities", {
   unitRate: numeric("unit_rate", { precision: 12, scale: 2 }).notNull(),
   quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
   remarks: text("remarks"),
+  // Date fields
+  plannedFromDate: date("planned_from_date"),
+  plannedToDate: date("planned_to_date"),
+  estimatedStartDate: date("estimated_start_date"),
+  estimatedEndDate: date("estimated_end_date"),
+  actualStartDate: date("actual_start_date"),
+  actualToDate: date("actual_to_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -374,8 +382,16 @@ export const insertActivitySchema = createInsertSchema(activities)
 export const insertProjectActivitySchema = createInsertSchema(projectActivities)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
+    wpId: z.number(),
+    projectId: z.number(),
     unitRate: z.string().or(z.number()).transform(val => val.toString()),
     quantity: z.string().or(z.number()).transform(val => val.toString()),
+    plannedFromDate: z.string().optional().nullable(),
+    plannedToDate: z.string().optional().nullable(),
+    estimatedStartDate: z.string().optional().nullable(),
+    estimatedEndDate: z.string().optional().nullable(),
+    actualStartDate: z.string().optional().nullable(),
+    actualToDate: z.string().optional().nullable(),
   });
 
 // Collaboration Thread schema
