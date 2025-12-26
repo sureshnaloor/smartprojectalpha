@@ -499,6 +499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Task routes
+  // Get all tasks for a project
   app.get("/api/projects/:projectId/tasks", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -518,6 +519,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get open tasks for a project (not closed)
+  app.get("/api/projects/:projectId/tasks/open", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const tasks = await storage.getOpenProjectTasks(projectId);
+      res.json(tasks);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get tasks for a specific activity
+  app.get("/api/activities/:activityId/tasks", async (req: Request, res: Response) => {
+    try {
+      const activityId = parseInt(req.params.activityId);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "Invalid activity ID" });
+      }
+
+      const activity = await storage.getProjectActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+
+      const tasks = await storage.getProjectTasksByActivity(activityId);
+      res.json(tasks);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   app.post("/api/projects/:projectId/tasks", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -530,9 +571,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Validate activityId is provided
+      if (!req.body.activityId) {
+        return res.status(400).json({ message: "Activity ID (activityId) is required" });
+      }
+
+      const activityId = parseInt(req.body.activityId);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "Invalid activity ID" });
+      }
+
+      // Verify the activity exists and belongs to the project
+      const activity = await storage.getProjectActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+      if (activity.projectId !== projectId) {
+        return res.status(400).json({ message: "Activity does not belong to this project" });
+      }
+
       const taskData = insertProjectTaskSchema.parse({
         ...req.body,
-        projectId
+        projectId,
+        activityId
       });
 
       const task = await storage.createProjectTask(taskData);
@@ -565,13 +626,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Task does not belong to this project" });
       }
 
-      const taskData = insertProjectTaskSchema.parse({
+      // Use partial schema for updates - preserve existing activityId if not provided
+      const partialTaskSchema = insertProjectTaskSchema.partial();
+      const taskData = partialTaskSchema.parse({
         ...req.body,
-        projectId // Ensure projectId is preserved
+        projectId, // Ensure projectId is preserved
+        activityId: req.body.activityId ?? task.activityId, // Preserve existing activityId if not provided
       });
 
       const updatedTask = await storage.updateProjectTask(taskId, taskData);
       res.json(updatedTask);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Close a task (set closedDate to today)
+  app.patch("/api/projects/:projectId/tasks/:taskId/close", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const taskId = parseInt(req.params.taskId);
+
+      if (isNaN(projectId) || isNaN(taskId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const task = await storage.getProjectTask(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      if (task.projectId !== projectId) {
+        return res.status(400).json({ message: "Task does not belong to this project" });
+      }
+
+      const closedTask = await storage.closeProjectTask(taskId);
+      if (!closedTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      res.json(closedTask);
     } catch (err) {
       handleError(err, res);
     }
@@ -2592,6 +2691,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get resources for a specific work package
+  app.get("/api/work-packages/:wpId/resources", async (req: Request, res: Response) => {
+    try {
+      const wpId = parseInt(req.params.wpId);
+      if (isNaN(wpId)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(wpId);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      const resources = await storage.getProjectResourcesByWorkPackage(wpId);
+      res.json(resources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   app.post("/api/projects/:projectId/resources", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -2604,9 +2723,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Validate wpId is provided
+      if (!req.body.wpId) {
+        return res.status(400).json({ message: "Work Package ID (wpId) is required" });
+      }
+
+      const wpId = parseInt(req.body.wpId);
+      if (isNaN(wpId)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      // Verify the work package exists and belongs to the project
+      const workPackage = await storage.getWorkPackage(wpId);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+      if (workPackage.projectId !== projectId) {
+        return res.status(400).json({ message: "Work package does not belong to this project" });
+      }
+
+      // Validate resource type
+      const validTypes = ["manpower", "equipment", "rental_manpower", "rental_equipment", "tools"];
+      if (req.body.type && !validTypes.includes(req.body.type)) {
+        return res.status(400).json({ 
+          message: `Resource type must be one of: ${validTypes.join(", ")}` 
+        });
+      }
+
       const resourceData = insertProjectResourceSchema.parse({
         ...req.body,
-        projectId
+        projectId,
+        wpId
       });
 
       const resource = await storage.createProjectResource(resourceData);
@@ -2639,9 +2786,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Resource does not belong to this project" });
       }
 
-      const resourceData = insertProjectResourceSchema.parse({
+      // Use partial schema for updates - preserve existing wpId if not provided
+      const partialResourceSchema = insertProjectResourceSchema.partial();
+      const resourceData = partialResourceSchema.parse({
         ...req.body,
-        projectId // Ensure projectId is preserved
+        projectId, // Ensure projectId is preserved
+        wpId: req.body.wpId ?? resource.wpId, // Preserve existing wpId if not provided
       });
 
       const updatedResource = await storage.updateProjectResource(resourceId, resourceData);

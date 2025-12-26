@@ -31,7 +31,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 
 // Resource type definitions
-type ResourceType = "manpower" | "equipment" | "material";
+type ResourceType = "manpower" | "equipment" | "rental_manpower" | "rental_equipment" | "tools";
 
 interface Resource {
   id: number;
@@ -253,7 +253,9 @@ export default function ResourceMaster() {
                       <SelectContent>
                         <SelectItem value="manpower">Manpower</SelectItem>
                         <SelectItem value="equipment">Equipment</SelectItem>
-                        <SelectItem value="material">Material</SelectItem>
+                        <SelectItem value="rental_manpower">Rental Manpower</SelectItem>
+                        <SelectItem value="rental_equipment">Rental Equipment</SelectItem>
+                        <SelectItem value="tools">Tools</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -18,42 +18,50 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Plus, Trash2, GripVertical, Pencil } from "lucide-react";
+import { Trash2, GripVertical, Pencil, Search, X, Calendar as CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 
 interface Resource {
     id: number;
     name: string;
     description: string | null;
-    type: "manpower" | "equipment" | "material";
+    type: "manpower" | "equipment" | "rental_manpower" | "rental_equipment" | "tools";
     unitOfMeasure: string;
     unitRate: string;
     remarks: string | null;
 }
 
+interface WorkPackage {
+    id: number;
+    wbsItemId: number;
+    projectId: number;
+    name: string;
+    code: string;
+    description: string | null;
+    budgetedCost: string;
+}
+
 interface ProjectResource {
     id: number;
     projectId: number;
+    wpId: number;
     globalResourceId: number | null;
     name: string;
     description: string | null;
-    type: "manpower" | "equipment" | "material";
+    type: "manpower" | "equipment" | "rental_manpower" | "rental_equipment" | "tools";
     unitOfMeasure: string;
     unitRate: string;
     quantity: string;
     remarks: string | null;
+    plannedStartDate: string | null;
+    plannedEndDate: string | null;
 }
 
 export default function ProjectResources() {
@@ -61,20 +69,65 @@ export default function ProjectResources() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedWpId, setSelectedWpId] = useState<number | null>(null);
+    const [draggedResource, setDraggedResource] = useState<Resource | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [dateRange, setDateRange] = useState<DateRange | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingResource, setEditingResource] = useState<ProjectResource | null>(null);
 
-    // Fetch global resources
-    const { data: globalResources = [] } = useQuery<Resource[]>({
+    // Fetch global resources (filtered to exclude material type)
+    const { data: allGlobalResources = [] } = useQuery<Resource[]>({
         queryKey: ["resources"],
         queryFn: () => get("/resources"),
     });
 
-    // Fetch project resources
-    const { data: projectResources = [], isLoading } = useQuery<ProjectResource[]>({
-        queryKey: ["project-resources", projectId],
-        queryFn: () => get(`/projects/${projectId}/resources`),
+    const globalResources = allGlobalResources.filter(
+        r => r.type !== "material" // Exclude material type
+    );
+
+    // Fetch work packages for the project
+    const { data: workPackages = [] } = useQuery<WorkPackage[]>({
+        queryKey: ["work-packages", projectId],
+        queryFn: async () => {
+            if (!projectId) return [];
+            // Fetch all WBS items and then get their work packages
+            const wbsResponse = await get(`/projects/${projectId}/wbs`);
+            const allWps: WorkPackage[] = [];
+            
+            for (const wbs of wbsResponse) {
+                try {
+                    const wpResponse = await fetch(`/api/wbs/${wbs.id}/work-packages`).then(r => r.json());
+                    if (Array.isArray(wpResponse)) {
+                        allWps.push(...wpResponse);
+                    }
+                } catch (error) {
+                    // Skip if no work packages found
+                }
+            }
+            
+            return allWps;
+        },
         enabled: !!projectId,
+    });
+
+    // Fetch resources for selected work package or all resources
+    const { data: wpResources = [] } = useQuery<ProjectResource[]>({
+        queryKey: selectedWpId === null ? ["all-project-resources", projectId] : ["wp-resources", selectedWpId],
+        queryFn: async () => {
+            if (selectedWpId === null) {
+                // Fetch all resources for the project
+                const response = await fetch(`/api/projects/${projectId}/resources`);
+                if (!response.ok) throw new Error("Failed to fetch resources");
+                return response.json();
+            } else {
+                // Fetch resources for specific work package
+                const response = await fetch(`/api/work-packages/${selectedWpId}/resources`);
+                if (!response.ok) throw new Error("Failed to fetch resources");
+                return response.json();
+            }
+        },
+        enabled: projectId !== undefined && (selectedWpId !== undefined),
     });
 
     // Create project resource mutation
@@ -82,9 +135,16 @@ export default function ProjectResources() {
         mutationFn: (data: Partial<ProjectResource>) =>
             post(`/projects/${projectId}/resources`, data),
         onSuccess: () => {
+            // Invalidate both specific WP resources and all project resources
+            if (selectedWpId !== null) {
+                queryClient.invalidateQueries({ queryKey: ["wp-resources", selectedWpId] });
+            }
+            queryClient.invalidateQueries({ queryKey: ["all-project-resources", projectId] });
             queryClient.invalidateQueries({ queryKey: ["project-resources", projectId] });
-            toast({ title: "Success", description: "Resource added to project" });
-            setIsDialogOpen(false);
+            toast({ title: "Success", description: "Resource added to work package" });
+            setDraggedResource(null);
+            setDateRange(null);
+            setShowDatePicker(false);
         },
         onError: (error: Error) => {
             toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -96,6 +156,11 @@ export default function ProjectResources() {
         mutationFn: ({ id, data }: { id: number; data: Partial<ProjectResource> }) =>
             put(`/projects/${projectId}/resources/${id}`, data),
         onSuccess: () => {
+            // Invalidate both specific WP resources and all project resources
+            if (selectedWpId !== null) {
+                queryClient.invalidateQueries({ queryKey: ["wp-resources", selectedWpId] });
+            }
+            queryClient.invalidateQueries({ queryKey: ["all-project-resources", projectId] });
             queryClient.invalidateQueries({ queryKey: ["project-resources", projectId] });
             toast({ title: "Success", description: "Resource updated" });
             setEditingResource(null);
@@ -110,8 +175,13 @@ export default function ProjectResources() {
     const deleteMutation = useMutation({
         mutationFn: (id: number) => del(`/projects/${projectId}/resources/${id}`),
         onSuccess: () => {
+            // Invalidate both specific WP resources and all project resources
+            if (selectedWpId !== null) {
+                queryClient.invalidateQueries({ queryKey: ["wp-resources", selectedWpId] });
+            }
+            queryClient.invalidateQueries({ queryKey: ["all-project-resources", projectId] });
             queryClient.invalidateQueries({ queryKey: ["project-resources", projectId] });
-            toast({ title: "Success", description: "Resource removed from project" });
+            toast({ title: "Success", description: "Resource removed from work package" });
         },
         onError: (error: Error) => {
             toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -120,32 +190,72 @@ export default function ProjectResources() {
 
     const handleDragStart = (e: React.DragEvent, resource: Resource) => {
         e.dataTransfer.setData("resource", JSON.stringify(resource));
+        setDraggedResource(resource);
     };
 
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
+        
+        // If "All" is selected, we need to prompt user to select a specific WP
+        if (selectedWpId === null) {
+            toast({ 
+                title: "Info", 
+                description: "Please select a specific work package to assign the resource to", 
+            });
+            return;
+        }
+
         const resourceData = e.dataTransfer.getData("resource");
         if (resourceData) {
             const resource: Resource = JSON.parse(resourceData);
 
-            // Check if already exists
-            const exists = projectResources.some(pr => pr.globalResourceId === resource.id);
+            // Check if already exists in this WP
+            const exists = wpResources.some(
+                pr => pr.globalResourceId === resource.id && pr.wpId === selectedWpId
+            );
             if (exists) {
-                toast({ title: "Warning", description: "Resource already exists in project", variant: "destructive" });
+                toast({ 
+                    title: "Warning", 
+                    description: "Resource already exists in this work package", 
+                    variant: "destructive" 
+                });
                 return;
             }
 
-            createMutation.mutate({
-                globalResourceId: resource.id,
-                name: resource.name,
-                description: resource.description,
-                type: resource.type,
-                unitOfMeasure: resource.unitOfMeasure,
-                unitRate: resource.unitRate,
-                quantity: "1", // Default quantity
-                remarks: resource.remarks,
-            });
+            // Show date picker for all resource types
+            setDraggedResource(resource);
+            setShowDatePicker(true);
         }
+    };
+
+    const handleDateRangeConfirm = () => {
+        if (!draggedResource || !selectedWpId) {
+            return;
+        }
+
+        // All resource types require dates
+        if (!dateRange?.from || !dateRange?.to) {
+            toast({ 
+                title: "Error", 
+                description: "Please select both start and end dates", 
+                variant: "destructive" 
+            });
+            return;
+        }
+
+        createMutation.mutate({
+            wpId: selectedWpId,
+            globalResourceId: draggedResource.id,
+            name: draggedResource.name,
+            description: draggedResource.description,
+            type: draggedResource.type as "manpower" | "equipment" | "rental_manpower" | "rental_equipment" | "tools",
+            unitOfMeasure: draggedResource.unitOfMeasure,
+            unitRate: draggedResource.unitRate,
+            quantity: "1", // Default quantity
+            remarks: draggedResource.remarks,
+            plannedStartDate: format(dateRange.from, "yyyy-MM-dd"),
+            plannedEndDate: format(dateRange.to, "yyyy-MM-dd"),
+        });
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -156,35 +266,20 @@ export default function ProjectResources() {
         resource.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const data = {
-            name: formData.get("name") as string,
-            description: formData.get("description") as string,
-            type: formData.get("type") as "manpower" | "equipment" | "material",
-            unitOfMeasure: formData.get("unitOfMeasure") as string,
-            unitRate: formData.get("unitRate") as string,
-            quantity: formData.get("quantity") as string,
-            remarks: formData.get("remarks") as string,
-        };
-
-        if (editingResource) {
-            updateMutation.mutate({ id: editingResource.id, data });
-        } else {
-            createMutation.mutate(data);
-        }
-    };
+    const selectedWorkPackage = workPackages.find(wp => wp.id === selectedWpId);
 
     return (
         <div className="flex h-[calc(100vh-4rem)] gap-4 p-4">
-            {/* Sidebar - Global Resources */}
+            {/* Left Sidebar - Global Resources */}
             <Card className="w-80 flex flex-col">
                 <CardHeader>
                     <CardTitle>Global Resources</CardTitle>
+                    <p className="text-xs text-muted-foreground">Manpower, Equipment, Rental & Tools</p>
                     <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search resources..."
+                            className="pl-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -202,14 +297,9 @@ export default function ProjectResources() {
                                 >
                                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                                     <div className="flex-1 overflow-hidden">
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-medium truncate">{resource.name}</p>
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
-                                                {resource.type}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            {resource.unitRate} / {resource.unitOfMeasure}
+                                        <p className="font-medium truncate">{resource.name}</p>
+                                        <p className="text-xs text-muted-foreground capitalize">
+                                            {resource.type.replace("_", " ")} • {resource.unitRate} / {resource.unitOfMeasure}
                                         </p>
                                     </div>
                                 </div>
@@ -219,183 +309,331 @@ export default function ProjectResources() {
                 </CardContent>
             </Card>
 
-            {/* Main Content - Project Resources */}
-            <Card className="flex-1 flex flex-col" onDrop={handleDrop} onDragOver={handleDragOver}>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Project Resources</CardTitle>
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button onClick={() => setEditingResource(null)}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Custom Resource
+            {/* Right Side - Work Packages and Resources */}
+            <div className="flex-1 flex flex-col gap-4">
+                {/* Work Packages List */}
+                <Card className="flex-shrink-0">
+                    <CardHeader>
+                        <CardTitle>Work Packages</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ScrollArea className="h-32">
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant={selectedWpId === null ? "default" : "outline"}
+                                    onClick={() => setSelectedWpId(null)}
+                                    className="text-xs font-semibold"
+                                >
+                                    All
+                                </Button>
+                                {workPackages.map((wp) => (
+                                    <Button
+                                        key={wp.id}
+                                        variant={selectedWpId === wp.id ? "default" : "outline"}
+                                        onClick={() => setSelectedWpId(wp.id)}
+                                        className="text-xs"
+                                    >
+                                        {wp.code} - {wp.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+
+                {/* Selected WP Resources Window */}
+                <Card 
+                    className="flex-1 flex flex-col" 
+                    onDrop={handleDrop} 
+                    onDragOver={handleDragOver}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>
+                            {selectedWpId === null 
+                                ? "All Resources"
+                                : selectedWorkPackage 
+                                    ? `${selectedWorkPackage.code} - ${selectedWorkPackage.name}`
+                                    : "Select a Work Package"}
+                        </CardTitle>
+                        {selectedWpId !== null && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    setSelectedWpId(null);
+                                    setShowDatePicker(false);
+                                    setDateRange(null);
+                                }}
+                            >
+                                <X className="h-4 w-4" />
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>{editingResource ? "Edit Resource" : "Add New Resource"}</DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                        )}
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-auto">
+                        {selectedWpId === undefined ? (
+                            <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg m-4">
+                                <div className="text-center">
+                                    <p>No work package selected.</p>
+                                    <p className="text-sm">Select a work package above to assign resources</p>
+                                </div>
+                            </div>
+                        ) : showDatePicker && draggedResource ? (
+                            <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+                                <div className="text-center">
+                                    <p className="font-semibold mb-2">Assign Resource: {draggedResource.name}</p>
+                                    <p className="text-sm text-muted-foreground mb-4 capitalize">
+                                        Type: {draggedResource.type.replace("_", " ")}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Select planned start and end dates
+                                    </p>
+                                </div>
+                                <div className="w-full max-w-md">
+                                    <DateRangePicker
+                                        value={dateRange || undefined}
+                                        onChange={setDateRange}
+                                        placeholder="Select date range"
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={handleDateRangeConfirm}
+                                        disabled={!dateRange?.from || !dateRange?.to || createMutation.isPending}
+                                    >
+                                        <CalendarIcon className="h-4 w-4 mr-2" />
+                                        Confirm Assignment
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setShowDatePicker(false);
+                                            setDraggedResource(null);
+                                            setDateRange(null);
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : wpResources.length === 0 ? (
+                            <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg m-4">
+                                <div className="text-center">
+                                    <p>
+                                        {selectedWpId === null 
+                                            ? "No resources found for this project." 
+                                            : "No resources assigned yet."}
+                                    </p>
+                                    {selectedWpId !== null && (
+                                        <p className="text-sm">Drag resources from the sidebar to assign them</p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        {selectedWpId === null && <TableHead>Work Package</TableHead>}
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Unit</TableHead>
+                                        <TableHead className="text-right">Rate</TableHead>
+                                        <TableHead className="text-right">Quantity</TableHead>
+                                        <TableHead className="text-right">Total</TableHead>
+                                        <TableHead>Planned Dates</TableHead>
+                                        <TableHead>Remarks</TableHead>
+                                        <TableHead className="w-[100px]">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {wpResources.map((resource) => {
+                                        const resourceWP = workPackages.find(wp => wp.id === resource.wpId);
+                                        return (
+                                        <TableRow key={resource.id}>
+                                            {selectedWpId === null && (
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {resourceWP ? `${resourceWP.code} - ${resourceWP.name}` : "Unknown"}
+                                                </TableCell>
+                                            )}
+                                            <TableCell className="font-medium">
+                                                <div>
+                                                    {resource.name}
+                                                    {resource.description && (
+                                                        <p className="text-xs text-muted-foreground">{resource.description}</p>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="capitalize">
+                                                {resource.type.replace("_", " ")}
+                                            </TableCell>
+                                            <TableCell>{resource.unitOfMeasure}</TableCell>
+                                            <TableCell className="text-right">{resource.unitRate}</TableCell>
+                                            <TableCell className="text-right">{resource.quantity}</TableCell>
+                                            <TableCell className="text-right">
+                                                {(parseFloat(resource.unitRate) * parseFloat(resource.quantity)).toFixed(2)}
+                                            </TableCell>
+                                            <TableCell>
+                                                {resource.plannedStartDate && resource.plannedEndDate ? (
+                                                    <span className="text-xs">
+                                                        {format(new Date(resource.plannedStartDate), "MMM dd, yyyy")} - {format(new Date(resource.plannedEndDate), "MMM dd, yyyy")}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">Not set</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="max-w-[200px] truncate" title={resource.remarks || ""}>
+                                                {resource.remarks}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            setEditingResource(resource);
+                                                            setIsDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-destructive"
+                                                        onClick={() => {
+                                                            if (confirm("Are you sure you want to delete this resource?")) {
+                                                                deleteMutation.mutate(resource.id);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Edit Resource Dialog */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Resource</DialogTitle>
+                    </DialogHeader>
+                    {editingResource && (
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const formData = new FormData(e.currentTarget);
+                                const data = {
+                                    name: formData.get("name") as string,
+                                    description: formData.get("description") as string,
+                                    unitOfMeasure: formData.get("unitOfMeasure") as string,
+                                    unitRate: formData.get("unitRate") as string,
+                                    quantity: formData.get("quantity") as string,
+                                    remarks: formData.get("remarks") as string,
+                                    plannedStartDate: formData.get("plannedStartDate") ? (formData.get("plannedStartDate") as string) : null,
+                                    plannedEndDate: formData.get("plannedEndDate") ? (formData.get("plannedEndDate") as string) : null,
+                                };
+                                updateMutation.mutate({ id: editingResource.id, data });
+                            }}
+                            className="space-y-4"
+                        >
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Name</Label>
+                                <Input
+                                    id="name"
+                                    name="name"
+                                    defaultValue={editingResource.name}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    name="description"
+                                    defaultValue={editingResource.description || ""}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="name">Name</Label>
+                                    <Label htmlFor="unitOfMeasure">Unit</Label>
                                     <Input
-                                        id="name"
-                                        name="name"
-                                        defaultValue={editingResource?.name}
+                                        id="unitOfMeasure"
+                                        name="unitOfMeasure"
+                                        defaultValue={editingResource.unitOfMeasure}
                                         required
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
-                                    <Textarea
-                                        id="description"
-                                        name="description"
-                                        defaultValue={editingResource?.description || ""}
+                                    <Label htmlFor="unitRate">Rate</Label>
+                                    <Input
+                                        id="unitRate"
+                                        name="unitRate"
+                                        type="number"
+                                        step="0.01"
+                                        defaultValue={editingResource.unitRate}
+                                        required
                                     />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="type">Type</Label>
-                                        <Select name="type" defaultValue={editingResource?.type || "manpower"}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="manpower">Manpower</SelectItem>
-                                                <SelectItem value="equipment">Equipment</SelectItem>
-                                                <SelectItem value="material">Material</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="unitOfMeasure">Unit</Label>
-                                        <Input
-                                            id="unitOfMeasure"
-                                            name="unitOfMeasure"
-                                            defaultValue={editingResource?.unitOfMeasure}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="unitRate">Rate</Label>
-                                        <Input
-                                            id="unitRate"
-                                            name="unitRate"
-                                            type="number"
-                                            step="0.01"
-                                            defaultValue={editingResource?.unitRate}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="quantity">Quantity</Label>
-                                        <Input
-                                            id="quantity"
-                                            name="quantity"
-                                            type="number"
-                                            step="0.01"
-                                            defaultValue={editingResource?.quantity}
-                                            required
-                                        />
-                                    </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="quantity">Quantity</Label>
+                                <Input
+                                    id="quantity"
+                                    name="quantity"
+                                    type="number"
+                                    step="0.01"
+                                    defaultValue={editingResource.quantity}
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="plannedStartDate">Planned Start Date</Label>
+                                    <Input
+                                        id="plannedStartDate"
+                                        name="plannedStartDate"
+                                        type="date"
+                                        defaultValue={editingResource.plannedStartDate || ""}
+                                    />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="remarks">Remarks</Label>
-                                    <Textarea
-                                        id="remarks"
-                                        name="remarks"
-                                        defaultValue={editingResource?.remarks || ""}
+                                    <Label htmlFor="plannedEndDate">Planned End Date</Label>
+                                    <Input
+                                        id="plannedEndDate"
+                                        name="plannedEndDate"
+                                        type="date"
+                                        defaultValue={editingResource.plannedEndDate || ""}
                                     />
                                 </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit">
-                                        {editingResource ? "Update" : "Create"}
-                                    </Button>
-                                </div>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-auto">
-                    {projectResources.length === 0 ? (
-                        <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg m-4">
-                            <div className="text-center">
-                                <p>No resources added yet.</p>
-                                <p className="text-sm">Drag resources from the sidebar or click "Add Custom Resource"</p>
                             </div>
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Unit</TableHead>
-                                    <TableHead className="text-right">Rate</TableHead>
-                                    <TableHead className="text-right">Quantity</TableHead>
-                                    <TableHead className="text-right">Total</TableHead>
-                                    <TableHead>Remarks</TableHead>
-                                    <TableHead className="w-[100px]">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {projectResources.map((resource) => (
-                                    <TableRow key={resource.id}>
-                                        <TableCell className="font-medium">
-                                            <div>
-                                                {resource.name}
-                                                {resource.description && (
-                                                    <p className="text-xs text-muted-foreground">{resource.description}</p>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="capitalize">{resource.type}</TableCell>
-                                        <TableCell>{resource.unitOfMeasure}</TableCell>
-                                        <TableCell className="text-right">{resource.unitRate}</TableCell>
-                                        <TableCell className="text-right">{resource.quantity}</TableCell>
-                                        <TableCell className="text-right">
-                                            {(parseFloat(resource.unitRate) * parseFloat(resource.quantity)).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell className="max-w-[200px] truncate" title={resource.remarks || ""}>
-                                            {resource.remarks}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => {
-                                                        setEditingResource(resource);
-                                                        setIsDialogOpen(true);
-                                                    }}
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive"
-                                                    onClick={() => {
-                                                        if (confirm("Are you sure you want to delete this resource?")) {
-                                                            deleteMutation.mutate(resource.id);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                            <div className="space-y-2">
+                                <Label htmlFor="remarks">Remarks</Label>
+                                <Textarea
+                                    id="remarks"
+                                    name="remarks"
+                                    defaultValue={editingResource.remarks || ""}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit">
+                                    Update
+                                </Button>
+                            </div>
+                        </form>
                     )}
-                </CardContent>
-            </Card>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

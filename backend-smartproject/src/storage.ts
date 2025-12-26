@@ -124,9 +124,12 @@ export interface IStorage {
 
   // Project Task methods
   getProjectTasks(projectId: number): Promise<ProjectTask[]>;
+  getProjectTasksByActivity(activityId: number): Promise<ProjectTask[]>;
+  getOpenProjectTasks(projectId: number): Promise<ProjectTask[]>; // Tasks where closedDate is null
   getProjectTask(id: number): Promise<ProjectTask | undefined>;
   createProjectTask(data: InsertProjectTask): Promise<ProjectTask>;
   updateProjectTask(id: number, data: InsertProjectTask): Promise<ProjectTask | undefined>;
+  closeProjectTask(id: number): Promise<ProjectTask | undefined>; // Set closedDate to today
   deleteProjectTask(id: number): Promise<void>;
 
   // Resource Plan methods
@@ -139,6 +142,7 @@ export interface IStorage {
 
   // Project Resource methods
   getProjectResources(projectId: number): Promise<ProjectResource[]>;
+  getProjectResourcesByWorkPackage(wpId: number): Promise<ProjectResource[]>;
   getProjectResource(id: number): Promise<ProjectResource | undefined>;
   createProjectResource(data: InsertProjectResource): Promise<ProjectResource>;
   updateProjectResource(id: number, data: InsertProjectResource): Promise<ProjectResource | undefined>;
@@ -698,6 +702,28 @@ export class DatabaseStorage implements IStorage {
     return dbTasks;
   }
 
+  async getProjectTasksByActivity(activityId: number): Promise<ProjectTask[]> {
+    const dbTasks = await db
+      .select()
+      .from(projectTasks)
+      .where(and(
+        eq(projectTasks.activityId, activityId),
+        sql`${projectTasks.closedDate} IS NULL` // Only open tasks
+      ));
+    return dbTasks;
+  }
+
+  async getOpenProjectTasks(projectId: number): Promise<ProjectTask[]> {
+    const dbTasks = await db
+      .select()
+      .from(projectTasks)
+      .where(and(
+        eq(projectTasks.projectId, projectId),
+        sql`${projectTasks.closedDate} IS NULL` // Only open tasks
+      ));
+    return dbTasks;
+  }
+
   async getProjectTask(id: number): Promise<ProjectTask | undefined> {
     const [task] = await db.select().from(projectTasks).where(eq(projectTasks.id, id));
     return task;
@@ -713,6 +739,16 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async closeProjectTask(id: number): Promise<ProjectTask | undefined> {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const [result] = await db
+      .update(projectTasks)
+      .set({ closedDate: today })
+      .where(eq(projectTasks.id, id))
+      .returning();
+    return result;
+  }
+
   async deleteProjectTask(id: number): Promise<void> {
     await db.delete(projectTasks).where(eq(projectTasks.id, id));
   }
@@ -720,6 +756,11 @@ export class DatabaseStorage implements IStorage {
   // Project Resource methods
   async getProjectResources(projectId: number): Promise<ProjectResource[]> {
     const dbResources = await db.select().from(projectResources).where(eq(projectResources.projectId, projectId));
+    return dbResources;
+  }
+
+  async getProjectResourcesByWorkPackage(wpId: number): Promise<ProjectResource[]> {
+    const dbResources = await db.select().from(projectResources).where(eq(projectResources.wpId, wpId));
     return dbResources;
   }
 

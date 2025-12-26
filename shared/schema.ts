@@ -99,7 +99,7 @@ export const resources = pgTable("resources", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  type: text("type").notNull(), // manpower, equipment, material
+  type: text("type").notNull(), // manpower, equipment, rental_manpower, rental_equipment, tools
   unitOfMeasure: text("unit_of_measure").notNull(), // hours, days, pieces, etc.
   unitRate: numeric("unit_rate", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").default("USD").notNull(),
@@ -359,7 +359,7 @@ export const insertResourceSchema = createInsertSchema(resources)
   .extend({
     unitRate: z.string().or(z.number()).transform(val => val.toString()),
     availability: z.string().or(z.number()).transform(val => val.toString()).default("100"),
-    type: z.enum(["manpower", "equipment", "material"]),
+    type: z.enum(["manpower", "equipment", "rental_manpower", "rental_equipment", "tools"]),
     currency: z.enum(["USD", "EUR", "SAR"]).default("USD"),
   });
 
@@ -517,12 +517,15 @@ export type CsvImportData = z.infer<typeof csvImportSchema>;
 export const projectTasks = pgTable("project_tasks", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  activityId: integer("activity_id").notNull().references(() => projectActivities.id, { onDelete: "cascade" }), // Parent activity ID - required
   globalTaskId: integer("global_task_id").references(() => tasks.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   description: text("description"),
   duration: integer("duration"), // Duration in minutes
   status: text("status").default("pending").notNull(), // pending, in_progress, completed
   remarks: text("remarks"),
+  plannedDate: date("planned_date"), // Date when task is planned
+  closedDate: date("closed_date"), // Date when task is closed (null if not closed)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -532,7 +535,12 @@ export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-} as any);
+} as any).extend({
+  activityId: z.number(),
+  projectId: z.number(),
+  plannedDate: z.string().optional().nullable(),
+  closedDate: z.string().optional().nullable(),
+});
 
 export type ProjectTask = typeof projectTasks.$inferSelect;
 export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
@@ -541,14 +549,18 @@ export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
 export const projectResources = pgTable("project_resources", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  wpId: integer("wp_id").notNull().references(() => workPackages.id, { onDelete: "cascade" }), // Work Package ID - required
   globalResourceId: integer("global_resource_id").references(() => resources.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   description: text("description"),
-  type: text("type").notNull(), // manpower, equipment, material
+  type: text("type").notNull(), // manpower, equipment, rental_manpower, rental_equipment, tools
   unitOfMeasure: text("unit_of_measure").notNull(),
   unitRate: numeric("unit_rate", { precision: 12, scale: 2 }).notNull(),
   quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
   remarks: text("remarks"),
+  // Date fields for planned dates (manpower and equipment only)
+  plannedStartDate: date("planned_start_date"),
+  plannedEndDate: date("planned_end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -556,8 +568,12 @@ export const projectResources = pgTable("project_resources", {
 export const insertProjectResourceSchema = createInsertSchema(projectResources)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
+    wpId: z.number(),
+    projectId: z.number(),
     unitRate: z.string().or(z.number()).transform(val => val.toString()),
     quantity: z.string().or(z.number()).transform(val => val.toString()),
+    plannedStartDate: z.string().optional().nullable(),
+    plannedEndDate: z.string().optional().nullable(),
   });
 
 export type ProjectResource = typeof projectResources.$inferSelect;
