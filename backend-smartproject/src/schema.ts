@@ -849,6 +849,54 @@ export const insertPlannedActivitySchema = createInsertSchema(plannedActivities)
     }),
   });
 
+// Material Master Table
+export const materialMaster = pgTable("material_master", {
+  id: serial("id").primaryKey(),
+  materialCode: text("material_code").notNull().unique(),
+  materialDescription: text("material_description").notNull(),
+  uom: text("uom").notNull(), // Unit of Measure
+  materialType: text("material_type").notNull(), // Type of material
+  materialGroup: text("material_group").notNull(), // Group classification
+  materialClass: text("material_class").notNull(), // mrp, common, project
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Vendor Master Table
+export const vendorMaster = pgTable("vendor_master", {
+  id: serial("id").primaryKey(),
+  vendorCode: text("vendor_code").notNull().unique(),
+  vendorName: text("vendor_name").notNull(),
+  vendorAddress: text("vendor_address").notNull(),
+  vendorCity: text("vendor_city").notNull(),
+  vendorCountry: text("vendor_country").notNull(),
+  vendorZipCode: text("vendor_zip_code").notNull(),
+  vendorEmail: text("vendor_email").notNull(),
+  vendorTelephone: text("vendor_telephone").notNull(),
+  vendorFax: text("vendor_fax"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Employee Master Table
+export const employeeMaster = pgTable("employee_master", {
+  id: serial("id").primaryKey(),
+  employeeNumber: text("employee_number").notNull().unique(),
+  empFirstName: text("emp_first_name").notNull(),
+  empMiddleName: text("emp_middle_name"),
+  empLastName: text("emp_last_name").notNull(),
+  empNationalId: text("emp_national_id").notNull().unique(),
+  empNationality: text("emp_nationality").notNull(),
+  empDob: date("emp_dob").notNull(),
+  empPosition: text("emp_position").notNull(),
+  empTitle: text("emp_title").notNull(),
+  empTrade: text("emp_trade").notNull(),
+  empGrade: text("emp_grade").notNull(),
+  empCostPerHour: numeric("emp_cost_per_hour", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertPlannedActivityTaskSchema = createInsertSchema(plannedActivityTasks)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
@@ -870,11 +918,40 @@ export const insertPlannedActivityTaskSchema = createInsertSchema(plannedActivit
     }),
   });
 
+// Material Master Schema
+export const insertMaterialMasterSchema = createInsertSchema(materialMaster)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+// Vendor Master Schema
+export const insertVendorMasterSchema = createInsertSchema(vendorMaster)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+// Employee Master Schema
+export const insertEmployeeMasterSchema = createInsertSchema(employeeMaster)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    empDob: z.date().or(z.string()).transform(val => {
+      if (typeof val === 'string') {
+        return new Date(val).toISOString().split('T')[0];
+      }
+      return val.toISOString().split('T')[0];
+    }),
+  });
+
 export type PlannedActivity = typeof plannedActivities.$inferSelect;
 export type InsertPlannedActivity = z.infer<typeof insertPlannedActivitySchema>;
 
 export type PlannedActivityTask = typeof plannedActivityTasks.$inferSelect;
 export type InsertPlannedActivityTask = z.infer<typeof insertPlannedActivityTaskSchema>;
+
+export type MaterialMaster = typeof materialMaster.$inferSelect;
+export type InsertMaterialMaster = z.infer<typeof insertMaterialMasterSchema>;
+
+export type VendorMaster = typeof vendorMaster.$inferSelect;
+export type InsertVendorMaster = z.infer<typeof insertVendorMasterSchema>;
+
+export type EmployeeMaster = typeof employeeMaster.$inferSelect;
+export type InsertEmployeeMaster = z.infer<typeof insertEmployeeMasterSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

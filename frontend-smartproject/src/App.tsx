@@ -18,6 +18,9 @@ import TaskMaster from "@/pages/task-master";
 import ProjectLayout from "@/layouts/project-layout";
 import MasterLayout from "@/layouts/master-layout";
 import ResourceMaster from "@/pages/resource-master";
+import MaterialMaster from "@/pages/material-master";
+import VendorMaster from "@/pages/vendor-master";
+import EmployeeMaster from "@/pages/employee-master";
 import RiskRegister from "@/pages/risk-register";
 import ProjectDailyProgress from "@/pages/project-daily-progress";
 import ResourcePlan from "@/pages/resource-plan";
@@ -276,6 +279,15 @@ function Router() {
 
       {/* Resource Master */}
       <Route path="/resource-master" component={ResourceMaster} />
+
+      {/* Material Master */}
+      <Route path="/material-master" component={MaterialMaster} />
+
+      {/* Vendor Master */}
+      <Route path="/vendor-master" component={VendorMaster} />
+
+      {/* Employee Master */}
+      <Route path="/employee-master" component={EmployeeMaster} />
 
       {/* New Pages Ported from Vanilla JS */}
       <Route path="/newlanding" component={NewLanding} />

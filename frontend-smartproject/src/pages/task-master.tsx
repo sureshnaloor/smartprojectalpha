@@ -31,6 +31,32 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 import MasterLayout from "@/layouts/master-layout";
 
+const wavedPatternStyle = `
+  @keyframes wave {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-2px); }
+  }
+  .wavy-pattern {
+    position: relative;
+  }
+  .wavy-pattern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:rgba(107,114,128,0.08);stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:rgba(107,114,128,0.03);stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,20 Q15,10 30,20 T60,20' stroke='url(%23grad)' stroke-width='1.5' fill='none'/%3E%3Cpath d='M0,35 Q15,25 30,35 T60,35' stroke='url(%23grad)' stroke-width='1.5' fill='none'/%3E%3Cpath d='M0,50 Q15,40 30,50 T60,50' stroke='url(%23grad)' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wavy-pattern > * {
+    position: relative;
+    z-index: 1;
+  }
+`;
+
 // API functions
 async function getTasks(): Promise<Task[]> {
   const response = await fetch("/api/tasks");
@@ -166,7 +192,11 @@ export default function TaskMaster() {
 
   return (
     <MasterLayout>
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <style>{wavedPatternStyle}</style>
+      <div className="flex-1 space-y-4 p-8 pt-6 wavy-pattern" style={{
+        backgroundImage: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 25%, #f0f9ff 50%, #e0e7ff 75%, #f3f4f6 100%), url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3ClinearGradient id=\'grad\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'%3E%3Cstop offset=\'0%\' style=\'stop-color:rgba(107,114,128,0.08);stop-opacity:1\' /%3E%3Cstop offset=\'100%\' style=\'stop-color:rgba(107,114,128,0.03);stop-opacity:1\' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d=\'M0,20 Q15,10 30,20 T60,20\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,35 Q15,25 30,35 T60,35\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,50 Q15,40 30,50 T60,50\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3C/svg%3E")',
+        backgroundRepeat: 'repeat'
+      }}>
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">Task Master</h2>
           <div className="flex items-center space-x-2">
@@ -178,15 +208,25 @@ export default function TaskMaster() {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent style={{
+            backgroundImage: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)',
+            border: '1px solid rgba(107, 114, 128, 0.3)'
+          }}>
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle style={{
+                backgroundImage: 'linear-gradient(to right, rgb(107, 114, 128), rgb(148, 163, 184))',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 'bold'
+              }}>
                 {editingTask ? "Edit Task" : "Create New Task"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Task Name</Label>
+                <Label htmlFor="name" className="font-semibold text-gray-700">Task Name</Label>
                 <Input
                   id="name"
                   name="name"
@@ -195,7 +235,7 @@ export default function TaskMaster() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="font-semibold text-gray-700">Description</Label>
                 <Textarea
                   id="description"
                   name="description"
@@ -204,7 +244,7 @@ export default function TaskMaster() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="activityId">Activity</Label>
+                <Label htmlFor="activityId" className="font-semibold text-gray-700">Activity</Label>
                 <Select name="activityId" defaultValue={editingTask?.activityId.toString()}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select an activity" />
@@ -229,7 +269,7 @@ export default function TaskMaster() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status" className="font-semibold text-gray-700">Status</Label>
                 <Select name="status" defaultValue={editingTask?.status || "pending"}>
                   <SelectTrigger>
                     <SelectValue />
@@ -262,21 +302,28 @@ export default function TaskMaster() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border border-gray-300" style={{
+            boxShadow: '0 4px 6px -1px rgba(107, 114, 128, 0.1), 0 2px 4px -1px rgba(107, 114, 128, 0.06)'
+          }}>
             <Table>
-              <TableHeader>
+              <TableHeader style={{
+                backgroundImage: 'linear-gradient(to right, rgb(243, 244, 246), rgb(229, 231, 235))',
+              }}>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>Duration (min)</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="font-bold text-gray-900">Name</TableHead>
+                  <TableHead className="font-bold text-gray-900">Description</TableHead>
+                  <TableHead className="font-bold text-gray-900">Activity</TableHead>
+                  <TableHead className="font-bold text-gray-900">Duration (min)</TableHead>
+                  <TableHead className="font-bold text-gray-900">Status</TableHead>
+                  <TableHead className="font-bold text-gray-900">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map((task) => (
-                  <TableRow key={task.id}>
+                {tasks.map((task, index) => (
+                  <TableRow key={task.id} className={index % 2 === 0 ? "bg-gradient-to-r from-gray-50 to-slate-50" : "bg-gradient-to-r from-slate-50 to-sky-50"} style={{
+                    borderColor: 'rgba(107, 114, 128, 0.2)',
+                    transition: 'background-color 0.2s ease'
+                  }}>
                     <TableCell className="font-medium">{task.name}</TableCell>
                     <TableCell>{task.description}</TableCell>
                     <TableCell>{getActivityName(task.activityId)}</TableCell>

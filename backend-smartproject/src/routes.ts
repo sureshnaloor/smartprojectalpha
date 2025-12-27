@@ -44,7 +44,13 @@ import {
   insertIndirectManpowerEntrySchema,
   insertPlannedActivitySchema,
   insertPlannedActivityTaskSchema,
-  insertWorkPackageSchema
+  insertWorkPackageSchema,
+  insertMaterialMasterSchema,
+  insertVendorMasterSchema,
+  insertEmployeeMasterSchema,
+  materialMaster,
+  vendorMaster,
+  employeeMaster,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -4526,6 +4532,273 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await storage.deletePlannedActivityTask(id);
       res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // MATERIAL MASTER ROUTES
+  // ========================================
+
+  app.get("/api/material-masters", async (req: Request, res: Response) => {
+    try {
+      const materials = await db.select().from(materialMaster).orderBy(materialMaster.materialCode);
+      res.json(materials);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/material-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid material ID" });
+      }
+      const material = await db.select().from(materialMaster).where(eq(materialMaster.id, id));
+      if (material.length === 0) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json(material[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/material-masters", async (req: Request, res: Response) => {
+    try {
+      const materialData = insertMaterialMasterSchema.parse(req.body);
+      const [material] = await db.insert(materialMaster).values(materialData).returning();
+      res.status(201).json(material);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/material-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid material ID" });
+      }
+      const materialData = insertMaterialMasterSchema.partial().parse(req.body);
+      const [updatedMaterial] = await db
+        .update(materialMaster)
+        .set({ ...materialData, updatedAt: new Date() })
+        .where(eq(materialMaster.id, id))
+        .returning();
+      if (!updatedMaterial) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json(updatedMaterial);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/material-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid material ID" });
+      }
+      await db.delete(materialMaster).where(eq(materialMaster.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Bulk import material masters
+  app.post("/api/material-masters/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const materials = csvData.map((row: any) => insertMaterialMasterSchema.parse(row));
+      const createdMaterials = await db.insert(materialMaster).values(materials).returning();
+      res.status(201).json(createdMaterials);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // VENDOR MASTER ROUTES
+  // ========================================
+
+  app.get("/api/vendor-masters", async (req: Request, res: Response) => {
+    try {
+      const vendors = await db.select().from(vendorMaster).orderBy(vendorMaster.vendorCode);
+      res.json(vendors);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/vendor-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid vendor ID" });
+      }
+      const vendor = await db.select().from(vendorMaster).where(eq(vendorMaster.id, id));
+      if (vendor.length === 0) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json(vendor[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/vendor-masters", async (req: Request, res: Response) => {
+    try {
+      const vendorData = insertVendorMasterSchema.parse(req.body);
+      const [vendor] = await db.insert(vendorMaster).values(vendorData).returning();
+      res.status(201).json(vendor);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/vendor-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid vendor ID" });
+      }
+      const vendorData = insertVendorMasterSchema.partial().parse(req.body);
+      const [updatedVendor] = await db
+        .update(vendorMaster)
+        .set({ ...vendorData, updatedAt: new Date() })
+        .where(eq(vendorMaster.id, id))
+        .returning();
+      if (!updatedVendor) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json(updatedVendor);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/vendor-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid vendor ID" });
+      }
+      await db.delete(vendorMaster).where(eq(vendorMaster.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Bulk import vendor masters
+  app.post("/api/vendor-masters/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const vendors = csvData.map((row: any) => insertVendorMasterSchema.parse(row));
+      const createdVendors = await db.insert(vendorMaster).values(vendors).returning();
+      res.status(201).json(createdVendors);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // EMPLOYEE MASTER ROUTES
+  // ========================================
+
+  app.get("/api/employee-masters", async (req: Request, res: Response) => {
+    try {
+      const employees = await db.select().from(employeeMaster).orderBy(employeeMaster.employeeNumber);
+      res.json(employees);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/employee-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+      const employee = await db.select().from(employeeMaster).where(eq(employeeMaster.id, id));
+      if (employee.length === 0) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      res.json(employee[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/employee-masters", async (req: Request, res: Response) => {
+    try {
+      const employeeData = insertEmployeeMasterSchema.parse(req.body);
+      const [employee] = await db.insert(employeeMaster).values(employeeData).returning();
+      res.status(201).json(employee);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/employee-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+      const employeeData = insertEmployeeMasterSchema.partial().parse(req.body);
+      const [updatedEmployee] = await db
+        .update(employeeMaster)
+        .set({ ...employeeData, updatedAt: new Date() })
+        .where(eq(employeeMaster.id, id))
+        .returning();
+      if (!updatedEmployee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      res.json(updatedEmployee);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/employee-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+      await db.delete(employeeMaster).where(eq(employeeMaster.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Bulk import employee masters
+  app.post("/api/employee-masters/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const employees = csvData.map((row: any) => insertEmployeeMasterSchema.parse(row));
+      const createdEmployees = await db.insert(employeeMaster).values(employees).returning();
+      res.status(201).json(createdEmployees);
     } catch (err) {
       handleError(err, res);
     }

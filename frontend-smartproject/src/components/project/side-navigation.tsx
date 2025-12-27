@@ -518,6 +518,39 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                     </Link>
                   </li>
                   <li>
+                    <Link href={`/material-master`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                        isActive('/material-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/material-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Building2 className="mr-3 h-4 w-4" />
+                        <span>Material Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={`/vendor-master`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                        isActive('/vendor-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/vendor-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Building className="mr-3 h-4 w-4" />
+                        <span>Vendor Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={`/employee-master`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                        isActive('/employee-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/employee-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <UserPlus className="mr-3 h-4 w-4" />
+                        <span>Employee Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
                     <Link href="/newlanding">
                       <a className={cn(
                         "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",

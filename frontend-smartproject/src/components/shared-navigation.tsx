@@ -151,6 +151,24 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                     </button>
                     <button 
                       className="nav-link border-none bg-transparent p-0"
+                      onClick={() => handleNavClick('/material-master')}
+                    >
+                      Material Master
+                    </button>
+                    <button 
+                      className="nav-link border-none bg-transparent p-0"
+                      onClick={() => handleNavClick('/vendor-master')}
+                    >
+                      Vendor Master
+                    </button>
+                    <button 
+                      className="nav-link border-none bg-transparent p-0"
+                      onClick={() => handleNavClick('/employee-master')}
+                    >
+                      Employee Master
+                    </button>
+                    <button 
+                      className="nav-link border-none bg-transparent p-0"
                       onClick={() => handleNavClick('/collab')}
                     >
                       Collaboration

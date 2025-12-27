@@ -30,6 +30,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 
+const wavedPatternStyle = `
+  @keyframes wave {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-2px); }
+  }
+  .wavy-pattern {
+    position: relative;
+  }
+  .wavy-pattern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:rgba(20,184,166,0.08);stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:rgba(20,184,166,0.03);stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,20 Q15,10 30,20 T60,20' stroke='url(%23grad)' stroke-width='1.5' fill='none'/%3E%3Cpath d='M0,35 Q15,25 30,35 T60,35' stroke='url(%23grad)' stroke-width='1.5' fill='none'/%3E%3Cpath d='M0,50 Q15,40 30,50 T60,50' stroke='url(%23grad)' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wavy-pattern > * {
+    position: relative;
+    z-index: 1;
+  }
+`;
+
 // Resource type definitions
 type ResourceType = "manpower" | "equipment" | "rental_manpower" | "rental_equipment" | "tools";
 
@@ -221,7 +247,11 @@ export default function ResourceMaster() {
 
   return (
     <MasterLayout>
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <style>{wavedPatternStyle}</style>
+      <div className="flex-1 space-y-4 p-8 pt-6 wavy-pattern" style={{
+        backgroundImage: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 25%, #f0f9ff 50%, #e0e7ff 75%, #f3f4f6 100%), url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3ClinearGradient id=\'grad\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'%3E%3Cstop offset=\'0%\' style=\'stop-color:rgba(107,114,128,0.08);stop-opacity:1\' /%3E%3Cstop offset=\'100%\' style=\'stop-color:rgba(107,114,128,0.03);stop-opacity:1\' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d=\'M0,20 Q15,10 30,20 T60,20\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,35 Q15,25 30,35 T60,35\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,50 Q15,40 30,50 T60,50\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3C/svg%3E")',
+        backgroundRepeat: 'repeat'
+      }}>
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">Resource Master</h2>
           <div className="flex items-center space-x-2">
@@ -232,15 +262,25 @@ export default function ResourceMaster() {
                   Add Resource
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent style={{
+                backgroundImage: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)',
+                border: '1px solid rgba(107, 114, 128, 0.3)'
+              }}>
                 <DialogHeader>
-                  <DialogTitle>
+                  <DialogTitle style={{
+                    backgroundImage: 'linear-gradient(to right, rgb(107, 114, 128), rgb(148, 163, 184))',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: 'bold'
+                  }}>
                     {editingResource ? "Edit Resource" : "Create New Resource"}
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="type">Resource Type</Label>
+                    <Label htmlFor="type" className="font-semibold text-gray-700">Resource Type</Label>
                     <Select
                       value={formData.type}
                       onValueChange={(value) =>
@@ -260,7 +300,7 @@ export default function ResourceMaster() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="name">Resource Name</Label>
+                    <Label htmlFor="name" className="font-semibold text-gray-700">Resource Name</Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -271,7 +311,7 @@ export default function ResourceMaster() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description" className="font-semibold text-gray-700">Description</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
@@ -281,7 +321,7 @@ export default function ResourceMaster() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="unitOfMeasure">Unit of Measure</Label>
+                    <Label htmlFor="unitOfMeasure" className="font-semibold text-gray-700">Unit of Measure</Label>
                     <Input
                       id="unitOfMeasure"
                       value={formData.unitOfMeasure}
@@ -292,7 +332,7 @@ export default function ResourceMaster() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="unitRate">Unit Rate</Label>
+                    <Label htmlFor="unitRate" className="font-semibold text-teal-700">Unit Rate</Label>
                     <Input
                       id="unitRate"
                       type="number"
@@ -305,7 +345,7 @@ export default function ResourceMaster() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
+                    <Label htmlFor="currency" className="font-semibold text-teal-700">Currency</Label>
                     <Select
                       value={formData.currency}
                       onValueChange={(value) =>
@@ -323,7 +363,7 @@ export default function ResourceMaster() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="availability">Availability (%)</Label>
+                    <Label htmlFor="availability" className="font-semibold text-teal-700">Availability (%)</Label>
                     <Input
                       id="availability"
                       type="number"
@@ -338,7 +378,7 @@ export default function ResourceMaster() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="remarks">Remarks</Label>
+                    <Label htmlFor="remarks" className="font-semibold text-teal-700">Remarks</Label>
                     <Textarea
                       id="remarks"
                       value={formData.remarks}
@@ -365,23 +405,30 @@ export default function ResourceMaster() {
           </div>
         </div>
 
-        <div className="rounded-md border">
+        <div className="rounded-md border border-gray-200" style={{
+          boxShadow: '0 4px 6px -1px rgba(107, 114, 128, 0.1), 0 2px 4px -1px rgba(107, 114, 128, 0.06)'
+        }}>
           <Table>
-            <TableHeader>
+            <TableHeader style={{
+              backgroundImage: 'linear-gradient(to right, rgb(243, 244, 246), rgb(229, 231, 235))',
+            }}>
               <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Unit of Measure</TableHead>
-                <TableHead>Unit Rate</TableHead>
-                <TableHead>Currency</TableHead>
-                <TableHead>Availability</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="font-bold text-gray-900">Type</TableHead>
+                <TableHead className="font-bold text-gray-900">Name</TableHead>
+                <TableHead className="font-bold text-gray-900">Description</TableHead>
+                <TableHead className="font-bold text-gray-900">Unit of Measure</TableHead>
+                <TableHead className="font-bold text-gray-900">Unit Rate</TableHead>
+                <TableHead className="font-bold text-gray-900">Currency</TableHead>
+                <TableHead className="font-bold text-gray-900">Availability</TableHead>
+                <TableHead className="font-bold text-gray-900">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {resources.map((resource) => (
-                <TableRow key={resource.id}>
+              {resources.map((resource, index) => (
+                <TableRow key={resource.id} className={index % 2 === 0 ? "bg-gradient-to-r from-gray-50 to-slate-50" : "bg-gradient-to-r from-slate-50 to-sky-50"} style={{
+                  borderColor: 'rgba(107, 114, 128, 0.2)',
+                  transition: 'background-color 0.2s ease'
+                }}>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       resource.type === "manpower" ? "bg-blue-100 text-blue-800" :

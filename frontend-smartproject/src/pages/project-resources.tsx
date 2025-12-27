@@ -73,6 +73,7 @@ export default function ProjectResources() {
     const [draggedResource, setDraggedResource] = useState<Resource | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | null>(null);
+    const [quantity, setQuantity] = useState<string>("1");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingResource, setEditingResource] = useState<ProjectResource | null>(null);
 
@@ -144,6 +145,7 @@ export default function ProjectResources() {
             toast({ title: "Success", description: "Resource added to work package" });
             setDraggedResource(null);
             setDateRange(null);
+            setQuantity("1");
             setShowDatePicker(false);
         },
         onError: (error: Error) => {
@@ -243,6 +245,15 @@ export default function ProjectResources() {
             return;
         }
 
+        if (!quantity || parseFloat(quantity) <= 0) {
+            toast({ 
+                title: "Error", 
+                description: "Please enter a valid quantity", 
+                variant: "destructive" 
+            });
+            return;
+        }
+
         createMutation.mutate({
             wpId: selectedWpId,
             globalResourceId: draggedResource.id,
@@ -251,7 +262,7 @@ export default function ProjectResources() {
             type: draggedResource.type as "manpower" | "equipment" | "rental_manpower" | "rental_equipment" | "tools",
             unitOfMeasure: draggedResource.unitOfMeasure,
             unitRate: draggedResource.unitRate,
-            quantity: "1", // Default quantity
+            quantity: quantity,
             remarks: draggedResource.remarks,
             plannedStartDate: format(dateRange.from, "yyyy-MM-dd"),
             plannedEndDate: format(dateRange.to, "yyyy-MM-dd"),
@@ -378,27 +389,42 @@ export default function ProjectResources() {
                                 </div>
                             </div>
                         ) : showDatePicker && draggedResource ? (
-                            <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+                            <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
                                 <div className="text-center">
                                     <p className="font-semibold mb-2">Assign Resource: {draggedResource.name}</p>
-                                    <p className="text-sm text-muted-foreground mb-4 capitalize">
+                                    <p className="text-sm text-muted-foreground capitalize">
                                         Type: {draggedResource.type.replace("_", " ")}
                                     </p>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Select planned start and end dates
-                                    </p>
                                 </div>
-                                <div className="w-full max-w-md">
-                                    <DateRangePicker
-                                        value={dateRange || undefined}
-                                        onChange={setDateRange}
-                                        placeholder="Select date range"
-                                    />
+                                <div className="w-full max-w-md space-y-6">
+                                    <div>
+                                        <Label className="text-sm font-semibold mb-2 block">Quantity *</Label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={quantity}
+                                            onChange={(e) => setQuantity(e.target.value)}
+                                            placeholder="Enter quantity"
+                                            className="w-full"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Rate: {draggedResource.unitRate} / {draggedResource.unitOfMeasure}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-sm font-semibold mb-2 block">Date Range *</Label>
+                                        <DateRangePicker
+                                            value={dateRange || undefined}
+                                            onChange={setDateRange}
+                                            placeholder="Select date range"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         onClick={handleDateRangeConfirm}
-                                        disabled={!dateRange?.from || !dateRange?.to || createMutation.isPending}
+                                        disabled={!dateRange?.from || !dateRange?.to || !quantity || createMutation.isPending}
                                     >
                                         <CalendarIcon className="h-4 w-4 mr-2" />
                                         Confirm Assignment
@@ -409,6 +435,7 @@ export default function ProjectResources() {
                                             setShowDatePicker(false);
                                             setDraggedResource(null);
                                             setDateRange(null);
+                                            setQuantity("1");
                                         }}
                                     >
                                         Cancel

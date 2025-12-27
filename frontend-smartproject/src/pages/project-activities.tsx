@@ -75,6 +75,7 @@ export default function ProjectActivities() {
     const [draggedActivity, setDraggedActivity] = useState<Activity | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | null>(null);
+    const [quantity, setQuantity] = useState<string>("1");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingActivity, setEditingActivity] = useState<ProjectActivity | null>(null);
 
@@ -216,6 +217,15 @@ export default function ProjectActivities() {
             return;
         }
 
+        if (!quantity || parseFloat(quantity) <= 0) {
+            toast({ 
+                title: "Error", 
+                description: "Please enter a valid quantity", 
+                variant: "destructive" 
+            });
+            return;
+        }
+
         createMutation.mutate({
             wpId: selectedWpId,
             globalActivityId: draggedActivity.id,
@@ -223,7 +233,7 @@ export default function ProjectActivities() {
             description: draggedActivity.description,
             unitOfMeasure: draggedActivity.unitOfMeasure,
             unitRate: draggedActivity.unitRate,
-            quantity: "1", // Default quantity
+            quantity: quantity,
             remarks: draggedActivity.remarks,
             plannedFromDate: format(dateRange.from, "yyyy-MM-dd"),
             plannedToDate: format(dateRange.to, "yyyy-MM-dd"),
@@ -340,24 +350,42 @@ export default function ProjectActivities() {
                                 </div>
                             </div>
                         ) : showDatePicker && draggedActivity ? (
-                            <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+                            <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
                                 <div className="text-center">
                                     <p className="font-semibold mb-2">Assign Activity: {draggedActivity.name}</p>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Select planned start and end dates
+                                    <p className="text-sm text-muted-foreground">
+                                        {draggedActivity.unitOfMeasure ? `Unit: ${draggedActivity.unitOfMeasure}` : ""}
                                     </p>
                                 </div>
-                                <div className="w-full max-w-md">
-                                    <DateRangePicker
-                                        value={dateRange || undefined}
-                                        onChange={setDateRange}
-                                        placeholder="Select date range"
-                                    />
+                                <div className="w-full max-w-md space-y-6">
+                                    <div>
+                                        <Label className="text-sm font-semibold mb-2 block">Quantity *</Label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={quantity}
+                                            onChange={(e) => setQuantity(e.target.value)}
+                                            placeholder="Enter quantity"
+                                            className="w-full"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Rate: {draggedActivity.unitRate} / {draggedActivity.unitOfMeasure}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-sm font-semibold mb-2 block">Date Range *</Label>
+                                        <DateRangePicker
+                                            value={dateRange || undefined}
+                                            onChange={setDateRange}
+                                            placeholder="Select date range"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         onClick={handleDateRangeConfirm}
-                                        disabled={!dateRange?.from || !dateRange?.to || createMutation.isPending}
+                                        disabled={!dateRange?.from || !dateRange?.to || !quantity || createMutation.isPending}
                                     >
                                         <Calendar className="h-4 w-4 mr-2" />
                                         Confirm Assignment
@@ -368,6 +396,7 @@ export default function ProjectActivities() {
                                             setShowDatePicker(false);
                                             setDraggedActivity(null);
                                             setDateRange(null);
+                                            setQuantity("1");
                                         }}
                                     >
                                         Cancel

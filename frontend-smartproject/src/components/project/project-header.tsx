@@ -177,7 +177,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
             >
-              Dashboard
+              Tab1
             </a>
           </Link>
           <Link href={`/projects/${projectId}/wbs`}>
@@ -188,7 +188,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
             >
-              Work Breakdown
+              Tab2
             </a>
           </Link>
           <Link href={`/projects/${projectId}/schedule`}>
@@ -199,8 +199,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
             >
-              <GanttChart className="inline-block h-4 w-4 mr-1" />
-              Schedule
+              Tab3
             </a>
           </Link>
           <Link href={`/projects/${projectId}/costs`}>
@@ -211,8 +210,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
             >
-              <DollarSign className="inline-block h-4 w-4 mr-1" />
-              Cost Control
+              Tab4
             </a>
           </Link>
           <Link href={`/projects/${projectId}/reports`}>
@@ -223,8 +221,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
             >
-              <FileSpreadsheet className="inline-block h-4 w-4 mr-1" />
-              Reports
+              Tab5
             </a>
           </Link>
         </nav>
