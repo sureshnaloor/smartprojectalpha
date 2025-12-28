@@ -44,20 +44,33 @@ const Navigation = () => {
           <div className="flex items-center">
             <div className="font-display text-2xl font-bold gradient-text">ConstructPro</div>
           </div>
-          <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="nav-link" onClick={(e) => handleSmoothScroll(e, '#features')}>
-              Features
+          <div className="hidden md:flex items-center space-x-6">
+            <a href="#features" className="nav-link text-sm flex items-center gap-2" onClick={(e) => handleSmoothScroll(e, '#features')}>
+              <svg className="w-4 h-4 text-amber-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l.518 1.597a1 1 0 00.95.69h1.68c.969 0 1.371 1.24.588 1.81l-1.36.987a1 1 0 00-.364 1.118l.518 1.597c.3.921-.755 1.688-1.54 1.118l-1.36-.987a1 1 0 00-1.176 0l-1.36.987c-.784.57-1.84-.197-1.54-1.118l.518-1.597a1 1 0 00-.364-1.118L2.233 7.024c-.783-.57-.38-1.81.588-1.81h1.68a1 1 0 00.95-.69l.518-1.597z" />
+              </svg>
+              <span>Features</span>
             </a>
-            <a href="#demo" className="nav-link" onClick={(e) => handleSmoothScroll(e, '#demo')}>
-              Demo
+            <a href="#demo" className="nav-link text-sm flex items-center gap-2" onClick={(e) => handleSmoothScroll(e, '#demo')}>
+              <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M4.018 14L14.41 9 4.018 4z" />
+              </svg>
+              <span>Demo</span>
             </a>
-            <a href="#pricing" className="nav-link" onClick={(e) => handleSmoothScroll(e, '#pricing')}>
-              Pricing
+            <a href="#pricing" className="nav-link text-sm flex items-center gap-2" onClick={(e) => handleSmoothScroll(e, '#pricing')}>
+              <svg className="w-4 h-4 text-sky-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M11 17a1 1 0 01-1 1H6a2 2 0 01-2-2v-5a1 1 0 011-1h5a2 2 0 012 2v5z" />
+                <path d="M15 7a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span>Pricing</span>
             </a>
-            <a href="#contact" className="nav-link" onClick={(e) => handleSmoothScroll(e, '#contact')}>
-              Contact
+            <a href="#contact" className="nav-link text-sm flex items-center gap-2" onClick={(e) => handleSmoothScroll(e, '#contact')}>
+              <svg className="w-4 h-4 text-rose-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M2.94 6.94a10 10 0 1114.12 0L10 13.99 2.94 6.94z" />
+              </svg>
+              <span>Contact</span>
             </a>
-            <button className="btn-primary" onClick={handleRequestDemo}>
+            <button className="btn-primary text-sm px-3 py-1.5" onClick={handleRequestDemo}>
               Request Demo
             </button>
           </div>
@@ -78,31 +91,44 @@ const Navigation = () => {
           <div className="space-y-2">
             <a 
               href="#features" 
-              className="block py-2 text-gray-700 hover:text-orange-600"
+              className="block py-2 text-gray-700 hover:text-orange-600 flex items-center gap-2 text-sm"
               onClick={(e) => handleSmoothScroll(e, '#features')}
             >
-              Features
+              <svg className="w-4 h-4 text-amber-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l.518 1.597a1 1 0 00.95.69h1.68c.969 0 1.371 1.24.588 1.81l-1.36.987a1 1 0 00-.364 1.118l.518 1.597c.3.921-.755 1.688-1.54 1.118l-1.36-.987a1 1 0 00-1.176 0l-1.36.987c-.784.57-1.84-.197-1.54-1.118l.518-1.597a1 1 0 00-.364-1.118L2.233 7.024c-.783-.57-.38-1.81.588-1.81h1.68a1 1 0 00.95-.69l.518-1.597z" />
+              </svg>
+              <span>Features</span>
             </a>
             <a 
               href="#demo" 
-              className="block py-2 text-gray-700 hover:text-orange-600"
+              className="block py-2 text-gray-700 hover:text-orange-600 flex items-center gap-2 text-sm"
               onClick={(e) => handleSmoothScroll(e, '#demo')}
             >
-              Demo
+              <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M4.018 14L14.41 9 4.018 4z" />
+              </svg>
+              <span>Demo</span>
             </a>
             <a 
               href="#pricing" 
-              className="block py-2 text-gray-700 hover:text-orange-600"
+              className="block py-2 text-gray-700 hover:text-orange-600 flex items-center gap-2 text-sm"
               onClick={(e) => handleSmoothScroll(e, '#pricing')}
             >
-              Pricing
+              <svg className="w-4 h-4 text-sky-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M11 17a1 1 0 01-1 1H6a2 2 0 01-2-2v-5a1 1 0 011-1h5a2 2 0 012 2v5z" />
+                <path d="M15 7a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span>Pricing</span>
             </a>
             <a 
               href="#contact" 
-              className="block py-2 text-gray-700 hover:text-orange-600"
+              className="block py-2 text-gray-700 hover:text-orange-600 flex items-center gap-2 text-sm"
               onClick={(e) => handleSmoothScroll(e, '#contact')}
             >
-              Contact
+              <svg className="w-4 h-4 text-rose-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path d="M2.94 6.94a10 10 0 1114.12 0L10 13.99 2.94 6.94z" />
+              </svg>
+              <span>Contact</span>
             </a>
             <button className="btn-primary w-full mt-4" onClick={handleRequestDemo}>
               Request Demo
