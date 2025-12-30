@@ -30,6 +30,7 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
   };
 
   // Check if current page is a wiki or document page
+  // Note: collab is excluded from isWikiPage so it can use ProjectHeader with tabs
   const isWikiPage = location.includes('/under-construction/ProjectDailyProgress') ||
     location.includes('/under-construction/ProjectDailyResourceDeployed') ||
     location.includes('/under-construction/RiskRegister') ||
@@ -44,8 +45,7 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
     location.includes('/lesson-learnt-register') ||
     location.includes('/direct-manpower-list') ||
     location.includes('/indirect-manpower-list') ||
-    location.includes('/planned-activity-tasks') ||
-    location.includes('/collab');
+    location.includes('/planned-activity-tasks');
 
   const isDocumentPage = location.includes('/under-construction/ProjectDrawings') ||
     location.includes('/under-construction/ProjectBOQ') ||

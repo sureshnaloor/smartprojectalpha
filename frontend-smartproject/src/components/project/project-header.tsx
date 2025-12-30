@@ -30,6 +30,27 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const isMobile = useMobile();
 
+  // Detect the current route context (activities, tasks, resources, collab)
+  // Extract the base path from the current location
+  const getRouteContext = () => {
+    // Check if we're on a page route (e.g., /activities/page1, /tasks/page2, /resources/page3, /collab/page1)
+    const pageMatch = location.match(/\/projects\/\d+\/(activities|tasks|resources|collab)\/page\d+/);
+    if (pageMatch) {
+      return pageMatch[1]; // Return 'activities', 'tasks', 'resources', or 'collab'
+    }
+    
+    // Check if we're on the base route (e.g., /activities, /tasks, /resources, /collab)
+    const baseMatch = location.match(/\/projects\/\d+\/(activities|tasks|resources|collab)(?:\/|$)/);
+    if (baseMatch) {
+      return baseMatch[1]; // Return 'activities', 'tasks', 'resources', or 'collab'
+    }
+    
+    // Default to 'resources' if no match found
+    return 'resources';
+  };
+
+  const routeContext = getRouteContext();
+
   // Fetch project data
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
     queryKey: [`/api/projects/${projectId}`],
@@ -169,10 +190,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
       {/* Navigation Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-6 px-4 sm:px-6 overflow-x-auto">
-          <Link href={`/projects/${projectId}/resources/page1`}>
+          <Link href={`/projects/${projectId}/${routeContext}/page1`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/resources/page1`
+                location === `/projects/${projectId}/${routeContext}/page1`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -180,10 +201,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab1
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/resources/page2`}>
+          <Link href={`/projects/${projectId}/${routeContext}/page2`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/resources/page2`
+                location === `/projects/${projectId}/${routeContext}/page2`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -191,10 +212,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab2
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/resources/page3`}>
+          <Link href={`/projects/${projectId}/${routeContext}/page3`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/resources/page3`
+                location === `/projects/${projectId}/${routeContext}/page3`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -202,10 +223,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab3
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/resources/page4`}>
+          <Link href={`/projects/${projectId}/${routeContext}/page4`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/resources/page4`
+                location === `/projects/${projectId}/${routeContext}/page4`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -213,10 +234,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab4
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/resources/page5`}>
+          <Link href={`/projects/${projectId}/${routeContext}/page5`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/resources/page5`
+                location === `/projects/${projectId}/${routeContext}/page5`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}

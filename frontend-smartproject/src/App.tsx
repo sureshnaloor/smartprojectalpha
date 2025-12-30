@@ -39,6 +39,20 @@ import ProjectResourcesPage2 from "@/pages/project-resources-page2";
 import ProjectResourcesPage3 from "@/pages/project-resources-page3";
 import ProjectResourcesPage4 from "@/pages/project-resources-page4";
 import ProjectResourcesPage5 from "@/pages/project-resources-page5";
+import ProjectActivitiesPage1 from "@/pages/project-activities-page1";
+import ProjectActivitiesPage2 from "@/pages/project-activities-page2";
+import ProjectActivitiesPage3 from "@/pages/project-activities-page3";
+import ProjectActivitiesPage4 from "@/pages/project-activities-page4";
+import ProjectActivitiesPage5 from "@/pages/project-activities-page5";
+import ProjectTasksPage1 from "@/pages/project-tasks-page1";
+import ProjectTasksPage2 from "@/pages/project-tasks-page2";
+import ProjectTasksPage3 from "@/pages/project-tasks-page3";
+import ProjectTasksPage4 from "@/pages/project-tasks-page4";
+import ProjectTasksPage5 from "@/pages/project-tasks-page5";
+import ProjectCollabPage2 from "@/pages/project-collab-page2";
+import ProjectCollabPage3 from "@/pages/project-collab-page3";
+import ProjectCollabPage4 from "@/pages/project-collab-page4";
+import ProjectCollabPage5 from "@/pages/project-collab-page5";
 import ProjectDrawings from "@/pages/project-drawings";
 import ProjectBoq from "@/pages/project-boq";
 import ProjectScope from "@/pages/project-scope";
@@ -250,11 +264,93 @@ function Router() {
         )}
       </Route>
 
+      {/* Project Activities - Tab Pages */}
+      <Route path="/projects/:projectId/activities/page1">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectActivitiesPage1 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/activities/page2">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectActivitiesPage2 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/activities/page3">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectActivitiesPage3 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/activities/page4">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectActivitiesPage4 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/activities/page5">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectActivitiesPage5 />
+          </ProjectLayout>
+        )}
+      </Route>
+
       {/* Project Activities */}
       <Route path="/projects/:projectId/activities">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectActivities />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      {/* Project Tasks - Tab Pages */}
+      <Route path="/projects/:projectId/tasks/page1">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectTasksPage1 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/tasks/page2">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectTasksPage2 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/tasks/page3">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectTasksPage3 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/tasks/page4">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectTasksPage4 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/tasks/page5">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectTasksPage5 />
           </ProjectLayout>
         )}
       </Route>
@@ -365,17 +461,60 @@ function Router() {
           <ThreadDetailPage />
         </MasterLayout>
       </Route>
-      <Route path="/projects/:projectId/collab">
+
+      {/* Project Collaboration Hub - Tab Pages */}
+      <Route path="/projects/:projectId/collab/page1">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <CollabPage />
           </ProjectLayout>
         )}
       </Route>
+
+      <Route path="/projects/:projectId/collab/page2">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectCollabPage2 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/collab/page3">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectCollabPage3 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/collab/page4">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectCollabPage4 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/collab/page5">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectCollabPage5 />
+          </ProjectLayout>
+        )}
+      </Route>
+
       <Route path="/projects/:projectId/collab/thread/:threadId">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ThreadDetailPage />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/collab">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <CollabPage />
           </ProjectLayout>
         )}
       </Route>
