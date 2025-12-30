@@ -551,6 +551,17 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                     </Link>
                   </li>
                   <li>
+                    <Link href={`/equipment-master`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                        isActive('/equipment-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/equipment-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <UserPlus className="mr-3 h-4 w-4" />
+                        <span>Equipment Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
                     <Link href="/newlanding">
                       <a className={cn(
                         "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",

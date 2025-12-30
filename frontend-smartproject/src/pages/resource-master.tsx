@@ -27,7 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 
 const wavedPatternStyle = `
@@ -105,6 +105,16 @@ async function deleteResource(id: number): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) throw new Error("Failed to delete resource");
+}
+
+async function bulkUploadResources(csvData: any[]): Promise<Resource[]> {
+  const response = await fetch("/api/resources/bulk-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csvData }),
+  });
+  if (!response.ok) throw new Error("Failed to upload resources");
+  return response.json();
 }
 
 export default function ResourceMaster() {
@@ -188,6 +198,51 @@ export default function ResourceMaster() {
       });
     },
   });
+
+  // Bulk upload mutation for CSV imports
+  const bulkUploadMutation = useMutation({
+    mutationFn: bulkUploadResources,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["resources"] });
+      toast({ title: `${data.length} resources uploaded successfully` });
+    },
+    onError: () => {
+      toast({ title: "Error uploading resources", variant: "destructive" });
+    },
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const csv = event.target?.result as string;
+        const lines = csv.split("\n").filter((line) => line.trim());
+        const headers = lines[0].split(",").map((h) => h.trim());
+
+        const csvData = lines.slice(1).map((line) => {
+          const values = line.split(",").map((v) => v.trim());
+          return {
+            type: values[headers.indexOf("type")],
+            name: values[headers.indexOf("name")],
+            description: values[headers.indexOf("description")] || "",
+            unitOfMeasure: values[headers.indexOf("unitOfMeasure")],
+            unitRate: values[headers.indexOf("unitRate")] || "0",
+            currency: values[headers.indexOf("currency")] || "USD",
+            availability: values[headers.indexOf("availability")] || "0",
+            remarks: values[headers.indexOf("remarks")] || "",
+          };
+        });
+
+        bulkUploadMutation.mutate(csvData);
+      } catch (error) {
+        toast({ title: "Error parsing CSV file", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Form handlers
   const handleSubmit = (e: React.FormEvent) => {
@@ -402,6 +457,38 @@ export default function ResourceMaster() {
                 </form>
               </DialogContent>
             </Dialog>
+
+            <Button 
+              variant="outline"
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href = "/templates/resource-master-template.csv";
+                link.download = "resource-master-template.csv";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="gap-2"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Template
+            </Button>
+
+            <label>
+              <Button variant="outline" asChild>
+                <span>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={bulkUploadMutation.isPending}
+              />
+            </label>
           </div>
         </div>
 

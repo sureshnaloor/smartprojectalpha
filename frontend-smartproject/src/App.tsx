@@ -21,6 +21,7 @@ import ResourceMaster from "@/pages/resource-master";
 import MaterialMaster from "@/pages/material-master";
 import VendorMaster from "@/pages/vendor-master";
 import EmployeeMaster from "@/pages/employee-master";
+import EquipmentMaster from "@/pages/equipment-master";
 import RiskRegister from "@/pages/risk-register";
 import ProjectDailyProgress from "@/pages/project-daily-progress";
 import ResourcePlan from "@/pages/resource-plan";
@@ -33,6 +34,11 @@ import ThreadDetailPage from "@/pages/thread-detail";
 import ProjectActivities from "@/pages/project-activities";
 import ProjectTasks from "@/pages/project-tasks";
 import ProjectResources from "@/pages/project-resources";
+import ProjectResourcesPage1 from "@/pages/project-resources-page1";
+import ProjectResourcesPage2 from "@/pages/project-resources-page2";
+import ProjectResourcesPage3 from "@/pages/project-resources-page3";
+import ProjectResourcesPage4 from "@/pages/project-resources-page4";
+import ProjectResourcesPage5 from "@/pages/project-resources-page5";
 import ProjectDrawings from "@/pages/project-drawings";
 import ProjectBoq from "@/pages/project-boq";
 import ProjectScope from "@/pages/project-scope";
@@ -262,7 +268,56 @@ function Router() {
         )}
       </Route>
 
+      {/* Project Resources - Tab Pages */}
+      <Route path="/projects/:projectId/resources/page1">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResourcesPage1 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/resources/page2">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResourcesPage2 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/resources/page3">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResourcesPage3 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/resources/page4">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResourcesPage4 />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/resources/page5">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResourcesPage5 />
+          </ProjectLayout>
+        )}
+      </Route>
+
       {/* Project Resources */}
+      <Route path="/projects/:projectId/resources/:type">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectResources />
+          </ProjectLayout>
+        )}
+      </Route>
+
       <Route path="/projects/:projectId/resources">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
@@ -288,6 +343,9 @@ function Router() {
 
       {/* Employee Master */}
       <Route path="/employee-master" component={EmployeeMaster} />
+
+      {/* Equipment Master */}
+      <Route path="/equipment-master" component={EquipmentMaster} />
 
       {/* New Pages Ported from Vanilla JS */}
       <Route path="/newlanding" component={NewLanding} />

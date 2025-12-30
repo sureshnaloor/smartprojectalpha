@@ -46,8 +46,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
+import { EmployeeResourceMapper } from "@/components/project/employee-resource-mapper";
 
 interface Employee {
   id: number;
@@ -502,6 +503,22 @@ export default function EmployeeMaster() {
                 </DialogContent>
               </Dialog>
 
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.href = "/templates/employee-master-template.csv";
+                  link.download = "employee-master-template.csv";
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="gap-2"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Template
+              </Button>
+
               <label>
                 <Button variant="outline" asChild>
                   <span>
@@ -568,6 +585,10 @@ export default function EmployeeMaster() {
                         <TableCell>{parseFloat(employee.empCostPerHour).toFixed(2)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <EmployeeResourceMapper
+                              employeeId={employee.id}
+                              employeeName={`${employee.empFirstName} ${employee.empLastName}`}
+                            />
                             <button
                               onClick={() => handleEdit(employee)}
                               className="p-1 hover:bg-gray-100 rounded"

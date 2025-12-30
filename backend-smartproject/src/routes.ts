@@ -48,9 +48,16 @@ import {
   insertMaterialMasterSchema,
   insertVendorMasterSchema,
   insertEmployeeMasterSchema,
+  insertEmployeeResourceMappingSchema,
+  insertEquipmentMasterSchema,
+  insertEquipmentResourceMappingSchema,
   materialMaster,
   vendorMaster,
   employeeMaster,
+  employeeResourceMappings,
+  equipmentMaster,
+  equipmentResourceMappings,
+  resources,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -4799,6 +4806,374 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employees = csvData.map((row: any) => insertEmployeeMasterSchema.parse(row));
       const createdEmployees = await db.insert(employeeMaster).values(employees).returning();
       res.status(201).json(createdEmployees);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get all manpower type resources for the mapping dialog
+  app.get("/api/resources/manpower/all", async (req: Request, res: Response) => {
+    try {
+      const manpowerResources = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.type, "manpower"));
+      res.json(manpowerResources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get resource mapping for an employee
+  app.get("/api/employee/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      const mapping = await db
+        .select()
+        .from(employeeResourceMappings)
+        .where(eq(employeeResourceMappings.employeeId, employeeId));
+
+      if (mapping.length === 0) {
+        return res.json(null);
+      }
+
+      res.json(mapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Create or update resource mapping for an employee (one-to-one)
+  app.post("/api/employee/:id/map-resource", async (req: Request, res: Response) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      const mappingData = insertEmployeeResourceMappingSchema.parse({
+        employeeId,
+        resourceId: req.body.resourceId,
+      });
+
+      // Check if employee exists
+      const employee = await db
+        .select()
+        .from(employeeMaster)
+        .where(eq(employeeMaster.id, employeeId));
+
+      if (employee.length === 0) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      // Check if resource exists
+      const resource = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, mappingData.resourceId));
+
+      if (resource.length === 0) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+
+      // Check if resource is of type manpower
+      if (resource[0].type !== "manpower") {
+        return res.status(400).json({ message: "Resource must be of type 'manpower'" });
+      }
+
+      // Check if mapping already exists for this employee
+      const existingMapping = await db
+        .select()
+        .from(employeeResourceMappings)
+        .where(eq(employeeResourceMappings.employeeId, employeeId));
+
+      if (existingMapping.length > 0) {
+        // Update existing mapping
+        const updatedMapping = await db
+          .update(employeeResourceMappings)
+          .set({
+            resourceId: mappingData.resourceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(employeeResourceMappings.employeeId, employeeId))
+          .returning();
+        return res.json(updatedMapping[0]);
+      }
+
+      // Create new mapping
+      const newMapping = await db
+        .insert(employeeResourceMappings)
+        .values(mappingData)
+        .returning();
+      res.status(201).json(newMapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Delete resource mapping for an employee
+  app.delete("/api/employee/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      const result = await db
+        .delete(employeeResourceMappings)
+        .where(eq(employeeResourceMappings.employeeId, employeeId))
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+
+      res.json({ message: "Mapping deleted successfully", deletedMapping: result[0] });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ===== EQUIPMENT MASTER ENDPOINTS =====
+
+  app.get("/api/equipment-masters", async (req: Request, res: Response) => {
+    try {
+      const equipment = await db.select().from(equipmentMaster);
+      res.json(equipment);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/equipment-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid equipment ID" });
+      }
+
+      const equipment = await db
+        .select()
+        .from(equipmentMaster)
+        .where(eq(equipmentMaster.id, id));
+
+      if (equipment.length === 0) {
+        return res.status(404).json({ message: "Equipment not found" });
+      }
+
+      res.json(equipment[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/equipment-masters", async (req: Request, res: Response) => {
+    try {
+      const equipmentData = insertEquipmentMasterSchema.parse(req.body);
+      const equipment = await db
+        .insert(equipmentMaster)
+        .values(equipmentData)
+        .returning();
+      res.status(201).json(equipment[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/equipment-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid equipment ID" });
+      }
+
+      const equipmentData = insertEquipmentMasterSchema.partial().parse(req.body);
+      const equipment = await db
+        .update(equipmentMaster)
+        .set(equipmentData)
+        .where(eq(equipmentMaster.id, id))
+        .returning();
+
+      if (equipment.length === 0) {
+        return res.status(404).json({ message: "Equipment not found" });
+      }
+
+      res.json(equipment[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/equipment-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid equipment ID" });
+      }
+
+      const result = await db
+        .delete(equipmentMaster)
+        .where(eq(equipmentMaster.id, id))
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Equipment not found" });
+      }
+
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/equipment-masters/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const equipmentList = csvData.map((row: any) =>
+        insertEquipmentMasterSchema.parse(row)
+      );
+      const createdEquipment = await db
+        .insert(equipmentMaster)
+        .values(equipmentList)
+        .returning();
+      res.status(201).json(createdEquipment);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ===== EQUIPMENT RESOURCE MAPPING ENDPOINTS =====
+
+  // Get all equipment type resources for the mapping dialog
+  app.get("/api/resources/equipment/all", async (req: Request, res: Response) => {
+    try {
+      const equipmentResources = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.type, "equipment"));
+      res.json(equipmentResources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get resource mapping for equipment
+  app.get("/api/equipment/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const equipmentId = parseInt(req.params.id);
+      if (isNaN(equipmentId)) {
+        return res.status(400).json({ message: "Invalid equipment ID" });
+      }
+
+      const mapping = await db
+        .select()
+        .from(equipmentResourceMappings)
+        .where(eq(equipmentResourceMappings.equipmentId, equipmentId));
+
+      if (mapping.length === 0) {
+        return res.json(null);
+      }
+
+      res.json(mapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Create or update resource mapping for equipment (one-to-one)
+  app.post("/api/equipment/:id/map-resource", async (req: Request, res: Response) => {
+    try {
+      const equipmentId = parseInt(req.params.id);
+      if (isNaN(equipmentId)) {
+        return res.status(400).json({ message: "Invalid equipment ID" });
+      }
+
+      const mappingData = insertEquipmentResourceMappingSchema.parse({
+        equipmentId,
+        resourceId: req.body.resourceId,
+      });
+
+      // Check if equipment exists
+      const equipment = await db
+        .select()
+        .from(equipmentMaster)
+        .where(eq(equipmentMaster.id, equipmentId));
+
+      if (equipment.length === 0) {
+        return res.status(404).json({ message: "Equipment not found" });
+      }
+
+      // Check if resource exists
+      const resource = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, mappingData.resourceId));
+
+      if (resource.length === 0) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+
+      // Check if resource is of type equipment
+      if (resource[0].type !== "equipment") {
+        return res.status(400).json({ message: "Resource must be of type 'equipment'" });
+      }
+
+      // Check if mapping already exists for this equipment
+      const existingMapping = await db
+        .select()
+        .from(equipmentResourceMappings)
+        .where(eq(equipmentResourceMappings.equipmentId, equipmentId));
+
+      if (existingMapping.length > 0) {
+        // Update existing mapping
+        const updatedMapping = await db
+          .update(equipmentResourceMappings)
+          .set({
+            resourceId: mappingData.resourceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(equipmentResourceMappings.equipmentId, equipmentId))
+          .returning();
+        return res.json(updatedMapping[0]);
+      }
+
+      // Create new mapping
+      const newMapping = await db
+        .insert(equipmentResourceMappings)
+        .values(mappingData)
+        .returning();
+      res.status(201).json(newMapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Delete resource mapping for equipment
+  app.delete("/api/equipment/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const equipmentId = parseInt(req.params.id);
+      if (isNaN(equipmentId)) {
+        return res.status(400).json({ message: "Invalid equipment ID" });
+      }
+
+      const result = await db
+        .delete(equipmentResourceMappings)
+        .where(eq(equipmentResourceMappings.equipmentId, equipmentId))
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+
+      res.json({ message: "Mapping deleted successfully", deletedMapping: result[0] });
     } catch (err) {
       handleError(err, res);
     }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -64,6 +64,16 @@ interface ActivityFormData {
   unitRate: number;
   currency: "USD" | "EUR" | "GBP" | "SAR";
   remarks: string;
+}
+
+async function bulkUploadActivities(csvData: any[]): Promise<Activity[]> {
+  const response = await fetch("/api/activities/bulk-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csvData }),
+  });
+  if (!response.ok) throw new Error("Failed to upload activities");
+  return response.json();
 }
 
 export default function ActivityMaster() {
@@ -140,6 +150,50 @@ export default function ActivityMaster() {
       toast.error("Failed to delete activity");
     },
   });
+
+  // Bulk upload for activities
+  const bulkUploadMutation = useMutation({
+    mutationFn: bulkUploadActivities,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      toast.success(`${data.length} activities uploaded successfully`);
+      setLocation('/activity-master');
+    },
+    onError: () => {
+      toast.error("Failed to upload activities");
+    },
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const csv = event.target?.result as string;
+        const lines = csv.split('\n').filter((line) => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim());
+
+        const csvData = lines.slice(1).map((line) => {
+          const values = line.split(',').map(v => v.trim());
+          return {
+            name: values[headers.indexOf('name')],
+            description: values[headers.indexOf('description')] || null,
+            unitOfMeasure: values[headers.indexOf('unitOfMeasure')],
+            unitRate: parseFloat(values[headers.indexOf('unitRate')] || '0'),
+            currency: values[headers.indexOf('currency')] || 'USD',
+            remarks: values[headers.indexOf('remarks')] || null,
+          };
+        });
+
+        bulkUploadMutation.mutate(csvData);
+      } catch (err) {
+        toast.error('Failed to parse CSV');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Filter activities based on search query
   const filteredActivities = activities.filter((activity) =>
@@ -298,6 +352,37 @@ export default function ActivityMaster() {
                 </form>
               </DialogContent>
             </Dialog>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href = "/templates/activity-master-template.csv";
+                link.download = "activity-master-template.csv";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="gap-2"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Template
+            </Button>
+
+            <label>
+              <Button variant="outline" asChild>
+                <span>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={bulkUploadMutation.isPending}
+              />
+            </label>
           </div>
         </div>
 

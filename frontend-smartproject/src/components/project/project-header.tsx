@@ -169,10 +169,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
       {/* Navigation Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-6 px-4 sm:px-6 overflow-x-auto">
-          <Link href={`/projects/${projectId}`}>
+          <Link href={`/projects/${projectId}/resources/page1`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}`
+                location === `/projects/${projectId}/resources/page1`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -180,10 +180,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab1
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/wbs`}>
+          <Link href={`/projects/${projectId}/resources/page2`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/wbs`
+                location === `/projects/${projectId}/resources/page2`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -191,10 +191,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab2
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/schedule`}>
+          <Link href={`/projects/${projectId}/resources/page3`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/schedule`
+                location === `/projects/${projectId}/resources/page3`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -202,10 +202,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab3
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/costs`}>
+          <Link href={`/projects/${projectId}/resources/page4`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/costs`
+                location === `/projects/${projectId}/resources/page4`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
@@ -213,10 +213,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
               Tab4
             </a>
           </Link>
-          <Link href={`/projects/${projectId}/reports`}>
+          <Link href={`/projects/${projectId}/resources/page5`}>
             <a
               className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/reports`
+                location === `/projects/${projectId}/resources/page5`
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}

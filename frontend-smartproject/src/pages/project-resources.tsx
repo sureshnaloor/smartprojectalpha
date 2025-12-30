@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { get, post, put, del } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, GripVertical, Pencil, Search, X, Calendar as CalendarIcon } from "lucide-react";
+import { Trash2, GripVertical, Pencil, Search, X, Calendar as CalendarIcon, Layers, Truck, Users, Hammer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -65,9 +65,11 @@ interface ProjectResource {
 }
 
 export default function ProjectResources() {
-    const { projectId } = useParams();
+    const { projectId, type } = useParams();
+    const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const [activeTab, setActiveTab] = useState<string | null>(type || "all");
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedWpId, setSelectedWpId] = useState<number | null>(null);
     const [draggedResource, setDraggedResource] = useState<Resource | null>(null);
@@ -274,10 +276,16 @@ export default function ProjectResources() {
     };
 
     const filteredGlobalResources = globalResources.filter(resource =>
-        resource.name.toLowerCase().includes(searchTerm.toLowerCase())
+        resource.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        (activeTab === "all" || activeTab === null ? true : resource.type === activeTab)
     );
 
     const selectedWorkPackage = workPackages.find(wp => wp.id === selectedWpId);
+
+    useEffect(() => {
+        // sync activeTab with URL param changes
+        setActiveTab(type || "all");
+    }, [type]);
 
     return (
         <div className="flex h-[calc(100vh-4rem)] gap-4 p-4">
@@ -285,6 +293,31 @@ export default function ProjectResources() {
             <Card className="w-80 flex flex-col">
                 <CardHeader>
                     <CardTitle>Global Resources</CardTitle>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        {[
+                            { key: 'all', label: 'All', icon: Layers },
+                            { key: 'equipment', label: 'Equipment', icon: Truck },
+                            { key: 'manpower', label: 'Manpower', icon: Users },
+                            { key: 'tools', label: 'Tools', icon: Hammer },
+                            { key: 'rental_manpower', label: 'Rental Manpower', icon: Users },
+                            { key: 'rental_equipment', label: 'Rental Equipment', icon: Truck },
+                        ].map(tab => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.key}
+                                    title={tab.label}
+                                    onClick={() => {
+                                        setActiveTab(tab.key);
+                                        if (projectId) setLocation(`/projects/${projectId}/resources/${tab.key}`);
+                                    }}
+                                    className={`flex items-center justify-center h-8 w-8 rounded-md border ${activeTab === tab.key ? 'bg-primary text-white border-transparent' : 'bg-white'} hover:bg-primary/10`}
+                                >
+                                    <Icon className="h-4 w-4" />
+                                </button>
+                            )
+                        })}
+                    </div>
                     <p className="text-xs text-muted-foreground">Manpower, Equipment, Rental & Tools</p>
                     <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />

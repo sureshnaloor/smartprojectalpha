@@ -34,7 +34,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 
 interface Vendor {
@@ -619,6 +619,22 @@ export default function VendorMaster() {
                   </form>
                 </DialogContent>
               </Dialog>
+
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.href = "/templates/vendor-master-template.csv";
+                  link.download = "vendor-master-template.csv";
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="gap-2"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Template
+              </Button>
 
               <label>
                 <Button variant="outline" asChild>

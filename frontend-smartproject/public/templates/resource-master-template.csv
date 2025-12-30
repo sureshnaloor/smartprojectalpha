@@ -1,0 +1,9 @@
+name,description,type,unitOfMeasure,unitRate,currency,availability,remarks
+Skilled Labor Force,Professional construction workers,manpower,hours,85.00,USD,80,Available for long-term contracts
+Heavy Equipment Operator,Trained equipment operators,manpower,hours,95.00,USD,75,Certified with safety training
+Mobile Crane Service,20-ton mobile crane for lifting,equipment,days,1200.00,USD,60,Available on call
+Temporary Workforce,Unskilled labor for general work,rental_manpower,hours,35.00,USD,90,Peak season availability
+Generator Rental,Diesel generators 100-500 kVA,rental_equipment,days,350.00,USD,70,Complete with fuel and maintenance
+Concrete Pumping Service,Concrete pump truck rental,rental_equipment,days,450.00,USD,65,Includes operator and delivery
+Safety Equipment Package,Helmets scaffolding harnesses,tools,months,500.00,USD,85,Regular inspection and certification
+Power Tools Set,Drills saws nail guns,tools,weeks,250.00,USD,95,All tools insured and maintained

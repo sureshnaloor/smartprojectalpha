@@ -54,7 +54,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 
 interface Material {
@@ -400,21 +400,37 @@ export default function MaterialMaster() {
                 </DialogContent>
               </Dialog>
 
-              <label>
-                <Button variant="outline" asChild>
-                  <span>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Import CSV
-                  </span>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = "/templates/material-master-template.csv";
+                    link.download = "material-master-template.csv";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="gap-2"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Template
                 </Button>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  disabled={bulkUploadMutation.isPending}
-                />
-              </label>
+
+                <label>
+                  <Button variant="outline" asChild>
+                    <span>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Import CSV
+                    </span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={bulkUploadMutation.isPending}
+                  />
+                </label>
             </div>
           </div>
 

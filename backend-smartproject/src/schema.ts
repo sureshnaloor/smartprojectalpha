@@ -878,6 +878,15 @@ export const vendorMaster = pgTable("vendor_master", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Employee Resource Mapping Table (maps employees to manpower resources - one-to-one)
+export const employeeResourceMappings = pgTable("employee_resource_mappings", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().unique().references(() => employeeMaster.id, { onDelete: "cascade" }),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Employee Master Table
 export const employeeMaster = pgTable("employee_master", {
   id: serial("id").primaryKey(),
@@ -893,6 +902,33 @@ export const employeeMaster = pgTable("employee_master", {
   empTrade: text("emp_trade").notNull(),
   empGrade: text("emp_grade").notNull(),
   empCostPerHour: numeric("emp_cost_per_hour", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Equipment Master Table
+export const equipmentMaster = pgTable("equipment_master", {
+  id: serial("id").primaryKey(),
+  equipmentNumber: text("equipment_number").notNull().unique(),
+  equipmentName: text("equipment_name").notNull(),
+  equipmentType: text("equipment_type").notNull(),
+  description: text("description"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  capacity: numeric("capacity", { precision: 12, scale: 2 }),
+  unit: text("unit"),
+  costPerHour: numeric("cost_per_hour", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").default("Active").notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Equipment Resource Mapping Table (maps equipment to equipment resources - one-to-one)
+export const equipmentResourceMappings = pgTable("equipment_resource_mappings", {
+  id: serial("id").primaryKey(),
+  equipmentId: integer("equipment_id").notNull().unique().references(() => equipmentMaster.id, { onDelete: "cascade" }),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -952,6 +988,27 @@ export type InsertVendorMaster = z.infer<typeof insertVendorMasterSchema>;
 
 export type EmployeeMaster = typeof employeeMaster.$inferSelect;
 export type InsertEmployeeMaster = z.infer<typeof insertEmployeeMasterSchema>;
+
+// Employee Resource Mapping Schema
+export const insertEmployeeResourceMappingSchema = createInsertSchema(employeeResourceMappings)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export type EmployeeResourceMapping = typeof employeeResourceMappings.$inferSelect;
+export type InsertEmployeeResourceMapping = z.infer<typeof insertEmployeeResourceMappingSchema>;
+
+// Equipment Master Schema
+export const insertEquipmentMasterSchema = createInsertSchema(equipmentMaster)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export type EquipmentMaster = typeof equipmentMaster.$inferSelect;
+export type InsertEquipmentMaster = z.infer<typeof insertEquipmentMasterSchema>;
+
+// Equipment Resource Mapping Schema
+export const insertEquipmentResourceMappingSchema = createInsertSchema(equipmentResourceMappings)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export type EquipmentResourceMapping = typeof equipmentResourceMappings.$inferSelect;
+export type InsertEquipmentResourceMapping = z.infer<typeof insertEquipmentResourceMappingSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
