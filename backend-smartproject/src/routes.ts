@@ -511,6 +511,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get categorized activities for a project (for page2 view)
+  app.get("/api/projects/:projectId/activities/categorized", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const categorized = await storage.getCategorizedActivities(projectId);
+      res.json(categorized);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get resources for activities (planned and actual utilization)
+  app.get("/api/projects/:projectId/activities/resources", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const activityResources = await storage.getActivityResources(projectId);
+      res.json(activityResources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   // Project Task routes
   // Get all tasks for a project
   app.get("/api/projects/:projectId/tasks", async (req: Request, res: Response) => {

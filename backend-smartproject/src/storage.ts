@@ -121,6 +121,12 @@ export interface IStorage {
   createProjectActivity(data: InsertProjectActivity): Promise<ProjectActivity>;
   updateProjectActivity(id: number, data: InsertProjectActivity): Promise<ProjectActivity | undefined>;
   deleteProjectActivity(id: number): Promise<void>;
+  getCategorizedActivities(projectId: number): Promise<{
+    currentlyPlanned: ProjectActivity[];
+    inProgress: ProjectActivity[];
+    pending: ProjectActivity[];
+    completed: ProjectActivity[];
+  }>;
 
   // Project Task methods
   getProjectTasks(projectId: number): Promise<ProjectTask[]>;
@@ -147,6 +153,15 @@ export interface IStorage {
   createProjectResource(data: InsertProjectResource): Promise<ProjectResource>;
   updateProjectResource(id: number, data: InsertProjectResource): Promise<ProjectResource | undefined>;
   deleteProjectResource(id: number): Promise<void>;
+  getActivityResources(projectId: number): Promise<Array<{
+    activity: ProjectActivity;
+    plannedResources: ProjectResource[];
+    actualResources: Array<{
+      resourceName: string;
+      dates: string[];
+      totalDays: number;
+    }>;
+  }>>;
 
   // Daily Progress methods
   getDailyProgress(projectId: number): Promise<DailyProgress[]>;
@@ -696,6 +711,106 @@ export class DatabaseStorage implements IStorage {
     await db.delete(projectActivities).where(eq(projectActivities.id, id));
   }
 
+  // Get categorized activities for a project
+  async getCategorizedActivities(projectId: number): Promise<{
+    currentlyPlanned: ProjectActivity[];
+    inProgress: ProjectActivity[];
+    pending: ProjectActivity[];
+    completed: ProjectActivity[];
+  }> {
+    const allActivities = await db
+      .select()
+      .from(projectActivities)
+      .where(eq(projectActivities.projectId, projectId));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Calculate 30-day window (current month ± 15 days = 30 days total)
+    const windowStart = new Date(today);
+    windowStart.setDate(windowStart.getDate() - 15);
+    
+    const windowEnd = new Date(today);
+    windowEnd.setDate(windowEnd.getDate() + 15);
+
+    const currentlyPlanned: ProjectActivity[] = [];
+    const inProgress: ProjectActivity[] = [];
+    const pending: ProjectActivity[] = [];
+    const completed: ProjectActivity[] = [];
+
+    for (const activity of allActivities) {
+      const plannedFrom = activity.plannedFromDate ? new Date(activity.plannedFromDate) : null;
+      const plannedTo = activity.plannedToDate ? new Date(activity.plannedToDate) : null;
+      const actualStart = activity.actualStartDate ? new Date(activity.actualStartDate) : null;
+      const actualEnd = activity.actualToDate ? new Date(activity.actualToDate) : null;
+
+      // Priority 1: Completed - has actualToDate (regardless of other dates)
+      if (actualEnd) {
+        completed.push(activity);
+        continue;
+      }
+
+      // Priority 2: In Progress - has actualStartDate but no actualToDate
+      if (actualStart && !actualEnd) {
+        inProgress.push(activity);
+        continue;
+      }
+
+      // Priority 3: Currently Planned - planned dates fall within the 30-day window
+      // Only include if not started yet
+      if (plannedFrom && plannedTo && !actualStart) {
+        const plannedStart = new Date(plannedFrom);
+        plannedStart.setHours(0, 0, 0, 0);
+        const plannedEnd = new Date(plannedTo);
+        plannedEnd.setHours(0, 0, 0, 0);
+
+        // Check if planned dates overlap with the window
+        const overlapsWindow = (
+          (plannedStart >= windowStart && plannedStart <= windowEnd) ||
+          (plannedEnd >= windowStart && plannedEnd <= windowEnd) ||
+          (plannedStart <= windowStart && plannedEnd >= windowEnd)
+        );
+
+        if (overlapsWindow) {
+          currentlyPlanned.push(activity);
+          continue;
+        }
+      }
+
+      // Priority 4: Pending - plannedFromDate has passed but activity hasn't started
+      // Only if not in the currently planned window
+      if (plannedFrom && !actualStart) {
+        const plannedStart = new Date(plannedFrom);
+        plannedStart.setHours(0, 0, 0, 0);
+        if (plannedStart < today) {
+          // Make sure it's not already in currently planned window
+          let isInWindow = false;
+          if (plannedTo) {
+            const plannedEnd = new Date(plannedTo);
+            plannedEnd.setHours(0, 0, 0, 0);
+            isInWindow = (
+              (plannedStart >= windowStart && plannedStart <= windowEnd) ||
+              (plannedEnd >= windowStart && plannedEnd <= windowEnd) ||
+              (plannedStart <= windowStart && plannedEnd >= windowEnd)
+            );
+          }
+          
+          if (!isInWindow) {
+            pending.push(activity);
+            continue;
+          }
+        }
+      }
+    }
+
+    return {
+      currentlyPlanned,
+      inProgress,
+      pending,
+      completed,
+    };
+  }
+
   // Project Task methods
   async getProjectTasks(projectId: number): Promise<ProjectTask[]> {
     const dbTasks = await db.select().from(projectTasks).where(eq(projectTasks.projectId, projectId));
@@ -781,6 +896,103 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectResource(id: number): Promise<void> {
     await db.delete(projectResources).where(eq(projectResources.id, id));
+  }
+
+  // Get resources for activities (planned and actual utilization)
+  async getActivityResources(projectId: number): Promise<Array<{
+    activity: ProjectActivity;
+    plannedResources: ProjectResource[];
+    actualResources: Array<{
+      resourceName: string;
+      dates: string[];
+      totalDays: number;
+    }>;
+  }>> {
+    // Get activities that are completed or in progress
+    const allActivities = await db
+      .select()
+      .from(projectActivities)
+      .where(eq(projectActivities.projectId, projectId));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Filter to only completed or in-progress activities
+    const relevantActivities = allActivities.filter((activity) => {
+      const actualEnd = activity.actualToDate ? new Date(activity.actualToDate) : null;
+      const actualStart = activity.actualStartDate ? new Date(activity.actualStartDate) : null;
+      
+      // Completed: has actualToDate
+      if (actualEnd) return true;
+      
+      // In Progress: has actualStartDate but no actualToDate
+      if (actualStart && !actualEnd) return true;
+      
+      return false;
+    });
+
+    // Get all daily progress entries for the project
+    const dailyProgressEntries = await db
+      .select()
+      .from(dailyProgress)
+      .where(eq(dailyProgress.projectId, projectId));
+
+    // Get all resources for the project
+    const allResources = await db
+      .select()
+      .from(projectResources)
+      .where(eq(projectResources.projectId, projectId));
+
+    // Build result array
+    const result = relevantActivities.map((activity) => {
+      // Get planned resources from the same work package
+      const plannedResources = allResources.filter(
+        (resource) => resource.wpId === activity.wpId
+      );
+
+      // Get actual resource utilization from daily progress
+      // Match by activity name (case-insensitive, try exact match first, then partial match)
+      const activityNameLower = activity.name.toLowerCase().trim();
+      const activityProgressEntries = dailyProgressEntries.filter((entry) => {
+        const entryActivityLower = entry.activity.toLowerCase().trim();
+        // Exact match (most reliable)
+        if (entryActivityLower === activityNameLower) return true;
+        // Partial match (activity name contains entry or vice versa)
+        if (entryActivityLower.includes(activityNameLower) || activityNameLower.includes(entryActivityLower)) {
+          return true;
+        }
+        return false;
+      });
+
+      // Aggregate actual resources
+      const actualResourceMap = new Map<string, Set<string>>();
+      
+      activityProgressEntries.forEach((entry) => {
+        entry.resourcesDeployed.forEach((resourceName) => {
+          if (!actualResourceMap.has(resourceName)) {
+            actualResourceMap.set(resourceName, new Set());
+          }
+          actualResourceMap.get(resourceName)!.add(entry.date);
+        });
+      });
+
+      const actualResources = Array.from(actualResourceMap.entries()).map(([resourceName, datesSet]) => {
+        const dates = Array.from(datesSet).sort();
+        return {
+          resourceName,
+          dates,
+          totalDays: dates.length,
+        };
+      });
+
+      return {
+        activity,
+        plannedResources,
+        actualResources,
+      };
+    });
+
+    return result;
   }
 
   // Daily Progress methods
