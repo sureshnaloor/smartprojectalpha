@@ -12,6 +12,7 @@ frontend-smartproject/.env.local
 frontend-smartproject/.env.development.local
 frontend-smartproject/.env.test.local
 frontend-smartproject/.env.production.local
+frontend-smartproject/.nvmrc
 
 # Backend dependencies and build
 backend-smartproject/node_modules/
@@ -22,6 +23,7 @@ backend-smartproject/.env.local
 backend-smartproject/.env.development.local
 backend-smartproject/.env.test.local
 backend-smartproject/.env.production.local
+backend-smartproject/.nvmrc
 
 # common folder where markdown files are stored
 common/
@@ -70,3 +72,6 @@ coverage/
 *.tsbuildinfo
 *.tar.gz
 .vercel
+
+DIGITALOCEAN_TROUBLESHOOTING.md
+.do/    

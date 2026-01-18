@@ -163,6 +163,28 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                     </div>
                     <ul className="py-1">
                       <li>
+                        <Link href={`/newproject/${currentProjectId}`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                            isActive(`/newproject/${currentProjectId}`) && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive(`/newproject/${currentProjectId}`) ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <Briefcase className="mr-3 h-4 w-4" />
+                            <span>{currentProject?.name}</span>
+                          </a>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href={`/projects/${currentProjectId}`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                            location === `/projects/${currentProjectId}` && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: location === `/projects/${currentProjectId}` ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <LayoutDashboard className="mr-3 h-4 w-4" />
+                            <span>WBS and activities</span>
+                          </a>
+                        </Link>
+                      </li>
+                      <li>
                         <Link href={`/projects/${currentProjectId}/collab`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",

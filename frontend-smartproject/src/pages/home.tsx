@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Project } from "@shared/types";
 import { formatCurrency, formatDate, formatPercent, calculateEarnedValue, calculateCPI, calculateSPI, getProjectProgress, getProjectBudget } from "@/lib/utils";
-import { 
-  Building, 
-  Clock, 
-  DollarSign, 
-  ArrowRight, 
-  Plus, 
+import {
+  Building,
+  Clock,
+  DollarSign,
+  ArrowRight,
+  ArrowUpRight,
+  Plus,
   MoreHorizontal,
   BarChart2,
   GanttChart,
@@ -91,7 +92,7 @@ export default function Home() {
         {/* Hero Section - Teal Gradient */}
         <div className="bg-gradient-to-br from-teal-50 to-teal-100 border-b border-teal-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <motion.div 
+            <motion.div
               className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
               initial="hidden"
               animate="visible"
@@ -103,20 +104,29 @@ export default function Home() {
                   Construction Project Management Made Simple
                 </h2>
                 <p className="text-lg text-gray-700 mb-8">
-                  Streamline your construction projects with powerful cost control, 
+                  Streamline your construction projects with powerful cost control,
                   scheduling, and performance monitoring tools.
                 </p>
                 <div className="flex flex-wrap gap-4">
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     onClick={() => setIsAddProjectModalOpen(true)}
                     className="bg-teal-600 hover:bg-teal-700 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
                   >
                     <Plus className="mr-2 h-5 w-5" />
                     Start New Project
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setLocation("/newlanding")}
+                    className="border-amber-600 text-amber-700 hover:bg-amber-50 transition-all duration-300"
+                  >
+                    <ArrowUpRight className="mr-2 h-5 w-5" />
+                    Go to New Landing
+                  </Button>
+                  <Button
+                    variant="outline"
                     size="lg"
                     className="border-teal-600 text-teal-700 hover:bg-teal-50 transition-all duration-300"
                   >
@@ -125,10 +135,10 @@ export default function Home() {
                   </Button>
                 </div>
               </motion.div>
-              
+
               {/* Feature Cards */}
               <div className="grid grid-cols-2 gap-4">
-                <motion.div 
+                <motion.div
                   className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-teal-200 transition-all duration-300 transform hover:-translate-y-1"
                   variants={itemVariants}
                 >
@@ -136,7 +146,7 @@ export default function Home() {
                   <h3 className="font-semibold text-gray-900 mb-1">Schedule Tracking</h3>
                   <p className="text-gray-600 text-sm">Monitor your project timeline with Gantt charts</p>
                 </motion.div>
-                <motion.div 
+                <motion.div
                   className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-teal-200 transition-all duration-300 transform hover:-translate-y-1"
                   variants={itemVariants}
                 >
@@ -144,7 +154,7 @@ export default function Home() {
                   <h3 className="font-semibold text-gray-900 mb-1">Cost Control</h3>
                   <p className="text-gray-600 text-sm">Track budgets, actual costs and variances</p>
                 </motion.div>
-                <motion.div 
+                <motion.div
                   className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-teal-200 transition-all duration-300 transform hover:-translate-y-1"
                   variants={itemVariants}
                 >
@@ -152,7 +162,7 @@ export default function Home() {
                   <h3 className="font-semibold text-gray-900 mb-1">WBS Management</h3>
                   <p className="text-gray-600 text-sm">Organize work in hierarchical structures</p>
                 </motion.div>
-                <motion.div 
+                <motion.div
                   className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-teal-200 transition-all duration-300 transform hover:-translate-y-1"
                   variants={itemVariants}
                 >
@@ -164,11 +174,11 @@ export default function Home() {
             </motion.div>
           </div>
         </div>
-        
+
         {/* How It Works Section - Stone Background */}
         <div className="bg-stone-100 border-b border-stone-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <motion.h2 
+            <motion.h2
               className="text-2xl font-bold text-center text-gray-900 mb-12"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -178,7 +188,7 @@ export default function Home() {
               How ConstructPro Works
             </motion.h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              <motion.div 
+              <motion.div
                 className="text-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -193,7 +203,7 @@ export default function Home() {
                   Set up your project with basic details, budget and timeline
                 </p>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="text-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -208,7 +218,7 @@ export default function Home() {
                   Break down project into manageable work packages
                 </p>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="text-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -223,7 +233,7 @@ export default function Home() {
                   Assign timelines and dependencies to activities
                 </p>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="text-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -241,11 +251,11 @@ export default function Home() {
             </div>
           </div>
         </div>
-        
+
         {/* Projects List - Light Gray Background */}
         <div className="bg-gray-50 py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div 
+            <motion.div
               className="flex justify-between items-center mb-8"
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
@@ -258,7 +268,7 @@ export default function Home() {
                   Manage your existing construction projects or create new ones
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={() => setIsAddProjectModalOpen(true)}
                 className="bg-teal-600 hover:bg-teal-700 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
               >
@@ -289,7 +299,7 @@ export default function Home() {
                 ))}
               </div>
             ) : projects.length === 0 ? (
-              <motion.div 
+              <motion.div
                 className="text-center py-16 bg-white rounded-lg border border-gray-200 shadow-sm"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -301,7 +311,7 @@ export default function Home() {
                   Get started by creating your first construction project
                 </p>
                 <div className="mt-6">
-                  <Button 
+                  <Button
                     onClick={() => setIsAddProjectModalOpen(true)}
                     className="bg-teal-600 hover:bg-teal-700 transition-all duration-300 hover:shadow-lg"
                   >
@@ -377,8 +387,8 @@ export default function Home() {
                         </div>
                       </CardContent>
                       <CardFooter>
-                        <Button 
-                          className="w-full bg-teal-600 hover:bg-teal-700 transition-all duration-300" 
+                        <Button
+                          className="w-full bg-teal-600 hover:bg-teal-700 transition-all duration-300"
                           onClick={() => handleProjectClick(project.id)}
                         >
                           Open Project

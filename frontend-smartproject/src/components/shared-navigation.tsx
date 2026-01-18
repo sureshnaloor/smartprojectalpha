@@ -3,6 +3,7 @@ import { useLocation } from 'wouter'
 import { useAuth } from '@/contexts/auth-context'
 import { UserProfile } from '@/components/user-profile'
 import { Button } from '@/components/ui/button'
+import { ArrowUpRight } from 'lucide-react'
 
 interface SharedNavigationProps {
   variant?: 'landing' | 'app'
@@ -52,8 +53,8 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
   }
 
   const isLanding = variant === 'landing'
-  const navBgClass = isLanding 
-    ? 'bg-white/95 backdrop-blur-sm' 
+  const navBgClass = isLanding
+    ? 'bg-white/95 backdrop-blur-sm'
     : 'bg-white shadow-sm border-b border-gray-200'
 
   return (
@@ -61,7 +62,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <div 
+            <div
               className="font-display text-2xl font-bold gradient-text cursor-pointer flex items-center gap-2"
               onClick={() => handleNavClick('/')}
             >
@@ -71,63 +72,77 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
               <span>ConstructPro</span>
             </div>
           </div>
-          
+
           <div className="hidden md:flex items-center space-x-6">
             {/* Navigation Links */}
             {isLanding ? (
               <>
-                <a 
-                  href="#features" 
-                  className="nav-link" 
+                <a
+                  href="#features"
+                  className="nav-link"
                   onClick={(e) => handleSmoothScroll(e, '#features')}
                 >
                   Features
                 </a>
-                <a 
-                  href="#demo" 
-                  className="nav-link" 
+                <a
+                  href="#demo"
+                  className="nav-link"
                   onClick={(e) => handleSmoothScroll(e, '#demo')}
                 >
                   Demo
                 </a>
-                <a 
-                  href="#pricing" 
-                  className="nav-link" 
+                <a
+                  href="#pricing"
+                  className="nav-link"
                   onClick={(e) => handleSmoothScroll(e, '#pricing')}
                 >
                   Pricing
                 </a>
-                <a 
-                  href="#contact" 
-                  className="nav-link" 
+                <a
+                  href="#contact"
+                  className="nav-link"
                   onClick={(e) => handleSmoothScroll(e, '#contact')}
                 >
                   Contact
                 </a>
-                <a 
+                <a
                   href="/playground"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="nav-link flex items-center gap-1.5"
+                  className="nav-link flex items-center gap-1.5 text-teal-600 font-semibold"
                 >
                   <span>Playground</span>
                   <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                   </svg>
                 </a>
+                <a
+                  href="/newlanding"
+                  className="nav-link flex items-center gap-1.5 text-amber-600 font-semibold"
+                >
+                  <span>New Landing</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
               </>
             ) : (
               <>
-                <a 
+                <a
                   href="/playground"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="nav-link flex items-center gap-1.5"
+                  className="nav-link flex items-center gap-1.5 text-teal-600 font-semibold"
                 >
                   <span>Playground/ Demo Test</span>
                   <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                   </svg>
+                </a>
+                <a
+                  href="/newlanding"
+                  className="nav-link flex items-center gap-1.5 text-amber-600 font-semibold"
+                >
+                  <span>New Landing</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
                 {/* {authenticated && (
                   <>
@@ -210,7 +225,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
 
           {/* Mobile Menu Button */}
           <div className="md:hidden">
-            <button 
+            <button
               className="text-gray-600 hover:text-gray-900"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
@@ -228,80 +243,96 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
           <div className="space-y-3">
             {isLanding ? (
               <>
-                <a 
-                  href="#features" 
+                <a
+                  href="#features"
                   className="block py-2 text-gray-700 hover:text-orange-600"
                   onClick={(e) => handleSmoothScroll(e, '#features')}
                 >
                   Features
                 </a>
-                <a 
-                  href="#demo" 
+                <a
+                  href="#demo"
                   className="block py-2 text-gray-700 hover:text-orange-600"
                   onClick={(e) => handleSmoothScroll(e, '#demo')}
                 >
                   Demo
                 </a>
-                <a 
-                  href="#pricing" 
+                <a
+                  href="#pricing"
                   className="block py-2 text-gray-700 hover:text-orange-600"
                   onClick={(e) => handleSmoothScroll(e, '#pricing')}
                 >
                   Pricing
                 </a>
-                <a 
-                  href="#contact" 
+                <a
+                  href="#contact"
                   className="block py-2 text-gray-700 hover:text-orange-600"
                   onClick={(e) => handleSmoothScroll(e, '#contact')}
                 >
                   Contact
                 </a>
-                <a 
+                <a
                   href="/playground"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block py-2 text-gray-700 hover:text-orange-600 flex items-center gap-1.5"
+                  className="block py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
                   <span>Playground</span>
                   <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                   </svg>
                 </a>
+                <a
+                  href="/newlanding"
+                  className="block py-2 text-amber-600 font-semibold flex items-center gap-1.5"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <span>New Landing</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
               </>
             ) : (
               <>
-                <a 
+                <a
                   href="/playground"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full text-left py-2 text-gray-700 hover:text-orange-600 flex items-center gap-1.5"
+                  className="block w-full text-left py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
                   <span>Playground/ Demo Test</span>
                   <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                   </svg>
                 </a>
+                <a
+                  href="/newlanding"
+                  className="block w-full text-left py-2 text-amber-600 font-semibold flex items-center gap-1.5"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <span>New Landing</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
                 {authenticated && (
                   <>
-                    <button 
+                    <button
                       className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
                       onClick={() => handleNavClick('/activity-master')}
                     >
                       Activity Master
                     </button>
-                    <button 
+                    <button
                       className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
                       onClick={() => handleNavClick('/task-master')}
                     >
                       Task Master
                     </button>
-                    <button 
+                    <button
                       className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
                       onClick={() => handleNavClick('/resource-master')}
                     >
                       Resource Master
                     </button>
-                    <button 
+                    <button
                       className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
                       onClick={() => handleNavClick('/collab')}
                     >
