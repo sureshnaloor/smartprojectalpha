@@ -141,7 +141,8 @@ export default function CollabPage() {
       });
 
       if (!threadResponse.ok) {
-        throw new Error('Failed to create thread');
+        const errorData = await threadResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to create thread');
       }
 
       const newThread = await threadResponse.json();
@@ -184,7 +185,7 @@ export default function CollabPage() {
     } catch (err) {
       toast({
         title: "Error",
-        description: "Failed to create thread. Please try again.",
+        description: err instanceof Error ? err.message : "Failed to create thread. Please try again.",
         variant: "destructive",
       });
     } finally {
