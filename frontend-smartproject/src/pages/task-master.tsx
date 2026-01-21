@@ -164,7 +164,6 @@ export default function TaskMaster() {
       description: formData.get("description") as string,
       activityId: parseInt(formData.get("activityId") as string),
       duration: parseInt(formData.get("duration") as string),
-      status: formData.get("status") as "pending" | "in_progress" | "completed",
     };
 
     if (editingTask) {
@@ -245,7 +244,7 @@ export default function TaskMaster() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="activityId" className="font-semibold text-gray-700">Activity</Label>
-                <Select name="activityId" defaultValue={editingTask?.activityId.toString()}>
+                <Select name="activityId" defaultValue={editingTask?.activityId?.toString()}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select an activity" />
                   </SelectTrigger>
@@ -264,22 +263,9 @@ export default function TaskMaster() {
                   id="duration"
                   name="duration"
                   type="number"
-                  defaultValue={editingTask?.duration}
+                  defaultValue={editingTask?.duration ?? undefined}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status" className="font-semibold text-gray-700">Status</Label>
-                <Select name="status" defaultValue={editingTask?.status || "pending"}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button
@@ -314,7 +300,6 @@ export default function TaskMaster() {
                   <TableHead className="font-bold text-gray-900">Description</TableHead>
                   <TableHead className="font-bold text-gray-900">Activity</TableHead>
                   <TableHead className="font-bold text-gray-900">Duration (min)</TableHead>
-                  <TableHead className="font-bold text-gray-900">Status</TableHead>
                   <TableHead className="font-bold text-gray-900">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -326,17 +311,8 @@ export default function TaskMaster() {
                   }}>
                     <TableCell className="font-medium">{task.name}</TableCell>
                     <TableCell>{task.description}</TableCell>
-                    <TableCell>{getActivityName(task.activityId)}</TableCell>
+                    <TableCell>{task.activityId ? getActivityName(task.activityId) : "None"}</TableCell>
                     <TableCell>{task.duration}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        task.status === "completed" ? "bg-green-100 text-green-800" :
-                        task.status === "in_progress" ? "bg-blue-100 text-blue-800" :
-                        "bg-gray-100 text-gray-800"
-                      }`}>
-                        {task.status.replace("_", " ")}
-                      </span>
-                    </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
@@ -362,6 +338,6 @@ export default function TaskMaster() {
           </div>
         )}
       </div>
-    </MasterLayout>
+    </MasterLayout >
   );
 } 

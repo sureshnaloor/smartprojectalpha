@@ -115,9 +115,6 @@ export const tasks = pgTable("tasks", {
   activityId: integer("activity_id").references(() => activities.id, { onDelete: "cascade" }), // Made nullable
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status").default("pending").notNull(), // pending, in_progress, completed
-  startDate: date("start_date"),
-  endDate: date("end_date"),
   duration: integer("duration"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -339,15 +336,6 @@ export const insertWorkPackageSchema = createInsertSchema(workPackages)
 export const insertTaskSchema = createInsertSchema(tasks)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
-    status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
-    startDate: z.date().or(z.string()).transform(val => {
-      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
-      return val.toISOString().split('T')[0];
-    }).optional().nullable(),
-    endDate: z.date().or(z.string()).transform(val => {
-      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
-      return val.toISOString().split('T')[0];
-    }).optional().nullable(),
     duration: z.string().or(z.number()).transform(val => typeof val === 'string' ? parseInt(val) : val).optional().nullable(),
   });
 
