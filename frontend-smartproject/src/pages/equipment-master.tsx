@@ -307,8 +307,10 @@ export default function EquipmentMasterPage() {
         <div className="p-8 space-y-6">
           {/* Header */}
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">Equipment Master</h1>
-            <p className="text-gray-600 mt-2">Manage your equipment inventory and resources</p>
+            <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Equipment Master
+            </h1>
+            <p className="text-muted-foreground mt-2">Manage your equipment inventory and resources</p>
           </div>
 
           {/* Search and Actions */}
@@ -508,7 +510,7 @@ export default function EquipmentMasterPage() {
               </DialogContent>
             </Dialog>
 
-            <Button 
+            <Button
               variant="outline"
               onClick={() => {
                 const link = document.createElement("a");
@@ -576,11 +578,10 @@ export default function EquipmentMasterPage() {
                     {filteredEquipment.map((eq, index) => (
                       <TableRow
                         key={eq.id}
-                        className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${
-                          index % 2 === 0
+                        className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${index % 2 === 0
                             ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100"
                             : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
-                        }`}
+                          }`}
                       >
                         <TableCell className="font-medium">{eq.equipmentNumber}</TableCell>
                         <TableCell>{eq.equipmentName}</TableCell>
@@ -590,11 +591,10 @@ export default function EquipmentMasterPage() {
                         <TableCell>{parseFloat(eq.costPerHour).toFixed(2)}</TableCell>
                         <TableCell>
                           <span
-                            className={`px-2 py-1 rounded-full text-sm font-medium ${
-                              eq.status === "Active"
+                            className={`px-2 py-1 rounded-full text-sm font-medium ${eq.status === "Active"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-gray-100 text-gray-800"
-                            }`}
+                              }`}
                           >
                             {eq.status}
                           </span>

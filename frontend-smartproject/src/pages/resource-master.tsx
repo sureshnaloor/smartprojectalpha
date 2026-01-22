@@ -308,7 +308,7 @@ export default function ResourceMaster() {
         backgroundRepeat: 'repeat'
       }}>
         <div className="flex items-center justify-between space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight">Resource Master</h2>
+          <h2 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">Resource Master</h2>
           <div className="flex items-center space-x-2">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -458,7 +458,7 @@ export default function ResourceMaster() {
               </DialogContent>
             </Dialog>
 
-            <Button 
+            <Button
               variant="outline"
               onClick={() => {
                 const link = document.createElement("a");
@@ -517,11 +517,10 @@ export default function ResourceMaster() {
                   transition: 'background-color 0.2s ease'
                 }}>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      resource.type === "manpower" ? "bg-blue-100 text-blue-800" :
+                    <span className={`px-2 py-1 rounded-full text-xs ${resource.type === "manpower" ? "bg-blue-100 text-blue-800" :
                       resource.type === "equipment" ? "bg-green-100 text-green-800" :
-                      "bg-orange-100 text-orange-800"
-                    }`}>
+                        "bg-orange-100 text-orange-800"
+                      }`}>
                       {resource.type}
                     </span>
                   </TableCell>

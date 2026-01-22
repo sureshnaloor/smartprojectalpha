@@ -137,8 +137,8 @@ export default function Dashboard({ projectId: propProjectId }: DashboardProps) 
   const projectCurrency = project?.currency || "USD";
 
   return (
-    <div className="flex-1 overflow-auto p-4 bg-gray-50">
-      <h1 className="text-3xl font-bold mb-8">{project?.name} Dashboard</h1>
+    <div className="flex-1 overflow-auto p-4 bg-gray-50 ">
+      <h1 className="text-xl font-semibold text-stone-500 mb-8 shadow-lg text-center">{project?.name} Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>

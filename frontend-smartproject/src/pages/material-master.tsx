@@ -278,7 +278,7 @@ export default function MaterialMaster() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Material Master</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">Material Master</h1>
             <p className="text-gray-600">Manage material codes, types, and classifications</p>
           </div>
 
@@ -291,7 +291,7 @@ export default function MaterialMaster() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1"
               />
-              
+
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button onClick={() => resetForm()}>
@@ -400,37 +400,37 @@ export default function MaterialMaster() {
                 </DialogContent>
               </Dialog>
 
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = "/templates/material-master-template.csv";
-                    link.download = "material-master-template.csv";
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }}
-                  className="gap-2"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Template
-                </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.href = "/templates/material-master-template.csv";
+                  link.download = "material-master-template.csv";
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="gap-2"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Template
+              </Button>
 
-                <label>
-                  <Button variant="outline" asChild>
-                    <span>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Import CSV
-                    </span>
-                  </Button>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={bulkUploadMutation.isPending}
-                  />
-                </label>
+              <label>
+                <Button variant="outline" asChild>
+                  <span>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import CSV
+                  </span>
+                </Button>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  disabled={bulkUploadMutation.isPending}
+                />
+              </label>
             </div>
           </div>
 
@@ -463,13 +463,12 @@ export default function MaterialMaster() {
                 </TableHeader>
                 <TableBody>
                   {filteredMaterials.map((material, index) => (
-                    <TableRow 
+                    <TableRow
                       key={material.id}
-                      className={`transition-colors duration-200 border-b border-gray-100 hover:shadow-sm ${
-                        index % 2 === 0 
-                          ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100" 
-                          : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
-                      }`}
+                      className={`transition-colors duration-200 border-b border-gray-100 hover:shadow-sm ${index % 2 === 0
+                        ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100"
+                        : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
+                        }`}
                     >
                       <TableCell className="font-medium">{material.materialCode}</TableCell>
                       <TableCell>{material.materialDescription}</TableCell>
@@ -478,13 +477,12 @@ export default function MaterialMaster() {
                       <TableCell>{material.materialGroup}</TableCell>
                       <TableCell>
                         <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            material.materialClass === "mrp"
-                              ? "bg-blue-100 text-blue-800"
-                              : material.materialClass === "common"
+                          className={`px-2 py-1 rounded text-xs font-medium ${material.materialClass === "mrp"
+                            ? "bg-blue-100 text-blue-800"
+                            : material.materialClass === "common"
                               ? "bg-green-100 text-green-800"
                               : "bg-purple-100 text-purple-800"
-                          }`}
+                            }`}
                         >
                           {material.materialClass.toUpperCase()}
                         </span>

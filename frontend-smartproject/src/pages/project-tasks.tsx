@@ -201,16 +201,16 @@ export default function ProjectTasks() {
 
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
-        
+
         const taskData = e.dataTransfer.getData("task");
         if (taskData) {
             const task: Task = JSON.parse(taskData);
 
             // If "All" is selected, we need to show activity selection dialog first
             if (selectedActivityId === null) {
-                toast({ 
-                    title: "Info", 
-                    description: "Please select a specific activity to assign the task to", 
+                toast({
+                    title: "Info",
+                    description: "Please select a specific activity to assign the task to",
                 });
                 return;
             }
@@ -220,10 +220,10 @@ export default function ProjectTasks() {
                 pt => pt.globalTaskId === task.id && pt.activityId === selectedActivityId
             );
             if (exists) {
-                toast({ 
-                    title: "Warning", 
-                    description: "Task already exists in this activity", 
-                    variant: "destructive" 
+                toast({
+                    title: "Warning",
+                    description: "Task already exists in this activity",
+                    variant: "destructive"
                 });
                 return;
             }
@@ -269,16 +269,16 @@ export default function ProjectTasks() {
     const selectedActivity = projectActivities.find(activity => activity.id === selectedActivityId);
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] gap-4 p-4">
+        <div className="flex h-[calc(100vh-4rem)] gap-6 p-6">
             {/* Left Sidebar - Global Tasks */}
-            <Card className="w-80 flex flex-col">
-                <CardHeader>
-                    <CardTitle>Global Tasks</CardTitle>
-                    <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Card className="w-80 flex flex-col bg-stone-50 border-stone-200 shadow-sm">
+                <CardHeader className="pb-4">
+                    <CardTitle className="text-xl font-bold text-stone-900">Global Tasks</CardTitle>
+                    <div className="relative mt-2">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-stone-400" />
                         <Input
                             placeholder="Search tasks..."
-                            className="pl-8"
+                            className="pl-8 bg-white border-stone-200 focus:ring-stone-500"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -286,18 +286,20 @@ export default function ProjectTasks() {
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden p-0">
                     <ScrollArea className="h-full px-4 pb-4">
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {filteredGlobalTasks.map((task) => (
                                 <div
                                     key={task.id}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, task)}
-                                    className="flex items-center gap-2 rounded-lg border p-3 cursor-move hover:bg-accent hover:text-accent-foreground transition-colors"
+                                    className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white p-4 cursor-move hover:bg-stone-100 hover:border-stone-300 transition-all shadow-sm group"
                                 >
-                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                    <GripVertical className="h-4 w-4 text-stone-300 group-hover:text-stone-500" />
                                     <div className="flex-1 overflow-hidden">
-                                        <p className="font-medium truncate">{task.name}</p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="font-semibold text-stone-800 group-hover:text-stone-900 truncate">
+                                            {task.name}
+                                        </p>
+                                        <p className="text-xs font-medium text-stone-500">
                                             {task.duration} min
                                         </p>
                                     </div>
@@ -312,10 +314,10 @@ export default function ProjectTasks() {
             <div className="flex-1 flex flex-col gap-4">
                 {/* Today's Date and Activities List */}
                 <Card className="flex-shrink-0">
-                    <CardHeader>
+                    <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                            <CardTitle>Activities</CardTitle>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <CardTitle className="text-xl font-bold text-zinc-900">Activities</CardTitle>
+                            <div className="flex items-center gap-2 text-sm font-medium text-zinc-500 bg-zinc-100 px-3 py-1 rounded-full transition-colors">
                                 <CalendarIcon className="h-4 w-4" />
                                 <span>{todayFormatted}</span>
                             </div>
@@ -347,16 +349,16 @@ export default function ProjectTasks() {
                 </Card>
 
                 {/* Selected Activity Tasks Window */}
-                <Card 
-                    className="flex-1 flex flex-col" 
-                    onDrop={handleDrop} 
+                <Card
+                    className="flex-1 flex flex-col"
+                    onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
                     <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>
-                            {selectedActivityId === null 
+                        <CardTitle className="text-xl font-bold text-zinc-900">
+                            {selectedActivityId === null
                                 ? "All Tasks"
-                                : selectedActivity 
+                                : selectedActivity
                                     ? selectedActivity.name
                                     : "Select an Activity"}
                         </CardTitle>
@@ -384,8 +386,8 @@ export default function ProjectTasks() {
                             <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg m-4">
                                 <div className="text-center">
                                     <p>
-                                        {selectedActivityId === null 
-                                            ? "No open tasks found for today." 
+                                        {selectedActivityId === null
+                                            ? "No open tasks found for today."
                                             : "No open tasks assigned yet."}
                                     </p>
                                     {selectedActivityId !== null && (
@@ -410,82 +412,81 @@ export default function ProjectTasks() {
                                     {activityTasks.map((task) => {
                                         const taskActivity = projectActivities.find(a => a.id === task.activityId);
                                         return (
-                                        <TableRow key={task.id}>
-                                            {selectedActivityId === null && (
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    {taskActivity?.name || "Unknown"}
-                                                </TableCell>
-                                            )}
-                                            <TableCell className="font-medium">
-                                                <div>
-                                                    {task.name}
-                                                    {task.description && (
-                                                        <p className="text-xs text-muted-foreground">{task.description}</p>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{task.duration ? `${task.duration} min` : "-"}</TableCell>
-                                            <TableCell>
-                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                    task.status === "completed" ? "bg-green-100 text-green-800" :
-                                                    task.status === "in_progress" ? "bg-blue-100 text-blue-800" :
-                                                    "bg-gray-100 text-gray-800"
-                                                }`}>
-                                                    {task.status.replace("_", " ")}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                {task.plannedDate ? (
-                                                    <span className="text-xs">
-                                                        {format(new Date(task.plannedDate), "MMM dd, yyyy")}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">Not set</span>
+                                            <TableRow key={task.id}>
+                                                {selectedActivityId === null && (
+                                                    <TableCell className="text-xs text-muted-foreground">
+                                                        {taskActivity?.name || "Unknown"}
+                                                    </TableCell>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="max-w-[200px] truncate" title={task.remarks || ""}>
-                                                {task.remarks}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => {
-                                                            setEditingTask(task);
-                                                            setIsDialogOpen(true);
-                                                        }}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => {
-                                                            if (confirm("Are you sure you want to close this task?")) {
-                                                                closeTaskMutation.mutate(task.id);
-                                                            }
-                                                        }}
-                                                        className="text-green-600 hover:text-green-700"
-                                                        title="Close Task"
-                                                    >
-                                                        <CheckCircle className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-destructive"
-                                                        onClick={() => {
-                                                            if (confirm("Are you sure you want to delete this task?")) {
-                                                                deleteMutation.mutate(task.id);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                                <TableCell className="font-medium">
+                                                    <div>
+                                                        {task.name}
+                                                        {task.description && (
+                                                            <p className="text-xs text-muted-foreground">{task.description}</p>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{task.duration ? `${task.duration} min` : "-"}</TableCell>
+                                                <TableCell>
+                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${task.status === "completed" ? "bg-green-100 text-green-700" :
+                                                        task.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                                                            "bg-zinc-100 text-zinc-700"
+                                                        }`}>
+                                                        {task.status.replace("_", " ")}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {task.plannedDate ? (
+                                                        <span className="text-xs">
+                                                            {format(new Date(task.plannedDate), "MMM dd, yyyy")}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">Not set</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="max-w-[200px] truncate" title={task.remarks || ""}>
+                                                    {task.remarks}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => {
+                                                                setEditingTask(task);
+                                                                setIsDialogOpen(true);
+                                                            }}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => {
+                                                                if (confirm("Are you sure you want to close this task?")) {
+                                                                    closeTaskMutation.mutate(task.id);
+                                                                }
+                                                            }}
+                                                            className="text-green-600 hover:text-green-700"
+                                                            title="Close Task"
+                                                        >
+                                                            <CheckCircle className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive"
+                                                            onClick={() => {
+                                                                if (confirm("Are you sure you want to delete this task?")) {
+                                                                    deleteMutation.mutate(task.id);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })}
                                 </TableBody>
@@ -516,9 +517,9 @@ export default function ProjectTasks() {
                             </p>
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button 
-                                type="button" 
-                                variant="outline" 
+                            <Button
+                                type="button"
+                                variant="outline"
                                 onClick={() => {
                                     setShowRemarksDialog(false);
                                     setDraggedTask(null);
@@ -527,7 +528,7 @@ export default function ProjectTasks() {
                             >
                                 Cancel
                             </Button>
-                            <Button 
+                            <Button
                                 type="button"
                                 onClick={handleConfirmTaskWithRemarks}
                                 disabled={createMutation.isPending}

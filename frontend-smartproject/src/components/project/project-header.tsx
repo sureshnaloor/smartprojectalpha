@@ -38,13 +38,13 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
     if (pageMatch) {
       return pageMatch[1]; // Return 'activities', 'tasks', 'resources', or 'collab'
     }
-    
+
     // Check if we're on the base route (e.g., /activities, /tasks, /resources, /collab)
     const baseMatch = location.match(/\/projects\/\d+\/(activities|tasks|resources|collab)(?:\/|$)/);
     if (baseMatch) {
       return baseMatch[1]; // Return 'activities', 'tasks', 'resources', or 'collab'
     }
-    
+
     // Default to 'resources' if no match found
     return 'resources';
   };
@@ -100,68 +100,71 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
   };
 
   return (
-    <div className="bg-white border-b border-gray-200">
+    <div className="bg-zinc-100 border-b border-zinc-200 shadow-sm">
       {/* Project Basic Information */}
-      <div className="px-4 py-4 sm:px-6">
+      <div className="px-6 py-6 sm:px-8">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
               {onClose && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={onClose} 
-                  className="mr-2 text-gray-500 hover:text-gray-700"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  className="mr-2 text-zinc-500 hover:text-zinc-700"
                 >
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   <span className="sr-only md:not-sr-only md:inline-block">Back to Projects</span>
                 </Button>
               )}
-              <h2 className="text-xl font-semibold text-gray-900 mr-2">
+              <h1 className="text-xl font-extrabold tracking-tight text-zinc-900">
                 {project.name}
-              </h2>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-7 w-7"
+              </h1>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-full border-zinc-300 hover:bg-zinc-200"
                 onClick={() => setIsEditModalOpen(true)}
               >
-                <PencilIcon className="h-3.5 w-3.5" />
+                <PencilIcon className="h-4 w-4 text-zinc-600" />
                 <span className="sr-only">Edit</span>
               </Button>
             </div>
-            <div className="mt-1 flex flex-wrap items-center text-sm text-gray-500">
-              <span className="mr-6">
-                <strong>Budget:</strong> {formatCurrency(project.budget, project.currency || "USD")}
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-base text-zinc-600">
+              <span className="flex items-center gap-1.5">
+                <span className="font-semibold text-sky-800">Budget:</span>
+                {formatCurrency(Number(project.budget), project.currency || "USD")}
               </span>
-              <span className="mr-6">
-                <strong>Timeline:</strong> {formatDate(project.startDate)} - {formatDate(project.endDate)}
+              <span className="flex items-center gap-1.5 text-balance">
+                <span className="font-semibold text-sky-800">Timeline:</span>
+                {formatDate(project.startDate ?? undefined)} — {formatDate(project.endDate ?? undefined)}
               </span>
-              <span className={`mr-6 flex items-center font-medium ${status.textColor}`}>
-                <span 
-                  className={`w-2 h-2 mr-1 rounded-full ${status.color}`}
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-bold ${status.color.replace('bg-', 'bg-opacity-20 ')} ${status.textColor}`}>
+                <span
+                  className={`w-2 h-2 mr-2 rounded-full ${status.color}`}
                 ></span>
                 {status.status}
               </span>
             </div>
           </div>
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="outline"
               size="sm"
+              className="bg-sky-100 border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 shadow-sm font-semibold"
               onClick={() => setIsImportModalOpen(true)}
             >
               Import WBS
             </Button>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="hover:bg-zinc-200">
+                  <MoreHorizontal className="h-5 w-5 text-zinc-600" />
                   <span className="sr-only">More options</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => setIsEditModalOpen(true)}>
                   Edit project details
@@ -171,7 +174,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                 <DropdownMenuItem>Export as Excel</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-red-500 focus:text-red-500"
+                  className="text-red-500 focus:text-red-500 focus:bg-red-50"
                   onSelect={(e) => e.preventDefault()}
                 >
                   <DeleteProjectDialog
@@ -188,59 +191,54 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
       </div>
 
       {/* Navigation Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-6 px-4 sm:px-6 overflow-x-auto">
+      <div className="px-6 sm:px-8 border-t border-zinc-200 bg-zinc-50/50">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto">
           <Link href={`/projects/${projectId}/${routeContext}/page1`}>
             <a
-              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/${routeContext}/page1`
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page1`
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                }`}
             >
               Tab1
             </a>
           </Link>
           <Link href={`/projects/${projectId}/${routeContext}/page2`}>
             <a
-              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/${routeContext}/page2`
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page2`
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                }`}
             >
               Tab2
             </a>
           </Link>
           <Link href={`/projects/${projectId}/${routeContext}/page3`}>
             <a
-              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/${routeContext}/page3`
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page3`
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                }`}
             >
               Tab3
             </a>
           </Link>
           <Link href={`/projects/${projectId}/${routeContext}/page4`}>
             <a
-              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/${routeContext}/page4`
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page4`
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                }`}
             >
               Tab4
             </a>
           </Link>
           <Link href={`/projects/${projectId}/${routeContext}/page5`}>
             <a
-              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
-                location === `/projects/${projectId}/${routeContext}/page5`
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page5`
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                }`}
             >
               Tab5
             </a>

@@ -207,7 +207,7 @@ export default function VendorMaster() {
       ...formData,
       vendorFax: formData.vendorFax || undefined,
     };
-    
+
     if (editingVendor) {
       updateMutation.mutate({ id: editingVendor.id, data: submitData });
     } else {
@@ -286,8 +286,8 @@ export default function VendorMaster() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Vendor Master</h1>
-            <p className="text-gray-600">Manage vendor information and contact details</p>
+            <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">Vendor Master</h1>
+            <p className="text-muted-foreground">Manage vendor information and contact details</p>
           </div>
 
           {/* Actions Bar */}
@@ -299,7 +299,7 @@ export default function VendorMaster() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1"
               />
-              
+
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button onClick={() => resetForm()}>
@@ -307,7 +307,7 @@ export default function VendorMaster() {
                     Add Vendor
                   </Button>
                 </DialogTrigger>
-                <DialogContent 
+                <DialogContent
                   className="max-w-2xl"
                   style={{
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)',
@@ -322,7 +322,7 @@ export default function VendorMaster() {
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto">
                     <div>
-                      <Label 
+                      <Label
                         htmlFor="vendorCode"
                         className="font-semibold text-gray-700"
                       >
@@ -354,7 +354,7 @@ export default function VendorMaster() {
                     </div>
 
                     <div>
-                      <Label 
+                      <Label
                         htmlFor="vendorName"
                         className="font-semibold text-teal-700"
                       >
@@ -386,7 +386,7 @@ export default function VendorMaster() {
                     </div>
 
                     <div>
-                      <Label 
+                      <Label
                         htmlFor="vendorAddress"
                         className="font-semibold text-teal-700"
                       >
@@ -419,7 +419,7 @@ export default function VendorMaster() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label 
+                        <Label
                           htmlFor="vendorCity"
                           className="font-semibold text-teal-700"
                         >
@@ -451,7 +451,7 @@ export default function VendorMaster() {
                       </div>
 
                       <div>
-                        <Label 
+                        <Label
                           htmlFor="vendorCountry"
                           className="font-semibold text-teal-700"
                         >
@@ -484,7 +484,7 @@ export default function VendorMaster() {
                     </div>
 
                     <div>
-                      <Label 
+                      <Label
                         htmlFor="vendorZipCode"
                         className="font-semibold text-teal-700"
                       >
@@ -517,7 +517,7 @@ export default function VendorMaster() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label 
+                        <Label
                           htmlFor="vendorEmail"
                           className="font-semibold text-teal-700"
                         >
@@ -550,7 +550,7 @@ export default function VendorMaster() {
                       </div>
 
                       <div>
-                        <Label 
+                        <Label
                           htmlFor="vendorTelephone"
                           className="font-semibold text-teal-700"
                         >
@@ -583,7 +583,7 @@ export default function VendorMaster() {
                     </div>
 
                     <div>
-                      <Label 
+                      <Label
                         htmlFor="vendorFax"
                         className="font-semibold text-slate-600"
                       >
@@ -620,7 +620,7 @@ export default function VendorMaster() {
                 </DialogContent>
               </Dialog>
 
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => {
                   const link = document.createElement("a");
@@ -684,13 +684,12 @@ export default function VendorMaster() {
                   </TableHeader>
                   <TableBody>
                     {filteredVendors.map((vendor, index) => (
-                      <TableRow 
+                      <TableRow
                         key={vendor.id}
-                        className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${
-                          index % 2 === 0 
-                            ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100" 
+                        className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${index % 2 === 0
+                            ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100"
                             : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
-                        }`}
+                          }`}
                       >
                         <TableCell className="font-medium">{vendor.vendorCode}</TableCell>
                         <TableCell>{vendor.vendorName}</TableCell>

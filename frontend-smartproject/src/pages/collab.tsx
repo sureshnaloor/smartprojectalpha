@@ -307,7 +307,7 @@ export default function CollabPage() {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Collaboration Hub</h1>
+        <h1 className="text-xl font-semibold text-stone-500 mb-2">Collaboration Hub</h1>
         <p className="text-gray-600">Stay connected with your team through discussions, announcements, and updates.</p>
       </div>
 

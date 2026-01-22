@@ -221,7 +221,7 @@ export default function EmployeeMaster() {
       ...formData,
       empMiddleName: formData.empMiddleName || undefined,
     };
-    
+
     if (editingEmployee) {
       updateMutation.mutate({ id: editingEmployee.id, data: submitData });
     } else {
@@ -307,8 +307,8 @@ export default function EmployeeMaster() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Employee Master</h1>
-            <p className="text-gray-600">Manage employee information and details</p>
+            <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">Employee Master</h1>
+            <p className="text-muted-foreground">Manage employee information and details</p>
           </div>
 
           {/* Actions Bar */}
@@ -320,7 +320,7 @@ export default function EmployeeMaster() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1"
               />
-              
+
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button onClick={() => resetForm()}>
@@ -328,7 +328,7 @@ export default function EmployeeMaster() {
                     Add Employee
                   </Button>
                 </DialogTrigger>
-                <DialogContent 
+                <DialogContent
                   className="max-w-2xl"
                   style={{
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)',
@@ -503,7 +503,7 @@ export default function EmployeeMaster() {
                 </DialogContent>
               </Dialog>
 
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => {
                   const link = document.createElement("a");
@@ -567,13 +567,12 @@ export default function EmployeeMaster() {
                   </TableHeader>
                   <TableBody>
                     {filteredEmployees.map((employee, index) => (
-                      <TableRow 
+                      <TableRow
                         key={employee.id}
-                        className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${
-                          index % 2 === 0 
-                            ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100" 
-                            : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
-                        }`}
+                        className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${index % 2 === 0
+                          ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100"
+                          : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
+                          }`}
                       >
                         <TableCell className="font-medium">{employee.employeeNumber}</TableCell>
                         <TableCell>

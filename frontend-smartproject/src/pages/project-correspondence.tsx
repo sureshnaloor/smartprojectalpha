@@ -129,7 +129,7 @@ export default function ProjectCorrespondence() {
             {/* Header Section */}
             <div className="relative flex items-center justify-center mb-8 p-6 rounded-xl bg-card border shadow-[0_10px_20px_rgba(0,0,0,0.1),0_6px_6px_rgba(0,0,0,0.1)] transition-all hover:shadow-[0_14px_28px_rgba(0,0,0,0.15),0_10px_10px_rgba(0,0,0,0.12)]">
                 <div className="text-center">
-                    <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                    <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                         Client Correspondence
                     </h1>
                     <p className="text-muted-foreground mt-2">Track Important Emails and External Links</p>
