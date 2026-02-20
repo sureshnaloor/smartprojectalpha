@@ -106,42 +106,30 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   Contact
                 </a>
                 <a
-                  href="/playground"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (authenticated) { setLocation('/newlanding'); }
+                    else { setLocation('/login'); }
+                  }}
                   className="nav-link flex items-center gap-1.5 text-teal-600 font-semibold"
                 >
                   <span>Playground</span>
-                  <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                </a>
-                <a
-                  href="/newlanding"
-                  className="nav-link flex items-center gap-1.5 text-amber-600 font-semibold"
-                >
-                  <span>New Landing</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
               </>
             ) : (
               <>
                 <a
-                  href="/playground"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (authenticated) { setLocation('/newlanding'); }
+                    else { setLocation('/login'); }
+                  }}
                   className="nav-link flex items-center gap-1.5 text-teal-600 font-semibold"
                 >
-                  <span>Playground/ Demo Test</span>
-                  <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                </a>
-                <a
-                  href="/newlanding"
-                  className="nav-link flex items-center gap-1.5 text-amber-600 font-semibold"
-                >
-                  <span>New Landing</span>
+                  <span>Playground</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
                 {/* {authenticated && (
@@ -272,44 +260,32 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   Contact
                 </a>
                 <a
-                  href="/playground"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (authenticated) { setLocation('/newlanding'); }
+                    else { setLocation('/login'); }
+                    setMobileMenuOpen(false);
+                  }}
                   className="block py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
                   <span>Playground</span>
-                  <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                </a>
-                <a
-                  href="/newlanding"
-                  className="block py-2 text-amber-600 font-semibold flex items-center gap-1.5"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <span>New Landing</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
               </>
             ) : (
               <>
                 <a
-                  href="/playground"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (authenticated) { setLocation('/newlanding'); }
+                    else { setLocation('/login'); }
+                    setMobileMenuOpen(false);
+                  }}
                   className="block w-full text-left py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
-                  <span>Playground/ Demo Test</span>
-                  <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                  </svg>
-                </a>
-                <a
-                  href="/newlanding"
-                  className="block w-full text-left py-2 text-amber-600 font-semibold flex items-center gap-1.5"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <span>New Landing</span>
+                  <span>Playground</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
                 {authenticated && (
