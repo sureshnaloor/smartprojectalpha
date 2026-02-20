@@ -49,6 +49,7 @@ export default function ProjectScope() {
             const res = await fetch(`/api/projects/${projectId}/scope/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: 'include',
             });
 
             if (!res.ok) {

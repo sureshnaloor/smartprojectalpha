@@ -42,6 +42,7 @@ export default function ProjectOtherDocuments() {
             const res = await fetch(`/api/projects/${projectId}/other-documents/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: 'include',
             });
 
             if (!res.ok) {

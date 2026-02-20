@@ -43,6 +43,7 @@ export default function ProjectRequestForInspection() {
             const res = await fetch(`/api/projects/${projectId}/request-for-inspection/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: 'include',
             });
 
             if (!res.ok) {

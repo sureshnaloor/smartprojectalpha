@@ -49,6 +49,7 @@ export default function ProjectBoq() {
             const res = await fetch(`/api/projects/${projectId}/boq/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: 'include',
             });
 
             if (!res.ok) {

@@ -45,6 +45,7 @@ export default function ProjectDrawings() {
             const res = await fetch(`/api/projects/${projectId}/drawings/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: 'include',
             });
 
             if (!res.ok) {

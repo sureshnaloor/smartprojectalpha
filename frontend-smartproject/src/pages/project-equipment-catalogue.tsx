@@ -42,6 +42,7 @@ export default function ProjectEquipmentCatalogue() {
             const res = await fetch(`/api/projects/${projectId}/equipment-catalogue/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: 'include',
             });
 
             if (!res.ok) {
