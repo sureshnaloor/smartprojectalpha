@@ -4,6 +4,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Add wavy pattern CSS
 const wavedPatternStyle = `
@@ -35,7 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
-import MasterLayout from "@/layouts/master-layout";
+import VendorMasterLayout from "@/layouts/vendor-master-layout";
 
 interface Vendor {
   id: number;
@@ -56,6 +63,18 @@ interface Vendor {
 async function getVendors(): Promise<Vendor[]> {
   const response = await fetch("/api/vendor-masters");
   if (!response.ok) throw new Error("Failed to fetch vendors");
+  return response.json();
+}
+
+async function getCountries() {
+  const response = await fetch("/api/countries");
+  if (!response.ok) throw new Error("Failed to fetch countries");
+  return response.json();
+}
+
+async function getCities() {
+  const response = await fetch("/api/cities");
+  if (!response.ok) throw new Error("Failed to fetch cities");
   return response.json();
 }
 
@@ -128,9 +147,19 @@ export default function VendorMaster() {
   });
 
   // Fetch vendors
-  const { data: vendors = [], isLoading } = useQuery({
+  const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
     queryKey: ["/api/vendor-masters"],
     queryFn: getVendors,
+  });
+
+  const { data: countries = [] } = useQuery({
+    queryKey: ["countries"],
+    queryFn: getCountries,
+  });
+
+  const { data: cities = [] } = useQuery({
+    queryKey: ["cities"],
+    queryFn: getCities,
   });
 
   // Create mutation
@@ -203,6 +232,10 @@ export default function VendorMaster() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.vendorCountry || !formData.vendorCity) {
+      toast({ title: "Validation Error", description: "Country and City are required.", variant: "destructive" });
+      return;
+    }
     const submitData = {
       ...formData,
       vendorFax: formData.vendorFax || undefined,
@@ -276,8 +309,15 @@ export default function VendorMaster() {
     vendor.vendorName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Filter cities based on selected country
+  const availableCities = cities.filter((city: any) => {
+    if (!formData.vendorCountry) return true; // Show all if no country selected, or you could return false to hide
+    const selectedCountry = countries.find((c: any) => c.name === formData.vendorCountry);
+    return selectedCountry ? city.countryId === selectedCountry.id : true;
+  });
+
   return (
-    <MasterLayout>
+    <VendorMasterLayout>
       <style>{wavedPatternStyle}</style>
       <div className="p-8 min-h-screen wavy-pattern" style={{
         backgroundImage: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 25%, #f0f9ff 50%, #e0e7ff 75%, #f3f4f6 100%), url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3ClinearGradient id=\'grad\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'%3E%3Cstop offset=\'0%\' style=\'stop-color:rgba(107,114,128,0.08);stop-opacity:1\' /%3E%3Cstop offset=\'100%\' style=\'stop-color:rgba(107,114,128,0.03);stop-opacity:1\' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d=\'M0,20 Q15,10 30,20 T60,20\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,35 Q15,25 30,35 T60,35\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,50 Q15,40 30,50 T60,50\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3C/svg%3E")',
@@ -420,66 +460,51 @@ export default function VendorMaster() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label
-                          htmlFor="vendorCity"
-                          className="font-semibold text-teal-700"
-                        >
-                          City <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="vendorCity"
-                          required
-                          value={formData.vendorCity}
-                          onChange={(e) =>
-                            setFormData({ ...formData, vendorCity: e.target.value })
-                          }
-                          className="mt-2 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-teal-50 transition-all duration-200"
-                          style={{
-                            background: '#ffffff',
-                            border: '2px solid #ccf0ee',
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.background = '#f0fdfa';
-                            e.target.style.borderColor = '#2dd4bf';
-                            e.target.style.boxShadow = '0 0 0 3px rgba(45, 212, 191, 0.1), inset 0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.background = '#ffffff';
-                            e.target.style.borderColor = '#ccf0ee';
-                            e.target.style.boxShadow = 'none';
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <Label
                           htmlFor="vendorCountry"
                           className="font-semibold text-teal-700"
                         >
                           Country <span className="text-red-500">*</span>
                         </Label>
-                        <Input
-                          id="vendorCountry"
-                          required
+                        <Select
                           value={formData.vendorCountry}
-                          onChange={(e) =>
-                            setFormData({ ...formData, vendorCountry: e.target.value })
-                          }
-                          className="mt-2 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-teal-50 transition-all duration-200"
-                          style={{
-                            background: '#ffffff',
-                            border: '2px solid #ccf0ee',
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.background = '#f0fdfa';
-                            e.target.style.borderColor = '#2dd4bf';
-                            e.target.style.boxShadow = '0 0 0 3px rgba(45, 212, 191, 0.1), inset 0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.background = '#ffffff';
-                            e.target.style.borderColor = '#ccf0ee';
-                            e.target.style.boxShadow = 'none';
-                          }}
-                        />
+                          onValueChange={(val) => setFormData({ ...formData, vendorCountry: val, vendorCity: "" })}
+                        >
+                          <SelectTrigger className="mt-2 bg-white border-2 border-[#ccf0ee] focus:ring-2 focus:ring-teal-500 transition-all duration-200">
+                            <SelectValue placeholder="Select Country" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {countries.map((c: any) => (
+                              <SelectItem key={c.id} value={c.name}>
+                                {c.name} {c.code ? `(${c.code})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label
+                          htmlFor="vendorCity"
+                          className="font-semibold text-teal-700"
+                        >
+                          City <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={formData.vendorCity}
+                          onValueChange={(val) => setFormData({ ...formData, vendorCity: val })}
+                          disabled={!formData.vendorCountry}
+                        >
+                          <SelectTrigger className="mt-2 bg-white border-2 border-[#ccf0ee] focus:ring-2 focus:ring-teal-500 transition-all duration-200 disabled:opacity-50">
+                            <SelectValue placeholder={formData.vendorCountry ? "Select City" : "Select Country First"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableCities.map((c: any) => (
+                              <SelectItem key={c.id} value={c.name}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
@@ -660,7 +685,7 @@ export default function VendorMaster() {
             background: '#ffffff',
             border: '1px solid rgba(13, 148, 136, 0.3)'
           }}>
-            {isLoading ? (
+            {vendorsLoading ? (
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
               </div>
@@ -687,8 +712,8 @@ export default function VendorMaster() {
                       <TableRow
                         key={vendor.id}
                         className={`transition-colors duration-200 border-b border-gray-200 hover:shadow-sm ${index % 2 === 0
-                            ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100"
-                            : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
+                          ? "bg-gradient-to-r from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100"
+                          : "bg-gradient-to-r from-slate-50 to-sky-50 hover:from-slate-100 hover:to-sky-100"
                           }`}
                       >
                         <TableCell className="font-medium">{vendor.vendorCode}</TableCell>
@@ -722,6 +747,6 @@ export default function VendorMaster() {
           </div>
         </div>
       </div>
-    </MasterLayout>
+    </VendorMasterLayout>
   );
 }

@@ -19,8 +19,20 @@ import ProjectLayout from "@/layouts/project-layout";
 import MasterLayout from "@/layouts/master-layout";
 import ResourceMaster from "@/pages/resource-master";
 import MaterialMaster from "@/pages/material-master";
+import MaterialMasterLayout from "@/layouts/material-master-layout";
+import MaterialMasterUom from "@/pages/material-master-uom";
+import MaterialMasterType from "@/pages/material-master-type";
+import MaterialMasterGroup from "@/pages/material-master-group";
 import VendorMaster from "@/pages/vendor-master";
+import VendorMasterCountry from "@/pages/vendor-master-country";
+import VendorMasterCity from "@/pages/vendor-master-city";
 import EmployeeMaster from "@/pages/employee-master";
+import EmployeeMasterLayout from "@/layouts/employee-master-layout";
+import EmployeeMasterNationality from "@/pages/employee-master-nationality";
+import EmployeeMasterTitle from "@/pages/employee-master-title";
+import EmployeeMasterPosition from "@/pages/employee-master-position";
+import EmployeeMasterGrade from "@/pages/employee-master-grade";
+import EmployeeMasterTrade from "@/pages/employee-master-trade";
 import EquipmentMaster from "@/pages/equipment-master";
 import RiskRegister from "@/pages/risk-register";
 import ProjectDailyProgress from "@/pages/project-daily-progress";
@@ -432,13 +444,43 @@ function Router() {
       <Route path="/resource-master" component={ResourceMaster} />
 
       {/* Material Master */}
-      <Route path="/material-master" component={MaterialMaster} />
+      <Route path="/material-master/uom">
+        <MaterialMasterLayout>
+          <MaterialMasterUom />
+        </MaterialMasterLayout>
+      </Route>
+      <Route path="/material-master/material-type">
+        <MaterialMasterLayout>
+          <MaterialMasterType />
+        </MaterialMasterLayout>
+      </Route>
+      <Route path="/material-master/material-group">
+        <MaterialMasterLayout>
+          <MaterialMasterGroup />
+        </MaterialMasterLayout>
+      </Route>
+      <Route path="/material-master">
+        <MaterialMasterLayout>
+          <MaterialMaster />
+        </MaterialMasterLayout>
+      </Route>
 
       {/* Vendor Master */}
       <Route path="/vendor-master" component={VendorMaster} />
+      <Route path="/vendor-master/country" component={VendorMasterCountry} />
+      <Route path="/vendor-master/city" component={VendorMasterCity} />
 
       {/* Employee Master */}
-      <Route path="/employee-master" component={EmployeeMaster} />
+      <Route path="/employee-master/nationality" component={EmployeeMasterNationality} />
+      <Route path="/employee-master/title" component={EmployeeMasterTitle} />
+      <Route path="/employee-master/position" component={EmployeeMasterPosition} />
+      <Route path="/employee-master/grade" component={EmployeeMasterGrade} />
+      <Route path="/employee-master/trade" component={EmployeeMasterTrade} />
+      <Route path="/employee-master">
+        <EmployeeMasterLayout>
+          <EmployeeMaster />
+        </EmployeeMasterLayout>
+      </Route>
 
       {/* Equipment Master */}
       <Route path="/equipment-master" component={EquipmentMaster} />

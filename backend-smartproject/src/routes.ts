@@ -59,6 +59,26 @@ import {
   equipmentResourceMappings,
   resources,
   fileUploads,
+  uoms,
+  materialTypes,
+  materialGroups,
+  insertUomSchema,
+  insertMaterialTypeSchema,
+  insertMaterialGroupSchema,
+  countries,
+  cities,
+  insertCountrySchema,
+  insertCitySchema,
+  nationalities,
+  employeeTitles,
+  employeePositions,
+  employeeGrades,
+  employeeTrades,
+  insertNationalitySchema,
+  insertEmployeeTitleSchema,
+  insertEmployeePositionSchema,
+  insertEmployeeGradeSchema,
+  insertEmployeeTradeSchema,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -1194,7 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const otherWorkPackagesTotal = allWorkPackages
             .filter(wp => wp.id !== id)
             .reduce((sum, wp) => sum + Number(wp.budgetedCost), 0);
-          
+
           if ((otherWorkPackagesTotal + Number(workPackageData.budgetedCost)) > Number(wbsItem.budgetedCost)) {
             return res.status(400).json({
               message: `Sum of all work package budgets (${otherWorkPackagesTotal + Number(workPackageData.budgetedCost)}) cannot exceed parent WBS budget (${wbsItem.budgetedCost})`
@@ -2799,8 +2819,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate resource type
       const validTypes = ["manpower", "equipment", "rental_manpower", "rental_equipment", "tools"];
       if (req.body.type && !validTypes.includes(req.body.type)) {
-        return res.status(400).json({ 
-          message: `Resource type must be one of: ${validTypes.join(", ")}` 
+        return res.status(400).json({
+          message: `Resource type must be one of: ${validTypes.join(", ")}`
         });
       }
 
@@ -2929,7 +2949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "drawings",
@@ -3068,7 +3088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "boq",
@@ -3193,7 +3213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "scope",
@@ -3310,7 +3330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, Buffer.from(fileContent), "application/json", fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "correspondence",
@@ -3593,7 +3613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "request-for-inspection",
@@ -3708,7 +3728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "itp-and-reports",
@@ -3823,7 +3843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "other-documents",
@@ -3938,7 +3958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
-      
+
       await db.insert(fileUploads).values({
         projectId,
         category: "equipment-catalogue",
@@ -4820,8 +4840,285 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const materials = csvData.map((row: any) => insertMaterialMasterSchema.parse(row));
-      const createdMaterials = await db.insert(materialMaster).values(materials).returning();
+      const createdMaterials = await db.insert(materialMaster).values(materials as any).returning();
       res.status(201).json(createdMaterials);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // UOM ROUTES
+  // ========================================
+
+  app.get("/api/uoms", async (req: Request, res: Response) => {
+    try {
+      const allUoms = await db.select().from(uoms).orderBy(uoms.name);
+      res.json(allUoms);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/uoms", async (req: Request, res: Response) => {
+    try {
+      const uomData = insertUomSchema.parse(req.body);
+      const [uom] = await db.insert(uoms).values(uomData).returning();
+      res.status(201).json(uom);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/uoms/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      const uomData = insertUomSchema.partial().parse(req.body);
+      const [updated] = await db.update(uoms)
+        .set({ ...uomData, updatedAt: new Date() })
+        .where(eq(uoms.id, id))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "UOM not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/uoms/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      await db.delete(uoms).where(eq(uoms.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // MATERIAL TYPE ROUTES
+  // ========================================
+
+  app.get("/api/material-types", async (req: Request, res: Response) => {
+    try {
+      const allTypes = await db.select().from(materialTypes).orderBy(materialTypes.name);
+      res.json(allTypes);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/material-types", async (req: Request, res: Response) => {
+    try {
+      const typeData = insertMaterialTypeSchema.parse(req.body);
+      const [materialType] = await db.insert(materialTypes).values(typeData).returning();
+      res.status(201).json(materialType);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/material-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      const typeData = insertMaterialTypeSchema.partial().parse(req.body);
+      const [updated] = await db.update(materialTypes)
+        .set({ ...typeData, updatedAt: new Date() })
+        .where(eq(materialTypes.id, id))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "Material Type not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/material-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      await db.delete(materialTypes).where(eq(materialTypes.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // MATERIAL GROUP ROUTES
+  // ========================================
+
+  app.get("/api/material-groups", async (req: Request, res: Response) => {
+    try {
+      const allGroups = await db.select().from(materialGroups).orderBy(materialGroups.name);
+      res.json(allGroups);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/material-groups", async (req: Request, res: Response) => {
+    try {
+      const groupData = insertMaterialGroupSchema.parse(req.body);
+      const [materialGroup] = await db.insert(materialGroups).values(groupData).returning();
+      res.status(201).json(materialGroup);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/material-groups/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      const groupData = insertMaterialGroupSchema.partial().parse(req.body);
+      const [updated] = await db.update(materialGroups)
+        .set({ ...groupData, updatedAt: new Date() })
+        .where(eq(materialGroups.id, id))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "Material Group not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/material-groups/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      await db.delete(materialGroups).where(eq(materialGroups.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // COUNTRY ROUTES
+  // ========================================
+
+  app.get("/api/countries", async (req: Request, res: Response) => {
+    try {
+      const allCountries = await db.select().from(countries).orderBy(countries.name);
+      res.json(allCountries);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/countries", async (req: Request, res: Response) => {
+    try {
+      const countryData = insertCountrySchema.parse(req.body);
+      const [country] = await db.insert(countries).values(countryData as any).returning();
+      res.status(201).json(country);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/countries/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      const countryData = insertCountrySchema.partial().parse(req.body);
+      const [updated] = await db.update(countries)
+        .set({ ...countryData, updatedAt: new Date() } as any)
+        .where(eq(countries.id, id))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "Country not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/countries/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      await db.delete(countries).where(eq(countries.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // CITY ROUTES
+  // ========================================
+
+  app.get("/api/cities", async (req: Request, res: Response) => {
+    try {
+      // Return cities joined with country name for better UX
+      const allCities = await db
+        .select({
+          id: cities.id,
+          name: cities.name,
+          countryId: cities.countryId,
+          countryName: countries.name,
+          createdAt: cities.createdAt,
+          updatedAt: cities.updatedAt,
+        })
+        .from(cities)
+        .leftJoin(countries, eq(cities.countryId, countries.id))
+        .orderBy(cities.name);
+      res.json(allCities);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/cities", async (req: Request, res: Response) => {
+    try {
+      const cityData = insertCitySchema.parse(req.body);
+      const [city] = await db.insert(cities).values(cityData as any).returning();
+      res.status(201).json(city);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/cities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      const cityData = insertCitySchema.partial().parse(req.body);
+      const [updated] = await db.update(cities)
+        .set({ ...cityData, updatedAt: new Date() } as any)
+        .where(eq(cities.id, id))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "City not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/cities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      await db.delete(cities).where(eq(cities.id, id));
+      res.status(204).end();
     } catch (err) {
       handleError(err, res);
     }
@@ -4859,7 +5156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vendor-masters", async (req: Request, res: Response) => {
     try {
       const vendorData = insertVendorMasterSchema.parse(req.body);
-      const [vendor] = await db.insert(vendorMaster).values(vendorData).returning();
+      const [vendor] = await db.insert(vendorMaster).values(vendorData as any).returning();
       res.status(201).json(vendor);
     } catch (err) {
       handleError(err, res);
@@ -4875,7 +5172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorData = insertVendorMasterSchema.partial().parse(req.body);
       const [updatedVendor] = await db
         .update(vendorMaster)
-        .set({ ...vendorData, updatedAt: new Date() })
+        .set({ ...vendorData, updatedAt: new Date() } as any)
         .where(eq(vendorMaster.id, id))
         .returning();
       if (!updatedVendor) {
@@ -4909,8 +5206,227 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const vendors = csvData.map((row: any) => insertVendorMasterSchema.parse(row));
-      const createdVendors = await db.insert(vendorMaster).values(vendors).returning();
+      const createdVendors = await db.insert(vendorMaster).values(vendors as any).returning();
       res.status(201).json(createdVendors);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // EMPLOYEE SETTINGS ROUTES
+  // ========================================
+
+  // Nationality Routes
+  app.get("/api/nationalities", async (_req: Request, res: Response) => {
+    try {
+      const results = await db.select().from(nationalities).orderBy(nationalities.name);
+      res.json(results);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/nationalities", async (req: Request, res: Response) => {
+    try {
+      const data = insertNationalitySchema.parse(req.body);
+      const [result] = await db.insert(nationalities).values(data as any).returning();
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/nationalities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertNationalitySchema.partial().parse(req.body);
+      const [result] = await db.update(nationalities).set({ ...data, updatedAt: new Date() } as any).where(eq(nationalities.id, id)).returning();
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/nationalities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(nationalities).where(eq(nationalities.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Employee Title Routes
+  app.get("/api/employee-titles", async (_req: Request, res: Response) => {
+    try {
+      const results = await db.select().from(employeeTitles).orderBy(employeeTitles.name);
+      res.json(results);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/employee-titles", async (req: Request, res: Response) => {
+    try {
+      const data = insertEmployeeTitleSchema.parse(req.body);
+      const [result] = await db.insert(employeeTitles).values(data as any).returning();
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/employee-titles/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertEmployeeTitleSchema.partial().parse(req.body);
+      const [result] = await db.update(employeeTitles).set({ ...data, updatedAt: new Date() } as any).where(eq(employeeTitles.id, id)).returning();
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/employee-titles/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(employeeTitles).where(eq(employeeTitles.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Employee Position Routes
+  app.get("/api/employee-positions", async (_req: Request, res: Response) => {
+    try {
+      const results = await db.select().from(employeePositions).orderBy(employeePositions.name);
+      res.json(results);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/employee-positions", async (req: Request, res: Response) => {
+    try {
+      const data = insertEmployeePositionSchema.parse(req.body);
+      const [result] = await db.insert(employeePositions).values(data as any).returning();
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/employee-positions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertEmployeePositionSchema.partial().parse(req.body);
+      const [result] = await db.update(employeePositions).set({ ...data, updatedAt: new Date() } as any).where(eq(employeePositions.id, id)).returning();
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/employee-positions/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(employeePositions).where(eq(employeePositions.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Employee Grade Routes
+  app.get("/api/employee-grades", async (_req: Request, res: Response) => {
+    try {
+      const results = await db.select().from(employeeGrades).orderBy(employeeGrades.name);
+      res.json(results);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/employee-grades", async (req: Request, res: Response) => {
+    try {
+      const data = insertEmployeeGradeSchema.parse(req.body);
+      const [result] = await db.insert(employeeGrades).values(data as any).returning();
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/employee-grades/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertEmployeeGradeSchema.partial().parse(req.body);
+      const [result] = await db.update(employeeGrades).set({ ...data, updatedAt: new Date() } as any).where(eq(employeeGrades.id, id)).returning();
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/employee-grades/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(employeeGrades).where(eq(employeeGrades.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Employee Trade Routes
+  app.get("/api/employee-trades", async (_req: Request, res: Response) => {
+    try {
+      const results = await db.select().from(employeeTrades).orderBy(employeeTrades.name);
+      res.json(results);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/employee-trades", async (req: Request, res: Response) => {
+    try {
+      const data = insertEmployeeTradeSchema.parse(req.body);
+      const [result] = await db.insert(employeeTrades).values(data as any).returning();
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/employee-trades/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertEmployeeTradeSchema.partial().parse(req.body);
+      const [result] = await db.update(employeeTrades).set({ ...data, updatedAt: new Date() } as any).where(eq(employeeTrades.id, id)).returning();
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/employee-trades/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(employeeTrades).where(eq(employeeTrades.id, id));
+      res.status(204).end();
     } catch (err) {
       handleError(err, res);
     }
@@ -4998,7 +5514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const employees = csvData.map((row: any) => insertEmployeeMasterSchema.parse(row));
-      const createdEmployees = await db.insert(employeeMaster).values(employees).returning();
+      const createdEmployees = await db.insert(employeeMaster).values(employees as any).returning();
       res.status(201).json(createdEmployees);
     } catch (err) {
       handleError(err, res);

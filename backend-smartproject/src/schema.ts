@@ -1025,3 +1025,132 @@ export const insertFileUploadSchema = createInsertSchema(fileUploads)
 
 export type FileUpload = typeof fileUploads.$inferSelect;
 export type InsertFileUpload = z.infer<typeof insertFileUploadSchema>;
+
+// UOM Table
+export const uoms = pgTable("uoms", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUomSchema = createInsertSchema(uoms).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type Uom = typeof uoms.$inferSelect;
+export type InsertUom = z.infer<typeof insertUomSchema>;
+
+// Material Type Table
+export const materialTypes = pgTable("material_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMaterialTypeSchema = createInsertSchema(materialTypes).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type MaterialType = typeof materialTypes.$inferSelect;
+export type InsertMaterialType = z.infer<typeof insertMaterialTypeSchema>;
+
+// Material Group Table
+export const materialGroups = pgTable("material_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMaterialGroupSchema = createInsertSchema(materialGroups).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type MaterialGroup = typeof materialGroups.$inferSelect;
+export type InsertMaterialGroup = z.infer<typeof insertMaterialGroupSchema>;
+
+// Country Table
+export const countries = pgTable("countries", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code"), // e.g. US, IN, UK
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCountrySchema = createInsertSchema(countries).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type Country = typeof countries.$inferSelect;
+export type InsertCountry = z.infer<typeof insertCountrySchema>;
+
+// City Table
+export const cities = pgTable("cities", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  countryId: integer("country_id").notNull().references(() => countries.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCitySchema = createInsertSchema(cities).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type City = typeof cities.$inferSelect;
+export type InsertCity = z.infer<typeof insertCitySchema>;
+// Nationality Table
+export const nationalities = pgTable("nationalities", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertNationalitySchema = createInsertSchema(nationalities).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type Nationality = typeof nationalities.$inferSelect;
+export type InsertNationality = z.infer<typeof insertNationalitySchema>;
+
+// Employee Title Table
+export const employeeTitles = pgTable("employee_titles", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmployeeTitleSchema = createInsertSchema(employeeTitles).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type EmployeeTitle = typeof employeeTitles.$inferSelect;
+export type InsertEmployeeTitle = z.infer<typeof insertEmployeeTitleSchema>;
+
+// Employee Position Table
+export const employeePositions = pgTable("employee_positions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmployeePositionSchema = createInsertSchema(employeePositions).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type EmployeePosition = typeof employeePositions.$inferSelect;
+export type InsertEmployeePosition = z.infer<typeof insertEmployeePositionSchema>;
+
+// Employee Grade Table
+export const employeeGrades = pgTable("employee_grades", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmployeeGradeSchema = createInsertSchema(employeeGrades).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type EmployeeGrade = typeof employeeGrades.$inferSelect;
+export type InsertEmployeeGrade = z.infer<typeof insertEmployeeGradeSchema>;
+
+// Employee Trade Table
+export const employeeTrades = pgTable("employee_trades", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmployeeTradeSchema = createInsertSchema(employeeTrades).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type EmployeeTrade = typeof employeeTrades.$inferSelect;
+export type InsertEmployeeTrade = z.infer<typeof insertEmployeeTradeSchema>;

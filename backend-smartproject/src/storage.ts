@@ -578,7 +578,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined> {
-    const [result] = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
+    const [result] = await db.update(tasks).set(data as any).where(eq(tasks.id, id)).returning();
     return result;
   }
 
@@ -598,7 +598,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createActivity(data: InsertActivity): Promise<Activity> {
-    const [result] = await db.insert(activities).values(data).returning();
+    const [result] = await db.insert(activities).values(data as any).returning();
     return {
       ...result,
       unitRate: result.unitRate,
@@ -606,7 +606,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateActivity(id: number, data: Partial<InsertActivity>): Promise<Activity | undefined> {
-    const [result] = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
+    const [result] = await db.update(activities).set(data as any).where(eq(activities.id, id)).returning();
     return result ? {
       ...result,
       unitRate: result.unitRate,
@@ -725,11 +725,11 @@ export class DatabaseStorage implements IStorage {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Calculate 30-day window (current month ± 15 days = 30 days total)
     const windowStart = new Date(today);
     windowStart.setDate(windowStart.getDate() - 15);
-    
+
     const windowEnd = new Date(today);
     windowEnd.setDate(windowEnd.getDate() + 15);
 
@@ -794,7 +794,7 @@ export class DatabaseStorage implements IStorage {
               (plannedStart <= windowStart && plannedEnd >= windowEnd)
             );
           }
-          
+
           if (!isInWindow) {
             pending.push(activity);
             continue;
@@ -921,13 +921,13 @@ export class DatabaseStorage implements IStorage {
     const relevantActivities = allActivities.filter((activity) => {
       const actualEnd = activity.actualToDate ? new Date(activity.actualToDate) : null;
       const actualStart = activity.actualStartDate ? new Date(activity.actualStartDate) : null;
-      
+
       // Completed: has actualToDate
       if (actualEnd) return true;
-      
+
       // In Progress: has actualStartDate but no actualToDate
       if (actualStart && !actualEnd) return true;
-      
+
       return false;
     });
 
@@ -966,7 +966,7 @@ export class DatabaseStorage implements IStorage {
 
       // Aggregate actual resources
       const actualResourceMap = new Map<string, Set<string>>();
-      
+
       activityProgressEntries.forEach((entry) => {
         entry.resourcesDeployed.forEach((resourceName) => {
           if (!actualResourceMap.has(resourceName)) {
