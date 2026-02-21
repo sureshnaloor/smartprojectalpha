@@ -44,7 +44,6 @@ export default function ProjectSubcontractCorrespondence() {
                 name,
                 link,
                 description,
-                uploadedBy: "Current User" // Replace with actual user
             });
 
             if (!res.ok) {
@@ -188,8 +187,8 @@ export default function ProjectSubcontractCorrespondence() {
                         <Card key={item.fileId} className="group overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 bg-muted/30">
                                 <div className="space-y-1 overflow-hidden">
-                                    <CardTitle className="text-base font-semibold truncate" title={item.fileInfo?.correspondenceName}>
-                                        {item.fileInfo?.correspondenceName || "Untitled"}
+                                    <CardTitle className="text-base font-semibold truncate" title={(item.fileInfo?.correspondenceName || item.fileInfo?.correspondencename)}>
+                                        {(item.fileInfo?.correspondenceName || item.fileInfo?.correspondencename) || "Untitled"}
                                     </CardTitle>
                                     <p className="text-xs text-muted-foreground truncate" title={item.fileInfo?.linkUrl}>
                                         {item.fileInfo?.linkUrl}
@@ -211,7 +210,7 @@ export default function ProjectSubcontractCorrespondence() {
                                         <span className="font-medium">Date:</span> {new Date(item.uploadTimestamp).toLocaleDateString()}
                                     </div>
                                     <div className="col-span-2">
-                                        <span className="font-medium">Added By:</span> {item.fileInfo?.uploadedBy || "Unknown"}
+                                        <span className="font-medium">Added By:</span> {(item.fileInfo?.uploadedBy || item.fileInfo?.uploadedby) || "Unknown"}
                                     </div>
                                 </div>
 

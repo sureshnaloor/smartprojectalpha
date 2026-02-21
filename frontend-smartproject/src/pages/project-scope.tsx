@@ -44,7 +44,6 @@ export default function ProjectScope() {
             formData.append("file", file);
             formData.append("scopeName", scopeName);
             formData.append("description", description);
-            formData.append("uploadedBy", "Current User"); // Replace with actual user if available
 
             const res = await fetch(`/api/projects/${projectId}/scope/upload`, {
                 method: "POST",
@@ -229,8 +228,8 @@ export default function ProjectScope() {
                         <Card key={file.fileId} className="group overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 bg-muted/30">
                                 <div className="space-y-1 overflow-hidden">
-                                    <CardTitle className="text-base font-semibold truncate" title={file.fileInfo?.scopeName || getDisplayName(file.fileName)}>
-                                        {file.fileInfo?.scopeName || getDisplayName(file.fileName)}
+                                    <CardTitle className="text-base font-semibold truncate" title={(file.fileInfo?.scopeName || file.fileInfo?.scopename) || getDisplayName(file.fileName)}>
+                                        {(file.fileInfo?.scopeName || file.fileInfo?.scopename) || getDisplayName(file.fileName)}
                                     </CardTitle>
                                     <p className="text-xs text-muted-foreground truncate" title={file.fileName}>
                                         {getDisplayName(file.fileName)}
@@ -255,7 +254,7 @@ export default function ProjectScope() {
                                         <span className="font-medium">Date:</span> {new Date(file.uploadTimestamp).toLocaleDateString()}
                                     </div>
                                     <div className="col-span-2">
-                                        <span className="font-medium">Uploaded By:</span> {file.fileInfo?.uploadedBy || "Unknown"}
+                                        <span className="font-medium">Uploaded By:</span> {(file.fileInfo?.uploadedBy || file.fileInfo?.uploadedby) || "Unknown"}
                                     </div>
                                 </div>
 

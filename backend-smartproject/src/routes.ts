@@ -58,6 +58,7 @@ import {
   equipmentMaster,
   equipmentResourceMappings,
   resources,
+  fileUploads,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -2903,7 +2904,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract metadata from body
       const drawingName = req.body.drawingName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User"; // In a real app, get from req.user
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       // Import dynamically to avoid top-level await issues if any
       const { uploadFile } = await import("./b2");
@@ -2921,10 +2925,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         drawingName: drawingName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "drawings",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: drawingName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3025,7 +3045,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract metadata from body
       const boqName = req.body.boqName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User";
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       // Import dynamically
       const { uploadFile } = await import("./b2");
@@ -3041,10 +3064,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         boqName: boqName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "boq",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: boqName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3131,7 +3170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract metadata from body
       const scopeName = req.body.scopeName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User";
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       // Import dynamically
       const { uploadFile } = await import("./b2");
@@ -3147,10 +3189,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         scopeName: scopeName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "scope",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: scopeName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3227,7 +3285,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID" });
       }
 
-      const { name, link, description, uploadedBy } = req.body;
+      const { name, link, description } = req.body;
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       if (!name || !link) {
         return res.status(400).json({ message: "Name and Link are required." });
@@ -3244,10 +3306,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         correspondenceName: name,
         description: description || "",
         linkUrl: link,
-        uploadedBy: uploadedBy || "Unknown User"
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, Buffer.from(fileContent), "application/json", fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "correspondence",
+        fileName: result.fileName || fileName,
+        originalName: "link.json",
+        displayName: name,
+        description,
+        fileSize: Buffer.from(fileContent).length,
+        contentType: "application/json",
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3499,7 +3577,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rfiName = req.body.rfiName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User";
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       const { uploadFile } = await import("./b2");
 
@@ -3508,10 +3589,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         rfiName: rfiName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "request-for-inspection",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: rfiName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3595,7 +3692,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const docName = req.body.docName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User";
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       const { uploadFile } = await import("./b2");
 
@@ -3604,10 +3704,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         docName: docName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "itp-and-reports",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: docName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3691,7 +3807,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const docName = req.body.docName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User";
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       const { uploadFile } = await import("./b2");
 
@@ -3700,10 +3819,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         docName: docName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "other-documents",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: docName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
@@ -3787,7 +3922,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const docName = req.body.docName || file.name;
       const description = req.body.description || "";
-      const uploadedBy = req.body.uploadedBy || "Unknown User";
+      const user = (req as any).user;
+      const uploadedByName = user?.name || req.body.uploadedBy || "Unknown User";
+      const uploadedById = user?.id || null;
+      const uploadedByEmail = user?.email || null;
 
       const { uploadFile } = await import("./b2");
 
@@ -3796,10 +3934,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileInfo = {
         docName: docName,
         description: description,
-        uploadedBy: uploadedBy
+        uploadedBy: uploadedByName
       };
 
       const result = await uploadFile(fileName, fileData, file.mimetype, fileInfo);
+      
+      await db.insert(fileUploads).values({
+        projectId,
+        category: "equipment-catalogue",
+        fileName: result.fileName || fileName,
+        originalName: file.name,
+        displayName: docName,
+        description,
+        fileSize: file.size,
+        contentType: file.mimetype,
+        b2FileId: result.fileId,
+        uploadedById,
+        uploadedByName,
+        uploadedByEmail,
+      });
+
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);

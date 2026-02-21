@@ -1000,3 +1000,28 @@ export type InsertEquipmentResourceMapping = z.infer<typeof insertEquipmentResou
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// File Uploads Table - stores metadata for all file uploads
+export const fileUploads = pgTable("file_uploads", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  category: text("category").notNull(), // drawings, boq, scope, correspondence, supplier-correspondence, request-for-inspection, itp-and-reports, other-documents, equipment-catalogue
+  fileName: text("file_name").notNull(), // B2 file path
+  originalName: text("original_name").notNull(), // Original file name
+  displayName: text("display_name"), // User-provided name (drawingName, boqName, etc.)
+  description: text("description"),
+  fileSize: integer("file_size"), // Size in bytes
+  contentType: text("content_type"), // MIME type
+  b2FileId: text("b2_file_id"), // Backblaze B2 file ID
+  uploadedById: integer("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+  uploadedByName: text("uploaded_by_name").notNull(),
+  uploadedByEmail: text("uploaded_by_email"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFileUploadSchema = createInsertSchema(fileUploads)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export type FileUpload = typeof fileUploads.$inferSelect;
+export type InsertFileUpload = z.infer<typeof insertFileUploadSchema>;
