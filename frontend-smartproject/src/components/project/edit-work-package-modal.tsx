@@ -87,6 +87,7 @@ export function EditWorkPackageModal({ workPackageId, isOpen, onOpenChange, onSu
       queryClient.invalidateQueries({ queryKey: [`/api/work-packages/${workPackageId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/wbs/${workPackage?.wbsItemId}/work-packages`] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${workPackage?.projectId}/wbs`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${workPackage?.projectId}/work-packages`] });
       toast({
         title: "Work Package Updated",
         description: "The Work Package has been updated successfully.",

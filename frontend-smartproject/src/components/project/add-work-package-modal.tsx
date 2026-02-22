@@ -91,6 +91,7 @@ export function AddWorkPackageModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/wbs/${wbsItemId}/work-packages`] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
       toast({
         title: "Success",
         description: "Work Package created successfully",

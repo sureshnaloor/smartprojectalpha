@@ -103,6 +103,25 @@ export default function NewProject() {
         enabled: !!projectId,
     });
 
+    // Fetch all work packages for the project (for WBS completion check)
+    const { data: projectWorkPackages = [] } = useQuery<WorkPackage[]>({
+        queryKey: [`/api/projects/${projectId}/work-packages`],
+        enabled: !!projectId,
+    });
+
+    // WBS is complete when every leaf WBS (no child WBS) has at least one work package.
+    // Edit Allocation is enabled only when the full WBS structure is closed in this way.
+    const isWbsComplete = useMemo(() => {
+        if (!flatWbsItems.length) return false;
+        const parentIds = new Set(flatWbsItems.map((i) => i.parentId).filter((id): id is number => id != null));
+        const leafWbsItems = flatWbsItems.filter((w) => !parentIds.has(w.id));
+        const wpCountByWbsId = projectWorkPackages.reduce<Record<number, number>>((acc, wp) => {
+            acc[wp.wbsItemId] = (acc[wp.wbsItemId] ?? 0) + 1;
+            return acc;
+        }, {});
+        return leafWbsItems.every((leaf) => (wpCountByWbsId[leaf.id] ?? 0) >= 1);
+    }, [flatWbsItems, projectWorkPackages]);
+
     // Helper component to check if WBS has work packages (for disabling Add Child WBS)
     const WbsItemActions = ({ item, level }: { item: WbsTreeNode; level: number }) => {
         const { data: workPackages = [] } = useQuery<WorkPackage[]>({
@@ -298,6 +317,7 @@ export default function NewProject() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
             toast({
                 title: "Deleted",
                 description: "WBS item and its children removed",
@@ -708,7 +728,11 @@ export default function NewProject() {
                                     </div>
                                 </div>
                             </div>
-                            <button className="w-full mt-6 py-3 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-white/50 transition-colors uppercase tracking-widest shadow-sm">
+                            <button
+                                className="w-full mt-6 py-3 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-white/50 transition-colors uppercase tracking-widest shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-white"
+                                disabled={!isWbsComplete}
+                                title={!isWbsComplete ? "Complete the WBS structure: every lowest-level WBS must have at least one Work Package." : undefined}
+                            >
                                 Edit Allocation
                             </button>
                         </div>

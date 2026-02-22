@@ -814,6 +814,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/projects/:projectId/work-packages", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const workPackages = await storage.getWorkPackagesByProject(projectId);
+      res.json(workPackages);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   app.get("/api/wbs/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);

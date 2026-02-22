@@ -1146,6 +1146,7 @@ function TreeItem({
                           await apiRequest("DELETE", `/api/work-packages/${wp.id}`);
                           queryClient.invalidateQueries({ queryKey: [`/api/wbs/${item.id}/work-packages`] });
                           queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+                          queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
                           toast({
                             title: "Work Package Deleted",
                             description: "The work package has been deleted successfully.",
@@ -1302,6 +1303,7 @@ function TreeItem({
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: [`/api/wbs/${item.id}/work-packages`] });
           queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
           onRefresh();
         }}
       />
@@ -1317,6 +1319,7 @@ function TreeItem({
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: [`/api/wbs/${item.id}/work-packages`] });
           queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
           onRefresh();
         }}
       />
