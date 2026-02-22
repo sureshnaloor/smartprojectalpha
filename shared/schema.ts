@@ -25,6 +25,8 @@ export const projects = pgTable("projects", {
   status: text("status"), // concept, planning, active, in progress, aborted, on-hold, completed
   startDate: date("start_date"),
   endDate: date("end_date"),
+  /** Budget allocation version: null = not completed, 0 = version 0 allocated, 1+ = amendments */
+  allocationVersion: integer("allocation_version"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -261,6 +263,7 @@ export const insertProjectSchema = createInsertSchema(projects)
       if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
       return val.toISOString().split('T')[0];
     }).optional().nullable(),
+    allocationVersion: z.number().int().min(0).optional().nullable(),
   });
 
 // Base WBS schema - a simpler version without all the refinements

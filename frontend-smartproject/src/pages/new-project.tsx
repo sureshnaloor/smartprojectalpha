@@ -41,6 +41,7 @@ import { EditWbsModal } from "@/components/project/edit-wbs-modal";
 import { WbsDetailsSheet } from "@/components/project/wbs-details-sheet";
 import { AddWorkPackageModal } from "@/components/project/add-work-package-modal";
 import { EditWorkPackageModal } from "@/components/project/edit-work-package-modal";
+import { EditAllocationModal } from "@/components/project/edit-allocation-modal";
 import { WbsItemWithWorkPackages } from "@/components/project/wbs-item-with-work-packages";
 import { ActivityNetworkDiagram } from "@/components/project/activity-network-diagram";
 import { ResourceNetworkDiagram } from "@/components/project/resource-network-diagram";
@@ -84,6 +85,7 @@ export default function NewProject() {
     const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<number | null>(null);
     const [selectedWbsForWorkPackage, setSelectedWbsForWorkPackage] = useState<{ id: number; name: string } | null>(null);
     const [selectedWpIdForDiagram, setSelectedWpIdForDiagram] = useState<number | null>(null);
+    const [isEditAllocationOpen, setIsEditAllocationOpen] = useState(false);
 
     // Fetch Project Details
     const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
@@ -121,6 +123,23 @@ export default function NewProject() {
         }, {});
         return leafWbsItems.every((leaf) => (wpCountByWbsId[leaf.id] ?? 0) >= 1);
     }, [flatWbsItems, projectWorkPackages]);
+
+    // Top-level WBS and allocation state (for Budget Overview after version 0)
+    const topLevelWbsItems = useMemo(
+        () => flatWbsItems.filter((w) => !w.parentId || w.isTopLevel),
+        [flatWbsItems]
+    );
+    const allocatedToWbs = useMemo(
+        () => topLevelWbsItems.reduce((sum, w) => sum + Number(w.budgetedCost || 0), 0),
+        [topLevelWbsItems]
+    );
+    const projectBudgetNum = Number(project?.budget) || 0;
+    // Version 0 is complete only when user has successfully clicked Allocate (stored on project)
+    const allocationComplete = project != null && project.allocationVersion != null;
+    const projectBuffer = projectBudgetNum - allocatedToWbs;
+    const usedBudgetForDisplay = allocationComplete ? allocatedToWbs : flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0);
+    const remainingForDisplay = allocationComplete ? projectBuffer : (projectBudgetNum - flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0));
+    const usagePercent = projectBudgetNum ? Math.round((usedBudgetForDisplay / projectBudgetNum) * 100) : 0;
 
     // Helper component to check if WBS has work packages (for disabling Add Child WBS)
     const WbsItemActions = ({ item, level }: { item: WbsTreeNode; level: number }) => {
@@ -704,9 +723,9 @@ export default function NewProject() {
                             </h3>
                             <div className="space-y-4">
                                 {[
-                                    { label: "Total Allocated", value: `${project.currency} ${Number(project.budget).toLocaleString()}`, color: "text-slate-600" },
-                                    { label: "Used Budget", value: `${project.currency} ${flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0).toLocaleString()}`, color: "text-slate-600" },
-                                    { label: "Remaining", value: `${project.currency} ${(Number(project.budget) - flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0)).toLocaleString()}`, color: "text-emerald-600 font-bold" },
+                                    { label: "Total Allocated", value: `${project.currency} ${projectBudgetNum.toLocaleString()}`, color: "text-slate-600" },
+                                    { label: "Used Budget", value: `${project.currency} ${usedBudgetForDisplay.toLocaleString()}`, color: "text-slate-600" },
+                                    { label: "Remaining", value: `${project.currency} ${remainingForDisplay.toLocaleString()}`, color: "text-emerald-600 font-bold" },
                                 ].map((row, i) => (
                                     <div key={i} className="flex justify-between items-center text-sm">
                                         <span className="text-slate-500">{row.label}</span>
@@ -717,13 +736,13 @@ export default function NewProject() {
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-xs font-bold text-slate-500 uppercase">Usage</span>
                                         <span className="text-xs font-bold text-slate-900">
-                                            {Math.round((flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0) / (Number(project.budget) || 1)) * 100)}%
+                                            {usagePercent}%
                                         </span>
                                     </div>
                                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-gradient-to-r from-blue-500 to-emerald-500"
-                                            style={{ width: `${Math.round((flatWbsItems.reduce((acc, i) => acc + Number(i.actualCost || 0), 0) / (Number(project.budget) || 1)) * 100)}%` }}
+                                            style={{ width: `${usagePercent}%` }}
                                         />
                                     </div>
                                 </div>
@@ -731,9 +750,10 @@ export default function NewProject() {
                             <button
                                 className="w-full mt-6 py-3 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-white/50 transition-colors uppercase tracking-widest shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-white"
                                 disabled={!isWbsComplete}
-                                title={!isWbsComplete ? "Complete the WBS structure: every lowest-level WBS must have at least one Work Package." : undefined}
+                                title={!isWbsComplete ? "Complete the WBS structure: every lowest-level WBS must have at least one Work Package." : allocationComplete ? "View current budget allocation" : undefined}
+                                onClick={() => isWbsComplete && setIsEditAllocationOpen(true)}
                             >
-                                Edit Allocation
+                                {allocationComplete ? "View Allocation" : "Edit Allocation"}
                             </button>
                         </div>
 
@@ -798,6 +818,17 @@ export default function NewProject() {
                 isOpen={isDetailsSheetOpen}
                 onOpenChange={setIsDetailsSheetOpen}
                 wbsId={detailsWbsId}
+            />
+
+            <EditAllocationModal
+                projectId={projectId!}
+                isOpen={isEditAllocationOpen}
+                onOpenChange={setIsEditAllocationOpen}
+                onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
+                }}
+                readOnly={allocationComplete}
             />
 
             {selectedWbsForWorkPackage && (

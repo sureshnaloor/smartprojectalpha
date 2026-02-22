@@ -25,6 +25,7 @@ export const projects = pgTable("projects", {
   status: text("status"), // concept, planning, active, in progress, aborted, on-hold, completed
   startDate: date("start_date"),
   endDate: date("end_date"),
+  allocationVersion: integer("allocation_version"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
