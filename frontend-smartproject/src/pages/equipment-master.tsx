@@ -46,8 +46,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
-import MasterLayout from "@/layouts/master-layout";
 import { EquipmentResourceMapper } from "@/components/project/equipment-resource-mapper";
 
 interface Equipment {
@@ -58,6 +64,7 @@ interface Equipment {
   description?: string;
   manufacturer?: string;
   model?: string;
+  year?: number | null;
   capacity?: string;
   unit?: string;
   costPerHour: string;
@@ -66,6 +73,15 @@ interface Equipment {
   createdAt: string;
   updatedAt: string;
 }
+
+interface MasterItem {
+  id: number;
+  name: string;
+  description?: string | null;
+}
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 2000 }, (_, i) => CURRENT_YEAR - i);
 
 // API functions
 async function getEquipment(): Promise<Equipment[]> {
@@ -131,16 +147,34 @@ export default function EquipmentMasterPage() {
     description: "",
     manufacturer: "",
     model: "",
+    year: "" as string | number,
     capacity: "",
     unit: "",
     costPerHour: "",
-    status: "Active",
     remarks: "",
   });
 
   const { data: equipment = [], isLoading } = useQuery({
     queryKey: ["equipment"],
     queryFn: getEquipment,
+  });
+
+  const { data: equipmentTypes = [] } = useQuery({
+    queryKey: ["/api/equipment-types"],
+    queryFn: async (): Promise<MasterItem[]> => {
+      const res = await fetch("/api/equipment-types");
+      if (!res.ok) throw new Error("Failed to fetch equipment types");
+      return res.json();
+    },
+  });
+
+  const { data: equipmentManufacturers = [] } = useQuery({
+    queryKey: ["/api/equipment-manufacturers"],
+    queryFn: async (): Promise<MasterItem[]> => {
+      const res = await fetch("/api/equipment-manufacturers");
+      if (!res.ok) throw new Error("Failed to fetch manufacturers");
+      return res.json();
+    },
   });
 
   const createMutation = useMutation({
@@ -216,10 +250,10 @@ export default function EquipmentMasterPage() {
       description: "",
       manufacturer: "",
       model: "",
+      year: "",
       capacity: "",
       unit: "",
       costPerHour: "",
-      status: "Active",
       remarks: "",
     });
     setEditingEquipment(null);
@@ -227,10 +261,17 @@ export default function EquipmentMasterPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload: Record<string, unknown> = {
+      ...formData,
+      year: formData.year === "" ? undefined : Number(formData.year),
+    };
     if (editingEquipment) {
-      updateMutation.mutate({ id: editingEquipment.id, data: formData });
+      updateMutation.mutate({
+        id: editingEquipment.id,
+        data: { ...payload, status: editingEquipment.status },
+      });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload as Omit<Equipment, "id" | "createdAt" | "updatedAt">);
     }
   };
 
@@ -243,10 +284,10 @@ export default function EquipmentMasterPage() {
       description: eq.description || "",
       manufacturer: eq.manufacturer || "",
       model: eq.model || "",
+      year: eq.year ?? "",
       capacity: eq.capacity || "",
       unit: eq.unit || "",
       costPerHour: eq.costPerHour,
-      status: eq.status,
       remarks: eq.remarks || "",
     });
     setIsDialogOpen(true);
@@ -271,6 +312,7 @@ export default function EquipmentMasterPage() {
 
         const csvData = lines.slice(1).map((line) => {
           const values = line.split(",").map((v) => v.trim());
+          const yearVal = values[headers.indexOf("year")];
           return {
             equipmentNumber: values[headers.indexOf("equipmentNumber")],
             equipmentName: values[headers.indexOf("equipmentName")],
@@ -278,6 +320,7 @@ export default function EquipmentMasterPage() {
             description: values[headers.indexOf("description")] || "",
             manufacturer: values[headers.indexOf("manufacturer")] || "",
             model: values[headers.indexOf("model")] || "",
+            year: yearVal ? parseInt(yearVal, 10) : undefined,
             capacity: values[headers.indexOf("capacity")] || "",
             unit: values[headers.indexOf("unit")] || "",
             costPerHour: values[headers.indexOf("costPerHour")],
@@ -301,7 +344,7 @@ export default function EquipmentMasterPage() {
   );
 
   return (
-    <MasterLayout>
+    <>
       <style>{wavedPatternStyle}</style>
       <div className="w-full">
         <div className="p-8 space-y-6">
@@ -371,14 +414,27 @@ export default function EquipmentMasterPage() {
                       <Label htmlFor="equipmentType" className="font-semibold text-stone-700">
                         Equipment Type *
                       </Label>
-                      <Input
-                        id="equipmentType"
+                      <Select
+                        value={formData.equipmentType || undefined}
+                        onValueChange={(v) => setFormData({ ...formData, equipmentType: v })}
                         required
-                        value={formData.equipmentType}
-                        onChange={(e) =>
-                          setFormData({ ...formData, equipmentType: e.target.value })
-                        }
-                      />
+                      >
+                        <SelectTrigger id="equipmentType">
+                          <SelectValue placeholder="Select type (add in Equipment Type tab)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            ...equipmentTypes,
+                            ...(formData.equipmentType && !equipmentTypes.some((t) => t.name === formData.equipmentType)
+                              ? [{ id: -1, name: formData.equipmentType }]
+                              : []),
+                          ].map((t) => (
+                            <SelectItem key={t.id} value={t.name}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -398,15 +454,28 @@ export default function EquipmentMasterPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="manufacturer" className="font-semibold text-stone-700">
-                        Manufacturer
+                        Manufacturer / OEM
                       </Label>
-                      <Input
-                        id="manufacturer"
-                        value={formData.manufacturer}
-                        onChange={(e) =>
-                          setFormData({ ...formData, manufacturer: e.target.value })
-                        }
-                      />
+                      <Select
+                        value={formData.manufacturer || undefined}
+                        onValueChange={(v) => setFormData({ ...formData, manufacturer: v })}
+                      >
+                        <SelectTrigger id="manufacturer">
+                          <SelectValue placeholder="Select manufacturer (add in Manufacturer tab)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            ...equipmentManufacturers,
+                            ...(formData.manufacturer && !equipmentManufacturers.some((m) => m.name === formData.manufacturer)
+                              ? [{ id: -1, name: formData.manufacturer }]
+                              : []),
+                          ].map((m) => (
+                            <SelectItem key={m.id} value={m.name}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>
@@ -421,6 +490,27 @@ export default function EquipmentMasterPage() {
                         }
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="year" className="font-semibold text-stone-700">
+                      Year
+                    </Label>
+                    <Select
+                      value={formData.year === "" ? undefined : String(formData.year)}
+                      onValueChange={(v) => setFormData({ ...formData, year: v === "" ? "" : Number(v) })}
+                    >
+                      <SelectTrigger id="year">
+                        <SelectValue placeholder="Select year (2001 onwards)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {YEAR_OPTIONS.map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -452,36 +542,20 @@ export default function EquipmentMasterPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="costPerHour" className="font-semibold text-stone-700">
-                        Cost per Hour *
-                      </Label>
-                      <Input
-                        id="costPerHour"
-                        required
-                        type="number"
-                        step="0.01"
-                        value={formData.costPerHour}
-                        onChange={(e) =>
-                          setFormData({ ...formData, costPerHour: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="status" className="font-semibold text-stone-700">
-                        Status *
-                      </Label>
-                      <Input
-                        id="status"
-                        required
-                        value={formData.status}
-                        onChange={(e) =>
-                          setFormData({ ...formData, status: e.target.value })
-                        }
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="costPerHour" className="font-semibold text-stone-700">
+                      Cost per Hour *
+                    </Label>
+                    <Input
+                      id="costPerHour"
+                      required
+                      type="number"
+                      step="0.01"
+                      value={formData.costPerHour}
+                      onChange={(e) =>
+                        setFormData({ ...formData, costPerHour: e.target.value })
+                      }
+                    />
                   </div>
 
                   <div>
@@ -569,6 +643,7 @@ export default function EquipmentMasterPage() {
                       <TableHead className="text-gray-900 font-bold">Type</TableHead>
                       <TableHead className="text-gray-900 font-bold">Manufacturer</TableHead>
                       <TableHead className="text-gray-900 font-bold">Model</TableHead>
+                      <TableHead className="text-gray-900 font-bold">Year</TableHead>
                       <TableHead className="text-gray-900 font-bold">Cost/Hour</TableHead>
                       <TableHead className="text-gray-900 font-bold">Status</TableHead>
                       <TableHead className="text-gray-900 font-bold">Actions</TableHead>
@@ -588,6 +663,7 @@ export default function EquipmentMasterPage() {
                         <TableCell>{eq.equipmentType}</TableCell>
                         <TableCell>{eq.manufacturer || "-"}</TableCell>
                         <TableCell>{eq.model || "-"}</TableCell>
+                        <TableCell>{eq.year ?? "-"}</TableCell>
                         <TableCell>{parseFloat(eq.costPerHour).toFixed(2)}</TableCell>
                         <TableCell>
                           <span
@@ -628,6 +704,6 @@ export default function EquipmentMasterPage() {
           </div>
         </div>
       </div>
-    </MasterLayout>
+    </>
   );
 }

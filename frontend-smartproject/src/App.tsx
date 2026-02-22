@@ -14,6 +14,8 @@ import CostControl from "@/pages/cost-control";
 import Reports from "@/pages/reports";
 import UnderConstruction from "@/pages/under-construction";
 import ActivityMaster from "@/pages/activity-master";
+import ActivityMasterLayout from "@/layouts/activity-master-layout";
+import ActivityMasterUom from "@/pages/activity-master-uom";
 import TaskMaster from "@/pages/task-master";
 import ProjectLayout from "@/layouts/project-layout";
 import MasterLayout from "@/layouts/master-layout";
@@ -23,10 +25,16 @@ import MaterialMasterLayout from "@/layouts/material-master-layout";
 import MaterialMasterUom from "@/pages/material-master-uom";
 import MaterialMasterType from "@/pages/material-master-type";
 import MaterialMasterGroup from "@/pages/material-master-group";
+import ServiceMaster from "@/pages/service-master";
+import ServiceMasterLayout from "@/layouts/service-master-layout";
+import ServiceMasterUom from "@/pages/service-master-uom";
+import ServiceMasterType from "@/pages/service-master-type";
+import ServiceMasterGroup from "@/pages/service-master-group";
 import VendorMaster from "@/pages/vendor-master";
 import VendorMasterCountry from "@/pages/vendor-master-country";
 import VendorMasterCity from "@/pages/vendor-master-city";
 import EmployeeMaster from "@/pages/employee-master";
+import EmployeeMasterRental from "@/pages/employee-master-rental";
 import EmployeeMasterLayout from "@/layouts/employee-master-layout";
 import EmployeeMasterNationality from "@/pages/employee-master-nationality";
 import EmployeeMasterTitle from "@/pages/employee-master-title";
@@ -34,6 +42,10 @@ import EmployeeMasterPosition from "@/pages/employee-master-position";
 import EmployeeMasterGrade from "@/pages/employee-master-grade";
 import EmployeeMasterTrade from "@/pages/employee-master-trade";
 import EquipmentMaster from "@/pages/equipment-master";
+import EquipmentMasterLayout from "@/layouts/equipment-master-layout";
+import EquipmentMasterRental from "@/pages/equipment-master-rental";
+import EquipmentMasterManufacturers from "@/pages/equipment-master-manufacturers";
+import EquipmentMasterTypes from "@/pages/equipment-master-types";
 import RiskRegister from "@/pages/risk-register";
 import ProjectDailyProgress from "@/pages/project-daily-progress";
 import ResourcePlan from "@/pages/resource-plan";
@@ -435,7 +447,16 @@ function Router() {
       </Route>
 
       {/* Activity Master */}
-      <Route path="/activity-master" component={ActivityMaster} />
+      <Route path="/activity-master/uom">
+        <ActivityMasterLayout>
+          <ActivityMasterUom />
+        </ActivityMasterLayout>
+      </Route>
+      <Route path="/activity-master">
+        <ActivityMasterLayout>
+          <ActivityMaster />
+        </ActivityMasterLayout>
+      </Route>
 
       {/* Task Master */}
       <Route path="/task-master" component={TaskMaster} />
@@ -465,6 +486,28 @@ function Router() {
         </MaterialMasterLayout>
       </Route>
 
+      {/* Service Master */}
+      <Route path="/service-master/uom">
+        <ServiceMasterLayout>
+          <ServiceMasterUom />
+        </ServiceMasterLayout>
+      </Route>
+      <Route path="/service-master/service-type">
+        <ServiceMasterLayout>
+          <ServiceMasterType />
+        </ServiceMasterLayout>
+      </Route>
+      <Route path="/service-master/service-group">
+        <ServiceMasterLayout>
+          <ServiceMasterGroup />
+        </ServiceMasterLayout>
+      </Route>
+      <Route path="/service-master">
+        <ServiceMasterLayout>
+          <ServiceMaster />
+        </ServiceMasterLayout>
+      </Route>
+
       {/* Vendor Master */}
       <Route path="/vendor-master" component={VendorMaster} />
       <Route path="/vendor-master/country" component={VendorMasterCountry} />
@@ -476,6 +519,11 @@ function Router() {
       <Route path="/employee-master/position" component={EmployeeMasterPosition} />
       <Route path="/employee-master/grade" component={EmployeeMasterGrade} />
       <Route path="/employee-master/trade" component={EmployeeMasterTrade} />
+      <Route path="/employee-master/rental">
+        <EmployeeMasterLayout>
+          <EmployeeMasterRental />
+        </EmployeeMasterLayout>
+      </Route>
       <Route path="/employee-master">
         <EmployeeMasterLayout>
           <EmployeeMaster />
@@ -483,7 +531,18 @@ function Router() {
       </Route>
 
       {/* Equipment Master */}
-      <Route path="/equipment-master" component={EquipmentMaster} />
+      <Route path="/equipment-master/rental">
+        <EquipmentMasterLayout>
+          <EquipmentMasterRental />
+        </EquipmentMasterLayout>
+      </Route>
+      <Route path="/equipment-master/manufacturers" component={EquipmentMasterManufacturers} />
+      <Route path="/equipment-master/equipment-types" component={EquipmentMasterTypes} />
+      <Route path="/equipment-master">
+        <EquipmentMasterLayout>
+          <EquipmentMaster />
+        </EquipmentMasterLayout>
+      </Route>
 
       {/* New Pages Ported from Vanilla JS */}
       <Route path="/newlanding" component={NewLanding} />

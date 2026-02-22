@@ -43,7 +43,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import MasterLayout from "@/layouts/master-layout";
+
+interface Uom {
+  id: number;
+  name: string;
+  description: string | null;
+}
 
 interface Activity {
   id: number;
@@ -54,7 +59,6 @@ interface Activity {
   remarks: string | null;
   createdAt: string;
   updatedAt: string;
-  currency: "USD" | "EUR" | "GBP" | "SAR";
 }
 
 interface ActivityFormData {
@@ -62,7 +66,6 @@ interface ActivityFormData {
   description: string;
   unitOfMeasure: string;
   unitRate: number;
-  currency: "USD" | "EUR" | "GBP" | "SAR";
   remarks: string;
 }
 
@@ -80,12 +83,21 @@ export default function ActivityMaster() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [formUom, setFormUom] = useState("");
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
 
-  // Fetch activities
   const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: ["/api/activities"],
+  });
+
+  const { data: uoms = [] } = useQuery<Uom[]>({
+    queryKey: ["/api/uoms"],
+    queryFn: async () => {
+      const res = await fetch("/api/uoms");
+      if (!res.ok) throw new Error("Failed to fetch UOMs");
+      return res.json();
+    },
   });
 
   // Create activity mutation
@@ -182,7 +194,6 @@ export default function ActivityMaster() {
             description: values[headers.indexOf('description')] || null,
             unitOfMeasure: values[headers.indexOf('unitOfMeasure')],
             unitRate: parseFloat(values[headers.indexOf('unitRate')] || '0'),
-            currency: values[headers.indexOf('currency')] || 'USD',
             remarks: values[headers.indexOf('remarks')] || null,
           };
         });
@@ -209,9 +220,8 @@ export default function ActivityMaster() {
     const data: ActivityFormData = {
       name: formData.get("name") as string,
       description: formData.get("description") as string,
-      unitOfMeasure: formData.get("unitOfMeasure") as string,
+      unitOfMeasure: formUom,
       unitRate: parseFloat(formData.get("unitRate") as string),
-      currency: formData.get("currency") as "USD" | "EUR" | "GBP" | "SAR",
       remarks: formData.get("remarks") as string,
     };
 
@@ -222,9 +232,9 @@ export default function ActivityMaster() {
     }
   };
 
-  // Handle edit click
   const handleEdit = (activity: Activity) => {
     setEditingActivity(activity);
+    setFormUom(activity.unitOfMeasure);
     setIsDialogOpen(true);
   };
 
@@ -236,7 +246,7 @@ export default function ActivityMaster() {
   };
 
   return (
-    <MasterLayout>
+    <>
       <style>{wavedPatternStyle}</style>
       <div className="flex-1 space-y-4 p-8 pt-6 wavy-pattern" style={{
         backgroundImage: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 25%, #f0f9ff 50%, #e0e7ff 75%, #f3f4f6 100%), url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3ClinearGradient id=\'grad\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'%3E%3Cstop offset=\'0%\' style=\'stop-color:rgba(107,114,128,0.08);stop-opacity:1\' /%3E%3Cstop offset=\'100%\' style=\'stop-color:rgba(107,114,128,0.03);stop-opacity:1\' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d=\'M0,20 Q15,10 30,20 T60,20\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,35 Q15,25 30,35 T60,35\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3Cpath d=\'M0,50 Q15,40 30,50 T60,50\' stroke=\'url(%23grad)\' stroke-width=\'1.5\' fill=\'none\'/%3E%3C/svg%3E")',
@@ -254,9 +264,9 @@ export default function ActivityMaster() {
                 className="pl-8 w-[300px]"
               />
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingActivity(null); else if (!editingActivity) setFormUom(""); }}>
               <DialogTrigger asChild>
-                <Button onClick={() => setEditingActivity(null)}>
+                <Button onClick={() => { setEditingActivity(null); setFormUom(""); }}>
                   <Plus className="mr-2 h-4 w-4" />
                   New Activity
                 </Button>
@@ -297,12 +307,24 @@ export default function ActivityMaster() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="unitOfMeasure">Unit of Measure</Label>
-                    <Input
-                      id="unitOfMeasure"
+                    <Select
                       name="unitOfMeasure"
-                      defaultValue={editingActivity?.unitOfMeasure}
+                      value={formUom}
+                      onValueChange={setFormUom}
                       required
-                    />
+                    >
+                      <SelectTrigger id="unitOfMeasure">
+                        <SelectValue placeholder="Select UOM" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uoms.map((u) => (
+                          <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {uoms.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Add UOMs in the UOM tab first.</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="unitRate">Unit Rate</Label>
@@ -314,20 +336,6 @@ export default function ActivityMaster() {
                       defaultValue={editingActivity?.unitRate}
                       required
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select name="currency" defaultValue={editingActivity?.currency || "USD"}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                        <SelectItem value="SAR">SAR</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="remarks">Remarks</Label>
@@ -398,7 +406,6 @@ export default function ActivityMaster() {
                 <TableHead className="font-bold text-gray-900">Description</TableHead>
                 <TableHead className="font-bold text-gray-900">Unit of Measure</TableHead>
                 <TableHead className="font-bold text-gray-900">Unit Rate</TableHead>
-                <TableHead className="font-bold text-gray-900">Currency</TableHead>
                 <TableHead className="font-bold text-gray-900">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -412,7 +419,6 @@ export default function ActivityMaster() {
                   <TableCell>{activity.description}</TableCell>
                   <TableCell>{activity.unitOfMeasure}</TableCell>
                   <TableCell>{activity.unitRate}</TableCell>
-                  <TableCell>{activity.currency}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
@@ -437,6 +443,6 @@ export default function ActivityMaster() {
           </Table>
         </div>
       </div>
-    </MasterLayout>
+    </>
   );
 } 

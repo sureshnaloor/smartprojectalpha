@@ -27,7 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Download, Users, HardDrive } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 
 const wavedPatternStyle = `
@@ -117,11 +117,26 @@ async function bulkUploadResources(csvData: any[]): Promise<Resource[]> {
   return response.json();
 }
 
+interface MappedEntities {
+  resourceType: string;
+  ownManpower: Array<{ id: number; employeeNumber: string; empFirstName: string; empLastName: string }>;
+  rentalManpower: any[];
+  ownEquipment: Array<{ id: number; equipmentNumber: string; equipmentName: string }>;
+  rentalEquipment: any[];
+}
+
+async function getMappedEntities(resourceId: number): Promise<MappedEntities> {
+  const response = await fetch(`/api/resources/${resourceId}/mapped-entities`);
+  if (!response.ok) throw new Error("Failed to fetch mapped entities");
+  return response.json();
+}
+
 export default function ResourceMaster() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -139,6 +154,12 @@ export default function ResourceMaster() {
   const { data: resources = [], isLoading } = useQuery({
     queryKey: ["resources"],
     queryFn: getResources,
+  });
+
+  const { data: mappedEntities, isLoading: mappedLoading } = useQuery({
+    queryKey: ["resources", selectedResourceId, "mapped-entities"],
+    queryFn: () => getMappedEntities(selectedResourceId!),
+    enabled: selectedResourceId != null,
   });
 
   const createMutation = useMutation({
@@ -285,6 +306,8 @@ export default function ResourceMaster() {
       deleteMutation.mutate(id);
     }
   };
+
+  const selectedResource = resources.find((r) => r.id === selectedResourceId);
 
   const resetForm = () => {
     setFormData({
@@ -492,66 +515,160 @@ export default function ResourceMaster() {
           </div>
         </div>
 
-        <div className="rounded-md border border-gray-200" style={{
-          boxShadow: '0 4px 6px -1px rgba(107, 114, 128, 0.1), 0 2px 4px -1px rgba(107, 114, 128, 0.06)'
-        }}>
-          <Table>
-            <TableHeader style={{
-              backgroundImage: 'linear-gradient(to right, rgb(243, 244, 246), rgb(229, 231, 235))',
-            }}>
-              <TableRow>
-                <TableHead className="font-bold text-gray-900">Type</TableHead>
-                <TableHead className="font-bold text-gray-900">Name</TableHead>
-                <TableHead className="font-bold text-gray-900">Description</TableHead>
-                <TableHead className="font-bold text-gray-900">Unit of Measure</TableHead>
-                <TableHead className="font-bold text-gray-900">Unit Rate</TableHead>
-                <TableHead className="font-bold text-gray-900">Currency</TableHead>
-                <TableHead className="font-bold text-gray-900">Availability</TableHead>
-                <TableHead className="font-bold text-gray-900">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {resources.map((resource, index) => (
-                <TableRow key={resource.id} className={index % 2 === 0 ? "bg-gradient-to-r from-gray-50 to-slate-50" : "bg-gradient-to-r from-slate-50 to-sky-50"} style={{
-                  borderColor: 'rgba(107, 114, 128, 0.2)',
-                  transition: 'background-color 0.2s ease'
+        <div className="flex flex-col gap-4 flex-1 min-h-0">
+          {/* Top section: Resources list (scrollable if needed) */}
+          <div className="rounded-md border border-gray-200 flex-shrink-0 overflow-hidden" style={{
+            boxShadow: '0 4px 6px -1px rgba(107, 114, 128, 0.1), 0 2px 4px -1px rgba(107, 114, 128, 0.06)'
+          }}>
+            <div className="max-h-[40vh] overflow-y-auto">
+              <Table>
+                <TableHeader style={{
+                  backgroundImage: 'linear-gradient(to right, rgb(243, 244, 246), rgb(229, 231, 235))',
                 }}>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${resource.type === "manpower" ? "bg-blue-100 text-blue-800" :
-                      resource.type === "equipment" ? "bg-green-100 text-green-800" :
-                        "bg-orange-100 text-orange-800"
-                      }`}>
-                      {resource.type}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">{resource.name}</TableCell>
-                  <TableCell>{resource.description}</TableCell>
-                  <TableCell>{resource.unitOfMeasure}</TableCell>
-                  <TableCell>{resource.unitRate}</TableCell>
-                  <TableCell>{resource.currency}</TableCell>
-                  <TableCell>{resource.availability}%</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(resource)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(resource.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  <TableRow>
+                    <TableHead className="font-bold text-gray-900">Type</TableHead>
+                    <TableHead className="font-bold text-gray-900">Name</TableHead>
+                    <TableHead className="font-bold text-gray-900">Description</TableHead>
+                    <TableHead className="font-bold text-gray-900">Unit of Measure</TableHead>
+                    <TableHead className="font-bold text-gray-900">Unit Rate</TableHead>
+                    <TableHead className="font-bold text-gray-900">Currency</TableHead>
+                    <TableHead className="font-bold text-gray-900">Availability</TableHead>
+                    <TableHead className="font-bold text-gray-900">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {resources.map((resource, index) => (
+                    <TableRow
+                      key={resource.id}
+                      className={`${index % 2 === 0 ? "bg-gradient-to-r from-gray-50 to-slate-50" : "bg-gradient-to-r from-slate-50 to-sky-50"} cursor-pointer hover:opacity-90 ${selectedResourceId === resource.id ? "ring-1 ring-primary/50 bg-primary/5" : ""}`}
+                      style={{ borderColor: "rgba(107, 114, 128, 0.2)", transition: "background-color 0.2s ease" }}
+                      onClick={() => setSelectedResourceId(resource.id)}
+                    >
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${resource.type === "manpower" ? "bg-blue-100 text-blue-800" : resource.type === "equipment" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}`}>
+                          {resource.type}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{resource.name}</TableCell>
+                      <TableCell>{resource.description}</TableCell>
+                      <TableCell>{resource.unitOfMeasure}</TableCell>
+                      <TableCell>{resource.unitRate}</TableCell>
+                      <TableCell>{resource.currency}</TableCell>
+                      <TableCell>{resource.availability}%</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(resource)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleDelete(resource.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {/* Bottom section: Mapped entities for selected resource */}
+          <div className="rounded-md border border-gray-200 flex-1 min-h-[200px] overflow-hidden flex flex-col bg-white" style={{
+            boxShadow: '0 4px 6px -1px rgba(107, 114, 128, 0.1), 0 2px 4px -1px rgba(107, 114, 128, 0.06)'
+          }}>
+            <div className="px-4 py-3 border-b border-gray-200 bg-slate-50 font-semibold text-gray-800">
+              {selectedResource ? (
+                <>Mapped entities for: <span className="text-primary">{selectedResource.name}</span></>
+              ) : (
+                "Select a resource above to view mapped manpower and equipment"
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 min-h-0">
+              {!selectedResourceId ? (
+                <p className="text-sm text-gray-500">Click a resource row to see its mapped employees or equipment below.</p>
+              ) : mappedLoading ? (
+                <div className="py-6 text-center text-gray-500">Loading mapped entities...</div>
+              ) : mappedEntities ? (
+                <div className="space-y-4">
+                  {mappedEntities.resourceType === "manpower" && (
+                    <>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                          <Users className="h-4 w-4" />
+                          Own Manpower (Employee Master)
+                        </h4>
+                        {mappedEntities.ownManpower.length === 0 ? (
+                          <p className="text-sm text-gray-500 pl-6">No employees mapped to this resource.</p>
+                        ) : (
+                          <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
+                            {mappedEntities.ownManpower.map((emp: any) => (
+                              <li key={emp.id}>
+                                {emp.employeeNumber} – {emp.empFirstName} {emp.empLastName}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                          <Users className="h-4 w-4" />
+                          Rental Manpower
+                        </h4>
+                        {mappedEntities.rentalManpower.length === 0 ? (
+                          <p className="text-sm text-gray-500 pl-6">No rental manpower mapped. (Mapping can be added later.)</p>
+                        ) : (
+                          <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
+                            {mappedEntities.rentalManpower.map((r: any) => (
+                              <li key={r.id}>{r.employeeNumber} – {r.empFirstName} {r.empLastName}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {mappedEntities.resourceType === "equipment" && (
+                    <>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                          <HardDrive className="h-4 w-4" />
+                          Own Equipment (Equipment Master)
+                        </h4>
+                        {mappedEntities.ownEquipment.length === 0 ? (
+                          <p className="text-sm text-gray-500 pl-6">No equipment mapped to this resource.</p>
+                        ) : (
+                          <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
+                            {mappedEntities.ownEquipment.map((eq: any) => (
+                              <li key={eq.id}>
+                                {eq.equipmentNumber} – {eq.equipmentName}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                          <HardDrive className="h-4 w-4" />
+                          Rental Equipment
+                        </h4>
+                        {mappedEntities.rentalEquipment.length === 0 ? (
+                          <p className="text-sm text-gray-500 pl-6">No rental equipment mapped. (Mapping can be added later.)</p>
+                        ) : (
+                          <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
+                            {mappedEntities.rentalEquipment.map((r: any) => (
+                              <li key={r.id}>{r.equipmentNumber} – {r.equipmentName}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {mappedEntities.resourceType !== "manpower" && mappedEntities.resourceType !== "equipment" && (
+                    <p className="text-sm text-gray-500">Mapped entities are shown for manpower and equipment resources only.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
     </MasterLayout>

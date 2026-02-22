@@ -1,0 +1,9 @@
+serviceCode,serviceDescription,uom,serviceType,serviceGroup
+SVC001,Third-party inspection and certification,EA,Inspection,Quality
+SVC002,Design and engineering consultancy,HR,Consultancy,Engineering
+SVC003,Soil testing and geotechnical survey,EA,Testing,Survey
+SVC004,Site security and guarding,HR,Security,Site Services
+SVC005,Crane hire and lifting,HR,Equipment Hire,Lifting
+SVC006,Scaffolding supply and erection,M2,Scaffolding,Site Services
+SVC007,Waste removal and disposal,EA,Waste,Environmental
+SVC008,Legal and contract administration,HR,Legal,Admin

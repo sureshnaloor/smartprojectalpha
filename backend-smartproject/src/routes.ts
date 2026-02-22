@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, isNull } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import {
   insertProjectSchema as projectSchema,
   insertWbsItemSchema as wbsItemSchema,
@@ -46,16 +46,30 @@ import {
   insertPlannedActivityTaskSchema,
   insertWorkPackageSchema,
   insertMaterialMasterSchema,
+  insertServiceMasterSchema,
+  insertServiceTypeSchema,
+  insertServiceGroupSchema,
   insertVendorMasterSchema,
   insertEmployeeMasterSchema,
   insertEmployeeResourceMappingSchema,
   insertEquipmentMasterSchema,
   insertEquipmentResourceMappingSchema,
+  insertRentalManpowerSchema,
   materialMaster,
+  serviceMaster,
+  serviceTypes,
+  serviceGroups,
   vendorMaster,
   employeeMaster,
+  rentalManpower,
   employeeResourceMappings,
   equipmentMaster,
+  equipmentManufacturers,
+  equipmentTypes,
+  rentalEquipment,
+  insertEquipmentManufacturerSchema,
+  insertEquipmentTypeSchema,
+  insertRentalEquipmentSchema,
   equipmentResourceMappings,
   resources,
   fileUploads,
@@ -2077,6 +2091,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const resources = await storage.getResources();
       res.json(resources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get entities mapped to a resource (manpower: own + rental; equipment: own + rental)
+  app.get("/api/resources/:id/mapped-entities", async (req: Request, res: Response) => {
+    try {
+      const resourceId = parseInt(req.params.id);
+      if (isNaN(resourceId)) {
+        return res.status(400).json({ message: "Invalid resource ID" });
+      }
+      const [resource] = await db.select().from(resources).where(eq(resources.id, resourceId));
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      const type = resource.type;
+
+      const result: {
+        resourceType: string;
+        ownManpower: any[];
+        rentalManpower: any[];
+        ownEquipment: any[];
+        rentalEquipment: any[];
+      } = {
+        resourceType: type,
+        ownManpower: [],
+        rentalManpower: [],
+        ownEquipment: [],
+        rentalEquipment: [],
+      };
+
+      if (type === "manpower") {
+        const empMappings = await db
+          .select({ employeeId: employeeResourceMappings.employeeId })
+          .from(employeeResourceMappings)
+          .where(eq(employeeResourceMappings.resourceId, resourceId));
+        if (empMappings.length > 0) {
+          const ids = empMappings.map((m) => m.employeeId);
+          const employees = await db
+            .select()
+            .from(employeeMaster)
+            .where(inArray(employeeMaster.id, ids));
+          result.ownManpower = employees;
+        }
+        // rentalManpower: no mapping table yet - leave empty for now
+      } else if (type === "equipment") {
+        const eqMappings = await db
+          .select({ equipmentId: equipmentResourceMappings.equipmentId })
+          .from(equipmentResourceMappings)
+          .where(eq(equipmentResourceMappings.resourceId, resourceId));
+        if (eqMappings.length > 0) {
+          const ids = eqMappings.map((m) => m.equipmentId);
+          const equipment = await db
+            .select()
+            .from(equipmentMaster)
+            .where(inArray(equipmentMaster.id, ids));
+          result.ownEquipment = equipment;
+        }
+        // rentalEquipment: no mapping table yet - leave empty for now
+      }
+
+      res.json(result);
     } catch (err) {
       handleError(err, res);
     }
@@ -5007,6 +5084,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // SERVICE MASTER ROUTES
+  // ========================================
+
+  app.get("/api/service-masters", async (req: Request, res: Response) => {
+    try {
+      const services = await db.select().from(serviceMaster).orderBy(serviceMaster.serviceCode);
+      res.json(services);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/service-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid service ID" });
+      const [service] = await db.select().from(serviceMaster).where(eq(serviceMaster.id, id));
+      if (!service) return res.status(404).json({ message: "Service not found" });
+      res.json(service);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/service-masters", async (req: Request, res: Response) => {
+    try {
+      const data = insertServiceMasterSchema.parse(req.body);
+      const [service] = await db.insert(serviceMaster).values(data).returning();
+      res.status(201).json(service);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/service-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid service ID" });
+      const data = insertServiceMasterSchema.partial().parse(req.body);
+      const [updated] = await db
+        .update(serviceMaster)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(serviceMaster.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Service not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/service-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid service ID" });
+      await db.delete(serviceMaster).where(eq(serviceMaster.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/service-masters/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) return res.status(400).json({ message: "csvData must be an array" });
+      const services = csvData.map((row: any) => insertServiceMasterSchema.parse(row));
+      const created = await db.insert(serviceMaster).values(services as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // SERVICE TYPE ROUTES
+  // ========================================
+
+  app.get("/api/service-types", async (req: Request, res: Response) => {
+    try {
+      const all = await db.select().from(serviceTypes).orderBy(serviceTypes.name);
+      res.json(all);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/service-types", async (req: Request, res: Response) => {
+    try {
+      const data = insertServiceTypeSchema.parse(req.body);
+      const [row] = await db.insert(serviceTypes).values(data).returning();
+      res.status(201).json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/service-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertServiceTypeSchema.partial().parse(req.body);
+      const [updated] = await db
+        .update(serviceTypes)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(serviceTypes.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Service Type not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/service-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(serviceTypes).where(eq(serviceTypes.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // SERVICE GROUP ROUTES
+  // ========================================
+
+  app.get("/api/service-groups", async (req: Request, res: Response) => {
+    try {
+      const all = await db.select().from(serviceGroups).orderBy(serviceGroups.name);
+      res.json(all);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/service-groups", async (req: Request, res: Response) => {
+    try {
+      const data = insertServiceGroupSchema.parse(req.body);
+      const [row] = await db.insert(serviceGroups).values(data).returning();
+      res.status(201).json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/service-groups/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertServiceGroupSchema.partial().parse(req.body);
+      const [updated] = await db
+        .update(serviceGroups)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(serviceGroups.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Service Group not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/service-groups/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(serviceGroups).where(eq(serviceGroups.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
   // COUNTRY ROUTES
   // ========================================
 
@@ -5227,6 +5481,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias for compatibility
+  app.get("/api/nationality", async (req: Request, res: Response) => {
+    const results = await db.select().from(nationalities).orderBy(nationalities.name);
+    res.json(results);
+  });
+
   app.post("/api/nationalities", async (req: Request, res: Response) => {
     try {
       const data = insertNationalitySchema.parse(req.body);
@@ -5268,6 +5528,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       handleError(err, res);
     }
+  });
+
+  // Alias for compatibility
+  app.get("/api/titles", async (_req: Request, res: Response) => {
+    const results = await db.select().from(employeeTitles).orderBy(employeeTitles.name);
+    res.json(results);
   });
 
   app.post("/api/employee-titles", async (req: Request, res: Response) => {
@@ -5313,6 +5579,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias for compatibility
+  app.get("/api/positions", async (_req: Request, res: Response) => {
+    const results = await db.select().from(employeePositions).orderBy(employeePositions.name);
+    res.json(results);
+  });
+
   app.post("/api/employee-positions", async (req: Request, res: Response) => {
     try {
       const data = insertEmployeePositionSchema.parse(req.body);
@@ -5356,6 +5628,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias for compatibility
+  app.get("/api/grades", async (_req: Request, res: Response) => {
+    const results = await db.select().from(employeeGrades).orderBy(employeeGrades.name);
+    res.json(results);
+  });
+
   app.post("/api/employee-grades", async (req: Request, res: Response) => {
     try {
       const data = insertEmployeeGradeSchema.parse(req.body);
@@ -5397,6 +5675,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       handleError(err, res);
     }
+  });
+
+  // Alias for compatibility
+  app.get("/api/trades", async (_req: Request, res: Response) => {
+    const results = await db.select().from(employeeTrades).orderBy(employeeTrades.name);
+    res.json(results);
   });
 
   app.post("/api/employee-trades", async (req: Request, res: Response) => {
@@ -5464,7 +5748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/employee-masters", async (req: Request, res: Response) => {
     try {
       const employeeData = insertEmployeeMasterSchema.parse(req.body);
-      const [employee] = await db.insert(employeeMaster).values(employeeData).returning();
+      const [employee] = await db.insert(employeeMaster).values(employeeData as any).returning();
       res.status(201).json(employee);
     } catch (err) {
       handleError(err, res);
@@ -5480,7 +5764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employeeData = insertEmployeeMasterSchema.partial().parse(req.body);
       const [updatedEmployee] = await db
         .update(employeeMaster)
-        .set({ ...employeeData, updatedAt: new Date() })
+        .set({ ...employeeData, updatedAt: new Date() } as any)
         .where(eq(employeeMaster.id, id))
         .returning();
       if (!updatedEmployee) {
@@ -5515,6 +5799,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const employees = csvData.map((row: any) => insertEmployeeMasterSchema.parse(row));
       const createdEmployees = await db.insert(employeeMaster).values(employees as any).returning();
+      res.status(201).json(createdEmployees);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // RENTAL MANPOWER ROUTES
+  // ========================================
+
+  app.get("/api/rental-manpower", async (req: Request, res: Response) => {
+    try {
+      const rentalEmployees = await db.select().from(rentalManpower).orderBy(rentalManpower.employeeNumber);
+      res.json(rentalEmployees);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/rental-manpower/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid rental employee ID" });
+      }
+      const employee = await db.select().from(rentalManpower).where(eq(rentalManpower.id, id));
+      if (employee.length === 0) {
+        return res.status(404).json({ message: "Rental employee not found" });
+      }
+      res.json(employee[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/rental-manpower", async (req: Request, res: Response) => {
+    try {
+      const employeeData = insertRentalManpowerSchema.parse(req.body);
+      const [employee] = await db.insert(rentalManpower).values(employeeData as any).returning();
+      res.status(201).json(employee);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/rental-manpower/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid rental employee ID" });
+      }
+      const employeeData = insertRentalManpowerSchema.partial().parse(req.body);
+      const [updatedEmployee] = await db
+        .update(rentalManpower)
+        .set({ ...employeeData, updatedAt: new Date() } as any)
+        .where(eq(rentalManpower.id, id))
+        .returning();
+      if (!updatedEmployee) {
+        return res.status(404).json({ message: "Rental employee not found" });
+      }
+      res.json(updatedEmployee);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/rental-manpower/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid rental employee ID" });
+      }
+      await db.delete(rentalManpower).where(eq(rentalManpower.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Bulk import rental manpower
+  app.post("/api/rental-manpower/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      // Fetch all vendors to map vendorCode to vendorId
+      const allVendors = await db.select().from(vendorMaster);
+      const vendorMap = new Map(allVendors.map((v) => [String(v.vendorCode).trim(), v.id]));
+
+      const employees: any[] = [];
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i];
+        const vendorCode = row.vendorCode != null ? String(row.vendorCode).trim() : "";
+        if (!vendorCode) {
+          return res.status(400).json({
+            message: `Row ${i + 1}: vendorCode is required. Add a vendorCode column or ensure it has a value.`,
+          });
+        }
+        const vendorId = vendorMap.get(vendorCode);
+        if (vendorId == null) {
+          const validCodes = Array.from(vendorMap.keys()).slice(0, 10).join(", ");
+          return res.status(400).json({
+            message: `Row ${i + 1}: vendorCode "${vendorCode}" not found. Ensure the vendor exists in Vendor Master. Valid codes include: ${validCodes}${vendorMap.size > 10 ? "..." : ""}`,
+          });
+        }
+        const mappedRow = { ...row, vendorId };
+        employees.push(insertRentalManpowerSchema.parse(mappedRow));
+      }
+
+      const createdEmployees = await db.insert(rentalManpower).values(employees as any).returning();
       res.status(201).json(createdEmployees);
     } catch (err) {
       handleError(err, res);
@@ -5755,6 +6151,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .values(equipmentList)
         .returning();
       res.status(201).json(createdEquipment);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ===== EQUIPMENT MANUFACTURERS (OEM) ENDPOINTS =====
+  app.get("/api/equipment-manufacturers", async (req: Request, res: Response) => {
+    try {
+      const list = await db.select().from(equipmentManufacturers).orderBy(equipmentManufacturers.name);
+      res.json(list);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/equipment-manufacturers/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [row] = await db.select().from(equipmentManufacturers).where(eq(equipmentManufacturers.id, id));
+      if (!row) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/equipment-manufacturers", async (req: Request, res: Response) => {
+    try {
+      const data = insertEquipmentManufacturerSchema.parse(req.body);
+      const [created] = await db.insert(equipmentManufacturers).values(data as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/equipment-manufacturers/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertEquipmentManufacturerSchema.partial().parse(req.body);
+      const [updated] = await db.update(equipmentManufacturers).set({ ...data, updatedAt: new Date() } as any).where(eq(equipmentManufacturers.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/equipment-manufacturers/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(equipmentManufacturers).where(eq(equipmentManufacturers.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ===== EQUIPMENT TYPES ENDPOINTS =====
+  app.get("/api/equipment-types", async (req: Request, res: Response) => {
+    try {
+      const list = await db.select().from(equipmentTypes).orderBy(equipmentTypes.name);
+      res.json(list);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/equipment-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [row] = await db.select().from(equipmentTypes).where(eq(equipmentTypes.id, id));
+      if (!row) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/equipment-types", async (req: Request, res: Response) => {
+    try {
+      const data = insertEquipmentTypeSchema.parse(req.body);
+      const [created] = await db.insert(equipmentTypes).values(data as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/equipment-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertEquipmentTypeSchema.partial().parse(req.body);
+      const [updated] = await db.update(equipmentTypes).set({ ...data, updatedAt: new Date() } as any).where(eq(equipmentTypes.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/equipment-types/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(equipmentTypes).where(eq(equipmentTypes.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ===== RENTAL EQUIPMENT ENDPOINTS =====
+  app.get("/api/rental-equipment", async (req: Request, res: Response) => {
+    try {
+      const list = await db.select().from(rentalEquipment).orderBy(rentalEquipment.equipmentNumber);
+      res.json(list);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/rental-equipment/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [row] = await db.select().from(rentalEquipment).where(eq(rentalEquipment.id, id));
+      if (!row) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/rental-equipment", async (req: Request, res: Response) => {
+    try {
+      const data = insertRentalEquipmentSchema.parse(req.body);
+      const [created] = await db.insert(rentalEquipment).values(data as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/rental-equipment/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const data = insertRentalEquipmentSchema.partial().parse(req.body);
+      const [updated] = await db.update(rentalEquipment).set({ ...data, updatedAt: new Date() } as any).where(eq(rentalEquipment.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/rental-equipment/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(rentalEquipment).where(eq(rentalEquipment.id, id));
+      res.status(204).end();
     } catch (err) {
       handleError(err, res);
     }

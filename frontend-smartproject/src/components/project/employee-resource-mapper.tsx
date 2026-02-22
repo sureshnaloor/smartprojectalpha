@@ -249,17 +249,21 @@ export function EmployeeResourceMapper({
             <div className="text-center py-4 text-red-600">
               <p>Error loading resources</p>
             </div>
-          ) : resources.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">
-              <p>No manpower resources available</p>
-            </div>
-          ) : (
+          ) : (() => {
+              const availableResources = resources.filter(
+                (r) => r.id !== currentMapping?.resourceId
+              );
+              return availableResources.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  <p>No other manpower resources available to map</p>
+                </div>
+              ) : (
             <div>
               <h3 className="font-semibold text-gray-900 mb-3">
                 Available Manpower Resources
               </h3>
               <div className="grid gap-3 max-h-96 overflow-y-auto">
-                {resources.map((resource) => (
+                {availableResources.map((resource) => (
                   <div
                     key={resource.id}
                     className={`border rounded-lg p-4 cursor-pointer transition-colors ${
@@ -303,7 +307,8 @@ export function EmployeeResourceMapper({
                 ))}
               </div>
             </div>
-          )}
+              );
+            })()}
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-2 pt-4 border-t">

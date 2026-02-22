@@ -96,7 +96,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
     <>
       <aside className={cn(
         "bg-gradient-to-r from-gray-200 via-gray-100 to-blue-100 border-r border-gray-300 flex-shrink-0 transition-all duration-300 h-[calc(100vh-4rem)] fixed md:relative top-16 md:top-0 z-30 shadow-lg",
-        isOpen ? "w-64 left-0" : "-left-full md:left-0 md:w-0"
+        isOpen ? "w-64 min-w-64 max-w-64 left-0" : "-left-full md:left-0 md:w-0 md:min-w-0 md:max-w-0"
       )}>
         <div className="h-full flex flex-col">
           <div className="px-4 py-4 border-b border-gray-300 bg-white shadow-sm">
@@ -547,6 +547,17 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/material-master') ? 600 : 500, letterSpacing: '0.12em' }}>
                         <Building2 className="mr-3 h-4 w-4" />
                         <span>Material Master</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={`/service-master`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                        isActive('/service-master') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/service-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Briefcase className="mr-3 h-4 w-4" />
+                        <span>Service Master</span>
                       </a>
                     </Link>
                   </li>

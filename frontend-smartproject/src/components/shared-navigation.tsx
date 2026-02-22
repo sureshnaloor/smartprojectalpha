@@ -160,6 +160,12 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                     </button>
                     <button 
                       className="nav-link border-none bg-transparent p-0"
+                      onClick={() => handleNavClick('/service-master')}
+                    >
+                      Service Master
+                    </button>
+                    <button 
+                      className="nav-link border-none bg-transparent p-0"
                       onClick={() => handleNavClick('/vendor-master')}
                     >
                       Vendor Master

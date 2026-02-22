@@ -850,6 +850,36 @@ export const materialMaster = pgTable("material_master", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Service Type Table (for Service Master)
+export const serviceTypes = pgTable("service_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Service Group Table (for Service Master)
+export const serviceGroups = pgTable("service_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Service Master Table (all services are outsourced; no own/rental distinction)
+export const serviceMaster = pgTable("service_master", {
+  id: serial("id").primaryKey(),
+  serviceCode: text("service_code").notNull().unique(),
+  serviceDescription: text("service_description").notNull(),
+  uom: text("uom").notNull(),
+  serviceType: text("service_type").notNull(),
+  serviceGroup: text("service_group").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Vendor Master Table
 export const vendorMaster = pgTable("vendor_master", {
   id: serial("id").primaryKey(),
@@ -889,7 +919,51 @@ export const employeeMaster = pgTable("employee_master", {
   empTitle: text("emp_title").notNull(),
   empTrade: text("emp_trade").notNull(),
   empGrade: text("emp_grade").notNull(),
+  empGender: text("emp_gender").notNull().default("M"),
+  entryDate: date("entry_date").notNull().defaultNow(),
+  exitDate: date("exit_date"),
   empCostPerHour: numeric("emp_cost_per_hour", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Rental Manpower Table
+export const rentalManpower = pgTable("rental_manpower", {
+  id: serial("id").primaryKey(),
+  employeeNumber: text("employee_number").notNull().unique(),
+  empFirstName: text("emp_first_name").notNull(),
+  empMiddleName: text("emp_middle_name"),
+  empLastName: text("emp_last_name").notNull(),
+  empNationalId: text("emp_national_id").notNull().unique(),
+  empNationality: text("emp_nationality").notNull(),
+  empDob: date("emp_dob").notNull(),
+  empPosition: text("emp_position").notNull(),
+  empTitle: text("emp_title").notNull(),
+  empTrade: text("emp_trade").notNull(),
+  empGrade: text("emp_grade").notNull(),
+  empGender: text("emp_gender").notNull().default("M"),
+  entryDate: date("entry_date").notNull().defaultNow(),
+  exitDate: date("exit_date"),
+  vendorId: integer("vendor_id").notNull().references(() => vendorMaster.id, { onDelete: "cascade" }),
+  empCostPerHour: numeric("emp_cost_per_hour", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Equipment Manufacturer/OEM Table
+export const equipmentManufacturers = pgTable("equipment_manufacturers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Equipment Type Table
+export const equipmentTypes = pgTable("equipment_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -903,11 +977,30 @@ export const equipmentMaster = pgTable("equipment_master", {
   description: text("description"),
   manufacturer: text("manufacturer"),
   model: text("model"),
+  year: integer("year"),
   capacity: numeric("capacity", { precision: 12, scale: 2 }),
   unit: text("unit"),
   costPerHour: numeric("cost_per_hour", { precision: 12, scale: 2 }).notNull(),
   status: text("status").default("Active").notNull(),
   remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Rental Equipment Table (equipment rented from vendors)
+export const rentalEquipment = pgTable("rental_equipment", {
+  id: serial("id").primaryKey(),
+  equipmentNumber: text("equipment_number").notNull().unique(),
+  equipmentName: text("equipment_name").notNull(),
+  equipmentType: text("equipment_type").notNull(),
+  description: text("description"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  year: integer("year"),
+  capacity: numeric("capacity", { precision: 12, scale: 2 }),
+  unit: text("unit"),
+  costPerHour: numeric("cost_per_hour", { precision: 12, scale: 2 }).notNull(),
+  vendorId: integer("vendor_id").notNull().references(() => vendorMaster.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -946,6 +1039,10 @@ export const insertPlannedActivityTaskSchema = createInsertSchema(plannedActivit
 export const insertMaterialMasterSchema = createInsertSchema(materialMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
 
+// Service Master Schema
+export const insertServiceMasterSchema = createInsertSchema(serviceMaster)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
 // Vendor Master Schema
 export const insertVendorMasterSchema = createInsertSchema(vendorMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
@@ -955,11 +1052,41 @@ export const insertEmployeeMasterSchema = createInsertSchema(employeeMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
     empDob: z.date().or(z.string()).transform(val => {
-      if (typeof val === 'string') {
-        return new Date(val).toISOString().split('T')[0];
-      }
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
       return val.toISOString().split('T')[0];
     }),
+    entryDate: z.date().or(z.string()).optional().nullable().transform(val => {
+      if (!val) return new Date().toISOString().split('T')[0];
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
+      return val.toISOString().split('T')[0];
+    }),
+    exitDate: z.date().or(z.string()).optional().nullable().transform(val => {
+      if (!val) return null;
+      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
+      return val.toISOString().split('T')[0];
+    }),
+    empGender: z.enum(["M", "F"]),
+  });
+
+// Rental Manpower Schema
+export const insertRentalManpowerSchema = createInsertSchema(rentalManpower)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    empDob: z.date().or(z.string()).transform(val => {
+      if (typeof val === "string") return new Date(val).toISOString().split("T")[0];
+      return val.toISOString().split("T")[0];
+    }),
+    entryDate: z.date().or(z.string()).optional().nullable().transform(val => {
+      if (!val) return new Date().toISOString().split("T")[0];
+      if (typeof val === "string") return new Date(val).toISOString().split("T")[0];
+      return val.toISOString().split("T")[0];
+    }),
+    exitDate: z.date().or(z.string()).optional().nullable().transform(val => {
+      if (!val) return null;
+      if (typeof val === "string") return new Date(val).toISOString().split("T")[0];
+      return val.toISOString().split("T")[0];
+    }),
+    empGender: z.enum(["M", "F"]),
   });
 
 export type PlannedActivity = typeof plannedActivities.$inferSelect;
@@ -971,11 +1098,17 @@ export type InsertPlannedActivityTask = z.infer<typeof insertPlannedActivityTask
 export type MaterialMaster = typeof materialMaster.$inferSelect;
 export type InsertMaterialMaster = z.infer<typeof insertMaterialMasterSchema>;
 
+export type ServiceMaster = typeof serviceMaster.$inferSelect;
+export type InsertServiceMaster = z.infer<typeof insertServiceMasterSchema>;
+
 export type VendorMaster = typeof vendorMaster.$inferSelect;
 export type InsertVendorMaster = z.infer<typeof insertVendorMasterSchema>;
 
 export type EmployeeMaster = typeof employeeMaster.$inferSelect;
 export type InsertEmployeeMaster = z.infer<typeof insertEmployeeMasterSchema>;
+
+export type RentalManpower = typeof rentalManpower.$inferSelect;
+export type InsertRentalManpower = z.infer<typeof insertRentalManpowerSchema>;
 
 // Employee Resource Mapping Schema
 export const insertEmployeeResourceMappingSchema = createInsertSchema(employeeResourceMappings)
@@ -984,12 +1117,30 @@ export const insertEmployeeResourceMappingSchema = createInsertSchema(employeeRe
 export type EmployeeResourceMapping = typeof employeeResourceMappings.$inferSelect;
 export type InsertEmployeeResourceMapping = z.infer<typeof insertEmployeeResourceMappingSchema>;
 
+// Equipment Manufacturer Schema
+export const insertEquipmentManufacturerSchema = createInsertSchema(equipmentManufacturers)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type EquipmentManufacturer = typeof equipmentManufacturers.$inferSelect;
+export type InsertEquipmentManufacturer = z.infer<typeof insertEquipmentManufacturerSchema>;
+
+// Equipment Type Schema
+export const insertEquipmentTypeSchema = createInsertSchema(equipmentTypes)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type EquipmentType = typeof equipmentTypes.$inferSelect;
+export type InsertEquipmentType = z.infer<typeof insertEquipmentTypeSchema>;
+
 // Equipment Master Schema
 export const insertEquipmentMasterSchema = createInsertSchema(equipmentMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
 
 export type EquipmentMaster = typeof equipmentMaster.$inferSelect;
 export type InsertEquipmentMaster = z.infer<typeof insertEquipmentMasterSchema>;
+
+// Rental Equipment Schema
+export const insertRentalEquipmentSchema = createInsertSchema(rentalEquipment)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type RentalEquipment = typeof rentalEquipment.$inferSelect;
+export type InsertRentalEquipment = z.infer<typeof insertRentalEquipmentSchema>;
 
 // Equipment Resource Mapping Schema
 export const insertEquipmentResourceMappingSchema = createInsertSchema(equipmentResourceMappings)
@@ -1064,6 +1215,16 @@ export const materialGroups = pgTable("material_groups", {
 export const insertMaterialGroupSchema = createInsertSchema(materialGroups).omit({ id: true, createdAt: true, updatedAt: true } as any);
 export type MaterialGroup = typeof materialGroups.$inferSelect;
 export type InsertMaterialGroup = z.infer<typeof insertMaterialGroupSchema>;
+
+// Service Type Schema
+export const insertServiceTypeSchema = createInsertSchema(serviceTypes).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type ServiceType = typeof serviceTypes.$inferSelect;
+export type InsertServiceType = z.infer<typeof insertServiceTypeSchema>;
+
+// Service Group Schema
+export const insertServiceGroupSchema = createInsertSchema(serviceGroups).omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type ServiceGroup = typeof serviceGroups.$inferSelect;
+export type InsertServiceGroup = z.infer<typeof insertServiceGroupSchema>;
 
 // Country Table
 export const countries = pgTable("countries", {

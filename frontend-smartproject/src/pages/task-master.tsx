@@ -163,7 +163,6 @@ export default function TaskMaster() {
       name: formData.get("name") as string,
       description: formData.get("description") as string,
       activityId: parseInt(formData.get("activityId") as string),
-      duration: parseInt(formData.get("duration") as string),
     };
 
     if (editingTask) {
@@ -187,6 +186,12 @@ export default function TaskMaster() {
   const getActivityName = (activityId: number) => {
     const activity = activities.find(a => a.id === activityId);
     return activity ? activity.name : `Activity ${activityId}`;
+  };
+
+  const getActivityUom = (activityId: number | null) => {
+    if (!activityId) return "—";
+    const activity = activities.find(a => a.id === activityId);
+    return activity?.unitOfMeasure ?? "—";
   };
 
   return (
@@ -257,16 +262,6 @@ export default function TaskMaster() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input
-                  id="duration"
-                  name="duration"
-                  type="number"
-                  defaultValue={editingTask?.duration ?? undefined}
-                  required
-                />
-              </div>
               <div className="flex justify-end space-x-2">
                 <Button
                   type="button"
@@ -299,7 +294,7 @@ export default function TaskMaster() {
                   <TableHead className="font-bold text-gray-900">Name</TableHead>
                   <TableHead className="font-bold text-gray-900">Description</TableHead>
                   <TableHead className="font-bold text-gray-900">Activity</TableHead>
-                  <TableHead className="font-bold text-gray-900">Duration (min)</TableHead>
+                  <TableHead className="font-bold text-gray-900">UOM</TableHead>
                   <TableHead className="font-bold text-gray-900">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -312,7 +307,7 @@ export default function TaskMaster() {
                     <TableCell className="font-medium">{task.name}</TableCell>
                     <TableCell>{task.description}</TableCell>
                     <TableCell>{task.activityId ? getActivityName(task.activityId) : "None"}</TableCell>
-                    <TableCell>{task.duration}</TableCell>
+                    <TableCell>{getActivityUom(task.activityId ?? null)}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button

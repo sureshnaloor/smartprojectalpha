@@ -26,14 +26,13 @@ export default function MasterLayout({ children, projectId }: MasterLayoutProps)
       <SharedNavigation variant="app" />
 
       <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 4rem)', paddingTop: '4rem' }}>
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Left Sidebar Navigation - Show global navigation for master pages */}
           <SideNavigation currentProjectId={projectId} />
 
-          {/* Main Content Area */}
-          <main className="flex-1 flex flex-col">
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+          {/* Main Content Area - min-w-0 allows flex child to shrink and stay within container */}
+          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
               {children}
             </div>
           </main>

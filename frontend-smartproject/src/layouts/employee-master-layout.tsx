@@ -10,6 +10,7 @@ export default function EmployeeMasterLayout({ children }: EmployeeMasterLayoutP
 
     const tabs = [
         { label: "Employee Master", href: "/employee-master" },
+        { label: "Rental Manpower", href: "/employee-master/rental" },
         { label: "Nationality", href: "/employee-master/nationality" },
         { label: "Title", href: "/employee-master/title" },
         { label: "Position", href: "/employee-master/position" },

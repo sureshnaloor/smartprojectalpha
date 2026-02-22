@@ -68,6 +68,12 @@ interface Material {
   updatedAt: string;
 }
 
+interface MasterItem {
+  id: number;
+  name: string;
+  description?: string | null;
+}
+
 // API functions
 async function getMaterials(): Promise<Material[]> {
   const response = await fetch("/api/material-masters");
@@ -136,6 +142,34 @@ export default function MaterialMaster() {
   const { data: materials = [], isLoading } = useQuery({
     queryKey: ["/api/material-masters"],
     queryFn: getMaterials,
+  });
+
+  // Fetch UOMs, material types, material groups for dropdowns
+  const { data: uoms = [] } = useQuery({
+    queryKey: ["/api/uoms"],
+    queryFn: async (): Promise<MasterItem[]> => {
+      const res = await fetch("/api/uoms");
+      if (!res.ok) throw new Error("Failed to fetch UOMs");
+      return res.json();
+    },
+  });
+
+  const { data: materialTypes = [] } = useQuery({
+    queryKey: ["/api/material-types"],
+    queryFn: async (): Promise<MasterItem[]> => {
+      const res = await fetch("/api/material-types");
+      if (!res.ok) throw new Error("Failed to fetch material types");
+      return res.json();
+    },
+  });
+
+  const { data: materialGroups = [] } = useQuery({
+    queryKey: ["/api/material-groups"],
+    queryFn: async (): Promise<MasterItem[]> => {
+      const res = await fetch("/api/material-groups");
+      if (!res.ok) throw new Error("Failed to fetch material groups");
+      return res.json();
+    },
   });
 
   // Create mutation
@@ -338,41 +372,79 @@ export default function MaterialMaster() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="uom" className="font-semibold text-green-700">Unit of Measure *</Label>
-                        <Input
-                          id="uom"
+                        <Select
+                          value={formData.uom || undefined}
+                          onValueChange={(v) => setFormData({ ...formData, uom: v })}
                           required
-                          value={formData.uom}
-                          onChange={(e) =>
-                            setFormData({ ...formData, uom: e.target.value })
-                          }
-                          placeholder="e.g. KG, M, L"
-                        />
+                        >
+                          <SelectTrigger id="uom">
+                            <SelectValue placeholder="Select UOM (add in UOM tab)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              ...uoms,
+                              ...(formData.uom && !uoms.some((u) => u.name === formData.uom)
+                                ? [{ id: -1, name: formData.uom }]
+                                : []),
+                            ].map((u) => (
+                              <SelectItem key={u.id} value={u.name}>
+                                {u.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div>
                         <Label htmlFor="materialType" className="font-semibold text-green-700">Material Type *</Label>
-                        <Input
-                          id="materialType"
+                        <Select
+                          value={formData.materialType || undefined}
+                          onValueChange={(v) => setFormData({ ...formData, materialType: v })}
                           required
-                          value={formData.materialType}
-                          onChange={(e) =>
-                            setFormData({ ...formData, materialType: e.target.value })
-                          }
-                        />
+                        >
+                          <SelectTrigger id="materialType">
+                            <SelectValue placeholder="Select type (add in Material Type tab)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              ...materialTypes,
+                              ...(formData.materialType && !materialTypes.some((t) => t.name === formData.materialType)
+                                ? [{ id: -1, name: formData.materialType }]
+                                : []),
+                            ].map((t) => (
+                              <SelectItem key={t.id} value={t.name}>
+                                {t.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="materialGroup" className="font-semibold text-green-700">Material Group *</Label>
-                        <Input
-                          id="materialGroup"
+                        <Select
+                          value={formData.materialGroup || undefined}
+                          onValueChange={(v) => setFormData({ ...formData, materialGroup: v })}
                           required
-                          value={formData.materialGroup}
-                          onChange={(e) =>
-                            setFormData({ ...formData, materialGroup: e.target.value })
-                          }
-                        />
+                        >
+                          <SelectTrigger id="materialGroup">
+                            <SelectValue placeholder="Select group (add in Material Group tab)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              ...materialGroups,
+                              ...(formData.materialGroup && !materialGroups.some((g) => g.name === formData.materialGroup)
+                                ? [{ id: -1, name: formData.materialGroup }]
+                                : []),
+                            ].map((g) => (
+                              <SelectItem key={g.id} value={g.name}>
+                                {g.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div>
