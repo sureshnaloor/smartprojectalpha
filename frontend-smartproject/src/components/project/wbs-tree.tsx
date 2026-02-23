@@ -177,7 +177,7 @@ export function WbsTree({ projectId }: WbsTreeProps) {
     
     // Process each summary item
     wbsItems
-      .filter(item => item.type === "Summary")
+      .filter(item => item.type === "Summary" || item.type === "WBS")
       .forEach(summaryItem => {
         const childKey = summaryItem.id.toString();
         const children = itemsByParent[childKey] || [];
@@ -221,7 +221,7 @@ export function WbsTree({ projectId }: WbsTreeProps) {
       
       // Check for summary items without work package children
       const summaryItemsWithoutWorkPackages: WbsItem[] = [];
-      const summaryItems = wbsItems.filter(item => item.type === "Summary");
+      const summaryItems = wbsItems.filter(item => item.type === "Summary" || item.type === "WBS");
       
       for (const summaryItem of summaryItems) {
         const childKey = summaryItem.id.toString();
@@ -869,7 +869,7 @@ function TreeItem({
   
   // Get budget info for Summary or for parent of WorkPackage
   const getBudgetDisplay = () => {
-    if (item.type === "Summary") {
+    if (item.type === "Summary" || item.type === "WBS") {
       const info = budgetInfo[item.id];
       if (info) {
         return (
@@ -914,7 +914,7 @@ function TreeItem({
     <>
       <div className="grid grid-cols-[minmax(250px,_1fr)_repeat(6,_minmax(100px,_1fr))] px-4 py-2 hover:bg-gray-50 border-b border-gray-100">
         <div className="flex items-center">
-          {item.type === "Summary" && (
+          {(item.type === "Summary" || item.type === "WBS") && (
             <button
               type="button"
               className="mr-1 h-5 w-5 flex items-center justify-center"
@@ -930,7 +930,7 @@ function TreeItem({
               )}
             </button>
           )}
-          {item.type !== "Summary" && (
+          {item.type !== "Summary" && item.type !== "WBS" && (
             <div className="mr-1 h-5 w-5"></div>
           )}
           
@@ -948,13 +948,13 @@ function TreeItem({
         
         <div className="text-sm">
           <span className={`px-2 py-0.5 rounded-full text-xs ${
-            item.type === "Summary" 
+            item.type === "Summary" || item.type === "WBS"
               ? "bg-blue-100 text-blue-800" 
               : item.type === "WorkPackage" 
                 ? "bg-purple-100 text-purple-800" 
                 : "bg-green-100 text-green-800"
           }`}>
-            {item.type}
+            {item.type === "Summary" ? "SUMMARY" : item.type === "WBS" ? "WBS" : item.type === "WorkPackage" ? "WORKPACKAGE" : item.type}
           </span>
         </div>
         

@@ -997,8 +997,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(404).json({ message: "Parent WBS item not found" });
           }
 
-          // Apply same rules as in the POST endpoint
-          if (parentWbsItem.type === "Summary") {
+          // Apply same rules as in the POST endpoint (Summary and WBS can have Summary/WBS/WorkPackage children, not Activity directly)
+          if (parentWbsItem.type === "Summary" || parentWbsItem.type === "WBS") {
             if (wbsItemData.type === "Activity") {
               return res.status(400).json({
                 message: "A 'Summary' WBS item cannot have an 'Activity' as a direct child. It must have a 'WorkPackage' in between."
@@ -1394,7 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Only WorkPackage items can have cost entries
-      if (wbsItem.type !== "WorkPackage" && wbsItem.type !== "Summary") {
+      if (wbsItem.type !== "WorkPackage" && wbsItem.type !== "Summary" && wbsItem.type !== "WBS") {
         return res.status(400).json({
           message: "Cost entries can only be added to 'WorkPackage' or 'Summary' items"
         });
@@ -1457,8 +1457,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Check if WBS item is of a type that can accept costs
-          if (wbsItem.type !== "WorkPackage" && wbsItem.type !== "Summary") {
-            errors.push(`Row ${i + 1}: WBS code '${row.wbsCode}' is of type '${wbsItem.type}'. Cost entries can only be added to 'Summary' or 'WorkPackage' types. 'Activity' type items cannot have costs.`);
+          if (wbsItem.type !== "WorkPackage" && wbsItem.type !== "Summary" && wbsItem.type !== "WBS") {
+            errors.push(`Row ${i + 1}: WBS code '${row.wbsCode}' is of type '${wbsItem.type}'. Cost entries can only be added to 'Summary', 'WBS', or 'WorkPackage' types. 'Activity' type items cannot have costs.`);
             continue;
           }
 
@@ -1521,122 +1521,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request body" });
       }
 
-      // Check if project exists
       const project = await storage.getProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Get all existing WBS items for the project
       const existingWbsItems = await storage.getWbsItems(projectId);
+      const wbsItemsByCode = new Map(existingWbsItems.map((item: { code: string; id: number }) => [item.code, item]));
 
-      // Create a mapping of WBS codes to WBS items for easy lookup
-      const wbsItemsByCode = new Map(existingWbsItems.map(item => [item.code, item]));
+      const existingWorkPackages = await storage.getWorkPackagesByProject(projectId);
+      const workPackagesByCode = new Map(existingWorkPackages.map((wp: { code: string; id: number }) => [wp.code, wp]));
 
-      // Track any validation errors
-      const errors = [];
-      const results = [];
+      const errors: string[] = [];
+      const results: unknown[] = [];
 
-      // Process each WBS item in the CSV data
-      for (let i = 0; i < csvData.length; i++) {
-        const row = csvData[i];
+      // CSV: Level 1 (root) -> wbs_items type "Summary"; Level 2/3 -> type "WBS". CSV WorkPackage -> work_packages table only.
+      const CSV_TYPE_SUMMARY = "SUMMARY";
+      const CSV_TYPE_WBS = "WBS";
+      const CSV_TYPE_WP = "WorkPackage";
 
-        // Skip invalid rows
-        if (!row.wbsCode || !row.wbsName || !row.wbsType) {
-          errors.push(`Row ${i + 1}: Missing required fields (wbsCode, wbsName, wbsType)`);
+      // Sort by code so parent is always before children (1, 1.1, 1.1.1, 1.1.1.1, 2, 2.1, ...)
+      const sortedRows = [...csvData].sort((a: { wbsCode: string }, b: { wbsCode: string }) => {
+        const aParts = a.wbsCode.split(".").map(Number);
+        const bParts = b.wbsCode.split(".").map(Number);
+        for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+          const av = aParts[i] ?? 0;
+          const bv = bParts[i] ?? 0;
+          if (av !== bv) return av - bv;
+        }
+        return 0;
+      });
+
+      // First pass: validate hierarchy rules (level vs type, and same-level children consistency)
+      const rowsByCode = new Map(sortedRows.map((r: { wbsCode: string }, idx: number) => [r.wbsCode, { ...r, _index: idx + 1 }]));
+      const childrenByParent = new Map<string, typeof sortedRows>();
+      for (const row of sortedRows) {
+        const code = row.wbsCode;
+        const parts = code.split(".");
+        const level = parts.length;
+        const csvType = (row.wbsType || "").trim();
+
+        if (!["SUMMARY", "WBS", "WorkPackage"].includes(csvType)) {
+          errors.push(`Row ${code}: Invalid wbsType '${row.wbsType}' - must be SUMMARY, WBS, or WorkPackage`);
           continue;
         }
-
-        // Validate WBS type
-        if (!["Summary", "WorkPackage", "Activity"].includes(row.wbsType)) {
-          errors.push(`Row ${i + 1}: Invalid WBS type '${row.wbsType}' - must be Summary, WorkPackage, or Activity`);
+        if (level === 1 && csvType !== "SUMMARY") {
+          errors.push(`Row ${code}: Level 1 (root) must be type SUMMARY`);
           continue;
         }
+        if (level === 2 && csvType !== "WBS") {
+          errors.push(`Row ${code}: Level 2 must be type WBS`);
+          continue;
+        }
+        if (level === 3) {
+          if (csvType !== "WBS" && csvType !== "WorkPackage") {
+            errors.push(`Row ${code}: Level 3 must be type WBS or WorkPackage`);
+            continue;
+          }
+        }
+        if (level >= 4) {
+          if (csvType !== "WorkPackage") {
+            errors.push(`Row ${code}: Level ${level} must be type WorkPackage`);
+            continue;
+          }
+          if (level > 4) {
+            errors.push(`Row ${code}: Maximum depth is 4 (SUMMARY -> WBS -> WBS or WorkPackage -> WorkPackage if level 3 is WBS)`);
+            continue;
+          }
+        }
 
-        // Parse level and parent from the WBS code
-        const codeParts = row.wbsCode.split('.');
-        const level = codeParts.length;
-        let parentCode = null;
-        let parentId = null;
+        const budgetVal = row.budget != null ? row.budget : row.amount;
+        const budgetNum = Number(budgetVal);
+        if (budgetVal === undefined || budgetVal === null || budgetVal === "" || isNaN(budgetNum) || budgetNum < 0) {
+          errors.push(`Row ${code}: Valid budget (number >= 0) required`);
+          continue;
+        }
 
         if (level > 1) {
-          // If not top level, get parent code by removing the last part
-          parentCode = codeParts.slice(0, -1).join('.');
+          const parentCode = parts.slice(0, -1).join(".");
+          if (!childrenByParent.has(parentCode)) childrenByParent.set(parentCode, []);
+          childrenByParent.get(parentCode)!.push(row);
+        }
+      }
+
+      // Level-2 WBS: children must be either all WBS or all WorkPackage (not mixed)
+      for (const [parentCode, children] of childrenByParent) {
+        const parentParts = parentCode.split(".");
+        if (parentParts.length !== 2) continue;
+        const types = new Set(children.map((c: { wbsType: string }) => (c.wbsType || "").trim()));
+        if (types.has("WBS") && types.has("WorkPackage")) {
+          errors.push(`Parent ${parentCode}: Level 2 WBS cannot have both WBS and WorkPackage children - use only one type`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return res.status(400).json({
+          message: "WBS import validation failed",
+          errors,
+          results: []
+        });
+      }
+
+      // Process in sorted order: SUMMARY/WBS -> wbs_items (type Summary); WorkPackage -> work_packages table
+      for (let i = 0; i < sortedRows.length; i++) {
+        const row = sortedRows[i];
+        const code = row.wbsCode;
+        const codeParts = code.split(".");
+        const level = codeParts.length;
+        const csvType = (row.wbsType || "").trim();
+        const budgetVal = row.budget != null ? row.budget : row.amount;
+        const budgetStr = String(Number(budgetVal));
+
+        if (csvType === CSV_TYPE_WP) {
+          // WorkPackage: insert into work_packages table; parent must be a WBS (Summary) node
+          const parentCode = codeParts.slice(0, -1).join(".");
           const parentItem = wbsItemsByCode.get(parentCode);
-
           if (!parentItem) {
-            errors.push(`Row ${i + 1}: Parent WBS item with code '${parentCode}' not found`);
+            errors.push(`Row ${i + 1}: Parent '${parentCode}' not found for Work Package (ensure parent WBS row appears before this row)`);
             continue;
           }
+          try {
+            const existingWp = workPackagesByCode.get(code);
+            const wpData = {
+              wbsItemId: parentItem.id,
+              projectId,
+              name: row.wbsName || code,
+              description: row.wbsDescription || null,
+              code,
+              budgetedCost: budgetStr,
+              actualCost: "0",
+              percentComplete: "0"
+            };
+            if (existingWp) {
+              await storage.updateWorkPackage(existingWp.id, wpData);
+              results.push({ code, type: "WorkPackage", status: "updated" });
+            } else {
+              const created = await storage.createWorkPackage(wpData as any);
+              results.push({ ...created, status: "created" });
+              workPackagesByCode.set(code, created as { code: string; id: number });
+            }
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            errors.push(`Row ${i + 1} (${code}): ${msg}`);
+          }
+          continue;
+        }
 
+        // SUMMARY (level 1 only) -> type "Summary"; WBS (level 2/3) -> type "WBS"
+        let parentId: number | null = null;
+        if (level > 1) {
+          const parentCode = codeParts.slice(0, -1).join(".");
+          const parentItem = wbsItemsByCode.get(parentCode);
+          if (!parentItem) {
+            errors.push(`Row ${i + 1}: Parent '${parentCode}' not found (ensure rows are ordered so parent appears before children)`);
+            continue;
+          }
           parentId = parentItem.id;
-
-          // Parent-child type validation
-          if (parentItem.type === "Summary" && row.wbsType === "Activity") {
-            errors.push(`Row ${i + 1}: 'Summary' parent cannot have 'Activity' as a direct child`);
-            continue;
-          } else if (parentItem.type === "WorkPackage" && row.wbsType !== "Activity") {
-            errors.push(`Row ${i + 1}: 'WorkPackage' parent can only have 'Activity' children`);
-            continue;
-          } else if (parentItem.type === "Activity") {
-            errors.push(`Row ${i + 1}: 'Activity' items cannot have children`);
-            continue;
-          }
         }
 
-        // Type-specific validations
-        if (row.wbsType === "Summary" || row.wbsType === "WorkPackage") {
-          // Validate budget (required for these types)
-          if (!row.amount || isNaN(Number(row.amount)) || Number(row.amount) <= 0) {
-            errors.push(`Row ${i + 1}: ${row.wbsType} type must have a positive budget amount`);
-            continue;
-          }
-        } else if (row.wbsType === "Activity") {
-          // Activities can't have budget
-          if (row.amount && Number(row.amount) !== 0) {
-            errors.push(`Row ${i + 1}: Activity type cannot have a budget amount (must be 0 or empty)`);
-            continue;
-          }
-        }
+        const wbsType = level === 1 ? "Summary" : "WBS";
 
-        // Prepare WBS item data
         const wbsItemData = {
           projectId,
           parentId,
-          name: row.wbsName,
+          name: row.wbsName || code,
           description: row.wbsDescription || "",
           level,
-          code: row.wbsCode,
-          type: row.wbsType,
-          budgetedCost: row.wbsType === "Activity" ? "0" : Number(row.amount).toString(),
+          code,
+          type: wbsType,
+          budgetedCost: budgetStr,
           isTopLevel: level === 1,
           actualCost: "0",
           percentComplete: "0"
         };
 
         try {
+          const existingItem = wbsItemsByCode.get(code);
           let result;
-          const existingItem = wbsItemsByCode.get(row.wbsCode);
-
           if (existingItem) {
-            // Update existing WBS item
             result = await storage.updateWbsItem(existingItem.id, wbsItemData);
             results.push({ ...result, status: "updated" });
           } else {
-            // Create new WBS item
             result = await storage.createWbsItem(wbsItemData);
             results.push({ ...result, status: "created" });
-
-            // Add to the mapping for parent-child validation of subsequent items
-            wbsItemsByCode.set(result.code, result);
+            wbsItemsByCode.set((result as { code: string }).code, result as { code: string; id: number });
           }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          errors.push(`Row ${i + 1}: Failed to process WBS item - ${errorMessage}`);
+          const msg = error instanceof Error ? error.message : String(error);
+          errors.push(`Row ${i + 1} (${code}): ${msg}`);
         }
       }
 
-      // Return errors if any
       if (errors.length > 0) {
         return res.status(400).json({
           message: "Some WBS items could not be imported",
@@ -1645,7 +1720,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Return success
       return res.status(200).json({
         message: "All WBS items imported successfully",
         count: results.length,

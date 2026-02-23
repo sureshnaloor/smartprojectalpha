@@ -14,14 +14,11 @@ import {
     ChevronDown,
     Plus,
     ArrowLeft,
-    Settings,
-    Download,
     Activity,
     ListTodo,
     AlertTriangle,
     Lightbulb,
     Briefcase,
-    FileText,
     Loader2,
     Edit2,
     Trash2,
@@ -111,8 +108,8 @@ export default function NewProject() {
         enabled: !!projectId,
     });
 
-    // WBS is complete when every leaf WBS (no child WBS) has at least one work package.
-    // Edit Allocation is enabled only when the full WBS structure is closed in this way.
+    // WBS is complete when every leaf WBS has at least one work package (table) OR is a WorkPackage-type
+    // wbs_item (CSV import creates those as leaves; they don't have work_packages table rows).
     const isWbsComplete = useMemo(() => {
         if (!flatWbsItems.length) return false;
         const parentIds = new Set(flatWbsItems.map((i) => i.parentId).filter((id): id is number => id != null));
@@ -121,7 +118,10 @@ export default function NewProject() {
             acc[wp.wbsItemId] = (acc[wp.wbsItemId] ?? 0) + 1;
             return acc;
         }, {});
-        return leafWbsItems.every((leaf) => (wpCountByWbsId[leaf.id] ?? 0) >= 1);
+        return leafWbsItems.every(
+            (leaf) =>
+                leaf.type === "WorkPackage" || (wpCountByWbsId[leaf.id] ?? 0) >= 1
+        );
     }, [flatWbsItems, projectWorkPackages]);
 
     // Top-level WBS and allocation state (for Budget Overview after version 0)
@@ -474,8 +474,8 @@ export default function NewProject() {
                         <div className={cn(
                             "w-2 h-2 rounded-full",
                             item.type === 'Summary' ? 'bg-blue-500' :
-                                item.type === 'WorkPackage' ? 'bg-amber-500' :
-                                    item.type === 'WBS' ? (item.level >= 3 ? 'bg-slate-500' : 'bg-teal-500') :
+                                item.type === 'WBS' ? 'bg-teal-500' :
+                                    item.type === 'WorkPackage' ? 'bg-amber-500' :
                                         item.type === 'Activity' ? 'bg-slate-500' : 'bg-emerald-500'
                         )} />
                         <div
@@ -486,7 +486,9 @@ export default function NewProject() {
                             }}
                         >
                             <div className="text-sm font-bold text-slate-800">{item.name}</div>
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-0.5">{item.type}</div>
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-0.5">
+                                {item.type === "Summary" ? "SUMMARY" : item.type === "WBS" ? "WBS" : item.type === "WorkPackage" ? "WORKPACKAGE" : item.type}
+                            </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -750,7 +752,7 @@ export default function NewProject() {
                             <button
                                 className="w-full mt-6 py-3 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-white/50 transition-colors uppercase tracking-widest shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-white"
                                 disabled={!isWbsComplete}
-                                title={!isWbsComplete ? "Complete the WBS structure: every lowest-level WBS must have at least one Work Package." : allocationComplete ? "View current budget allocation" : undefined}
+                                title={!isWbsComplete ? "Complete the WBS structure: every lowest-level WBS must have at least one Work Package (or be a Work Package node)." : allocationComplete ? "View current budget allocation" : undefined}
                                 onClick={() => isWbsComplete && setIsEditAllocationOpen(true)}
                             >
                                 {allocationComplete ? "View Allocation" : "Edit Allocation"}
@@ -773,24 +775,6 @@ export default function NewProject() {
                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</div>
                                     </div>
                                 ))}
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="space-y-3">
-                            <button className="w-full py-3 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/20 uppercase tracking-widest flex items-center justify-center gap-2">
-                                <Plus size={14} /> New Activity
-                            </button>
-                            <button className="w-full py-3 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 uppercase tracking-widest shadow-sm">
-                                <FileText size={14} /> Generate Report
-                            </button>
-                            <div className="flex gap-3">
-                                <button className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 uppercase tracking-widest">
-                                    <Download size={14} /> Export
-                                </button>
-                                <button className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 uppercase tracking-widest">
-                                    <Settings size={14} /> Settings
-                                </button>
                             </div>
                         </div>
                     </div>

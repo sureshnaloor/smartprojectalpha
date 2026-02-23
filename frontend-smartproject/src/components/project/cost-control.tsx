@@ -37,7 +37,7 @@ export function CostControl({ projectId }: CostControlProps) {
   const filteredItems = useMemo(() => {
     // First filter by type - only Summary and WorkPackage have budgets
     const budgetableItems = wbsItems.filter(item => 
-      item.type === "Summary" || item.type === "WorkPackage"
+      item.type === "Summary" || item.type === "WBS" || item.type === "WorkPackage"
     );
     
     // Then filter by level

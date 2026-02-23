@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { WbsItem } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { parseCsvFile, downloadCsvTemplate } from "@/lib/csv";
+import { parseWbsCsvFile, downloadWbsCsvTemplate } from "@/lib/csv";
 
 import {
   Dialog,
@@ -89,7 +89,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
       setParseErrors([]);
       setIsParsingComplete(false);
 
-      const { data, errors } = await parseCsvFile(file);
+      const { data, errors } = await parseWbsCsvFile(file);
 
       setCsvData(data);
       setParseErrors(errors);
@@ -127,6 +127,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/wbs`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/work-packages`] });
       toast({
         title: "Import Successful",
         description: `${csvData.length} WBS items have been imported.`,
@@ -194,9 +195,9 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
     onClose();
   };
 
-  // Download CSV template
+  // Download WBS CSV template
   const handleDownloadTemplate = () => {
-    downloadCsvTemplate();
+    downloadWbsCsvTemplate();
   };
 
   return (
@@ -211,14 +212,13 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
 
         <Alert className="mb-4">
           <AlertDescription>
-            <p className="mb-1 font-semibold">Import Requirements:</p>
+            <p className="mb-1 font-semibold">WBS hierarchy (tree from top):</p>
             <ul className="list-disc pl-5 text-sm space-y-1">
-              <li><strong>WBS Type rules:</strong></li>
-              <ul className="list-disc pl-5 text-xs space-y-1 mt-1">
-                <li><strong>Summary/WorkPackage:</strong> Must have budget amount</li>
-                <li><strong>Activity:</strong> Cannot have budget</li>
-              </ul>
-              <li>Existing WBS items with matching codes will be updated</li>
+              <li><strong>SUMMARY</strong> — Root only (level 1). Cannot have Work packages directly below.</li>
+              <li><strong>WBS</strong> — Level 2 or 3. Level 2 has either only WBS or only Work packages below (not both). Level 3 can be WBS or WorkPackage; if WBS, only Work packages below.</li>
+              <li><strong>WorkPackage</strong> — Leaves with a budget. Use preliminary values here; finalize with &quot;Edit allocation&quot; for version 0.</li>
+              <li>Each parent WBS has a budget; buffer = parent budget − sum of children budgets (assigned to the WBS).</li>
+              <li>Existing items with the same code will be updated.</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -262,7 +262,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
                       </div>
                     </FormControl>
                     <FormDescription>
-                      Upload a CSV file with the required columns: wbsCode, wbsName, wbsType, and other properties
+                      Columns: wbsCode, wbsName, wbsType, wbsDescription (optional), budget
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -284,8 +284,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
               <AlertDescription className="flex">
                 <AlertTriangle className="h-5 w-5 mr-2 text-amber-600 flex-shrink-0" />
                 <p className="text-sm">
-                  <strong>Important:</strong> The template includes example WBS items with different types.
-                  Make sure to follow the validation rules for each type.
+                  <strong>Important:</strong> Use the template structure (SUMMARY → WBS → WorkPackage). Budgets are preliminary until you finalize with &quot;Edit allocation&quot; (version 0).
                 </p>
               </AlertDescription>
             </Alert>
@@ -313,7 +312,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
                         <TableHead>Code</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Type</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Budget</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -332,7 +331,7 @@ export function ImportWbsModal({ isOpen, onClose, projectId }: ImportWbsModalPro
                             <TableCell>{row.wbsName}</TableCell>
                             <TableCell>{row.wbsType}</TableCell>
                             <TableCell className="text-right font-mono">
-                              {row.amount ? `$${parseFloat(row.amount).toFixed(2)}` : '-'}
+                              {(row.amount ?? row.budget) ? `$${parseFloat(String(row.amount ?? row.budget)).toFixed(2)}` : "-"}
                             </TableCell>
                           </TableRow>
                         );

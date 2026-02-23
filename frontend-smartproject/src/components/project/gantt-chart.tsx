@@ -814,7 +814,7 @@ function GanttItem({
           {item.type !== "Activity" && (
             <div className="absolute inset-0 flex items-center px-4">
               <span className="text-xs text-gray-400">
-                {item.type === "Summary" ? "Summary Item" : "Work Package"}
+                {item.type === "Summary" ? "Summary Item" : item.type === "WBS" ? "WBS Item" : "Work Package"}
               </span>
             </div>
           )}

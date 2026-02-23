@@ -168,3 +168,121 @@ export function validateCsvData(data: any[]): any {
   return csvImportSchema.parse(data);
 }
 
+// --- WBS upload: SUMMARY (root), WBS (2nd/3rd level), WorkPackage (leaves) ---
+const WBS_TYPES = ["SUMMARY", "WBS", "WorkPackage"] as const;
+
+export function parseWbsCsvText(text: string): { data: any[]; errors: string[] } {
+  try {
+    const cleanText = text.replace(/^\uFEFF/, "");
+    const lines = cleanText.split(/\r?\n/).filter((line) => line.trim() !== "");
+    if (lines.length === 0) {
+      return { data: [], errors: ["CSV file is empty or contains no valid data"] };
+    }
+    const headers = lines[0].split(",").map((h) => h.trim());
+    const requiredColumns = ["wbsCode", "wbsName", "wbsType"];
+    const missingColumns = requiredColumns.filter((col) => !headers.includes(col));
+    if (missingColumns.length > 0) {
+      return {
+        data: [],
+        errors: [`Missing required columns: ${missingColumns.join(", ")}. Use: wbsCode, wbsName, wbsType, wbsDescription, budget`],
+      };
+    }
+    const budgetCol = headers.includes("budget") ? "budget" : "amount";
+    const data: any[] = [];
+    const errors: string[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const values = line.split(",").map((v) => v.trim());
+      if (values.length !== headers.length) {
+        errors.push(`Line ${i + 1}: Column count mismatch (expected ${headers.length}, got ${values.length})`);
+        continue;
+      }
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index];
+      });
+      if (!row.wbsCode) {
+        errors.push(`Line ${i + 1}: Missing WBS code`);
+        continue;
+      }
+      if (!row.wbsName) {
+        errors.push(`Line ${i + 1}: Missing WBS name`);
+        continue;
+      }
+      if (!row.wbsType || !WBS_TYPES.includes(row.wbsType as (typeof WBS_TYPES)[number])) {
+        errors.push(`Line ${i + 1}: Invalid wbsType - must be SUMMARY, WBS, or WorkPackage`);
+        continue;
+      }
+      const budgetVal = row[budgetCol] ?? row.amount ?? row.budget ?? "";
+      if (row.wbsType === "SUMMARY" || row.wbsType === "WBS" || row.wbsType === "WorkPackage") {
+        if (!budgetVal || isNaN(Number(budgetVal)) || Number(budgetVal) < 0) {
+          errors.push(`Line ${i + 1}: ${row.wbsType} must have a valid budget (number >= 0)`);
+          continue;
+        }
+      }
+      data.push({
+        ...row,
+        amount: budgetVal,
+        wbsDescription: row.wbsDescription ?? "",
+      });
+    }
+    return { data, errors };
+  } catch (error) {
+    return {
+      data: [],
+      errors: [error instanceof Error ? error.message : "Unknown error parsing CSV"],
+    };
+  }
+}
+
+export async function parseWbsCsvFile(file: File): Promise<{ data: any[]; errors: string[] }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = (event.target?.result as string) || "";
+        resolve(parseWbsCsvText(text));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsText(file);
+  });
+}
+
+/** Template: Project -> SUMMARY (root) -> WBS (2nd) -> WBS (3rd) -> WorkPackage. Budgets are preliminary until Edit Allocation (version 0). */
+export function generateWbsCsvTemplate(): string {
+  return [
+    "wbsCode,wbsName,wbsType,wbsDescription,budget",
+    "1,Engineering & Design,SUMMARY,Top-level phase,50000",
+    "1.1,Design,WBS,Design sub-phase,20000",
+    "1.1.1,Detailed Design,WBS,Detailed design only WBS,15000",
+    "1.1.1.1,Drawings,WorkPackage,Preliminary budget,8000",
+    "1.1.1.2,Specifications,WorkPackage,Preliminary budget,7000",
+    "1.2,Procurement,WBS,Procurement sub-phase,30000",
+    "1.2.1,Equipment,WBS,Equipment only WBS,30000",
+    "1.2.1.1,Boilers,WorkPackage,Preliminary budget,12000",
+    "1.2.1.2,Pumps,WorkPackage,Preliminary budget,18000",
+    "2,Construction,SUMMARY,Construction phase,40000",
+    "2.1,Civil Works,WBS,Civil only WBS,40000",
+    "2.1.1,Foundation,WorkPackage,Preliminary budget,25000",
+    "2.1.2,Structure,WorkPackage,Preliminary budget,15000",
+  ].join("\n");
+}
+
+export function downloadWbsCsvTemplate(): void {
+  const csvContent = generateWbsCsvTemplate();
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "WBS_upload_template.csv");
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
