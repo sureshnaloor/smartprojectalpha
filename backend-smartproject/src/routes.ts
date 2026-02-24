@@ -5449,6 +5449,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk CSV upload: material code, quantity, work package id or code → lookup master, compute estimated value, insert
+  const wpMaterialsBulkUploadSchema = z.object({
+    csvData: z.array(z.object({
+      materialCode: z.string().min(1),
+      quantity: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : String(v).trim())),
+      wpIdOrCode: z.union([z.string(), z.number()]).transform((v) => String(v).trim()),
+    })),
+  });
+
+  app.post("/api/projects/:projectId/work-package-materials/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      const { csvData } = wpMaterialsBulkUploadSchema.parse({ csvData: req.body?.csvData });
+      if (!csvData.length) return res.status(400).json({ message: "csvData must be a non-empty array" });
+
+      const materials = await db.select().from(materialMaster);
+      const materialByCode = new Map(materials.map((m: { materialCode: string; id: number; baseRate: string }) => [m.materialCode.trim().toLowerCase(), m]));
+      const projectWps = await storage.getWorkPackagesByProject(projectId);
+      const validWpIds = new Set(projectWps.map((wp: { id: number }) => wp.id));
+      const wpByCode = new Map(projectWps.map((wp: { code: string; id: number }) => [wp.code.trim().toLowerCase(), wp.id]));
+
+      const created: unknown[] = [];
+      const errors: { row: number; message: string }[] = [];
+
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i];
+        const qty = parseFloat(row.quantity);
+        if (isNaN(qty) || qty <= 0) {
+          errors.push({ row: i + 1, message: `Invalid quantity: ${row.quantity}` });
+          continue;
+        }
+        let wpId: number;
+        const raw = row.wpIdOrCode;
+        const asNum = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+        if (!Number.isNaN(asNum) && validWpIds.has(asNum)) {
+          wpId = asNum;
+        } else {
+          const byCode = wpByCode.get(raw.toLowerCase());
+          if (byCode !== undefined) wpId = byCode;
+          else {
+            errors.push({ row: i + 1, message: `Work package "${raw}" not found (use ID or code from the list, e.g. 1.2.1.1)` });
+            continue;
+          }
+        }
+        const mat = materialByCode.get(row.materialCode.trim().toLowerCase());
+        if (!mat) {
+          errors.push({ row: i + 1, message: `Material code not found: ${row.materialCode}` });
+          continue;
+        }
+        const baseRate = Number(mat.baseRate ?? 0);
+        const estimatedValue = (qty * baseRate).toFixed(2);
+        const [inserted] = await db.insert(workPackageMaterials).values({
+          projectId,
+          wpId,
+          materialId: mat.id,
+          quantity: row.quantity,
+          estimatedValue,
+          updatedAt: new Date(),
+        } as any).returning();
+        if (inserted) created.push(inserted);
+      }
+
+      res.status(201).json({ created: created.length, rows: created, errors: errors.length ? errors : undefined });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Bulk CSV upload: service code, quantity, work package id or code → lookup master, compute estimated value, insert
+  const wpServicesBulkUploadSchema = z.object({
+    csvData: z.array(z.object({
+      serviceCode: z.string().min(1),
+      quantity: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : String(v).trim())),
+      wpIdOrCode: z.union([z.string(), z.number()]).transform((v) => String(v).trim()),
+    })),
+  });
+
+  app.post("/api/projects/:projectId/work-package-services/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      const { csvData } = wpServicesBulkUploadSchema.parse({ csvData: req.body?.csvData });
+      if (!csvData.length) return res.status(400).json({ message: "csvData must be a non-empty array" });
+
+      const services = await db.select().from(serviceMaster);
+      const serviceByCode = new Map(services.map((s: { serviceCode: string; id: number; baseRate: string }) => [s.serviceCode.trim().toLowerCase(), s]));
+      const projectWps = await storage.getWorkPackagesByProject(projectId);
+      const validWpIds = new Set(projectWps.map((wp: { id: number }) => wp.id));
+      const wpByCode = new Map(projectWps.map((wp: { code: string; id: number }) => [wp.code.trim().toLowerCase(), wp.id]));
+
+      const created: unknown[] = [];
+      const errors: { row: number; message: string }[] = [];
+
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i];
+        const qty = parseFloat(row.quantity);
+        if (isNaN(qty) || qty <= 0) {
+          errors.push({ row: i + 1, message: `Invalid quantity: ${row.quantity}` });
+          continue;
+        }
+        let wpId: number;
+        const raw = row.wpIdOrCode;
+        const asNum = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+        if (!Number.isNaN(asNum) && validWpIds.has(asNum)) {
+          wpId = asNum;
+        } else {
+          const byCode = wpByCode.get(raw.toLowerCase());
+          if (byCode !== undefined) wpId = byCode;
+          else {
+            errors.push({ row: i + 1, message: `Work package "${raw}" not found (use ID or code from the list, e.g. 1.2.1.1)` });
+            continue;
+          }
+        }
+        const svc = serviceByCode.get(row.serviceCode.trim().toLowerCase());
+        if (!svc) {
+          errors.push({ row: i + 1, message: `Service code not found: ${row.serviceCode}` });
+          continue;
+        }
+        const baseRate = Number(svc.baseRate ?? 0);
+        const estimatedValue = (qty * baseRate).toFixed(2);
+        const [inserted] = await db.insert(workPackageServices).values({
+          projectId,
+          wpId,
+          serviceId: svc.id,
+          quantity: row.quantity,
+          estimatedValue,
+          updatedAt: new Date(),
+        } as any).returning();
+        if (inserted) created.push(inserted);
+      }
+
+      res.status(201).json({ created: created.length, rows: created, errors: errors.length ? errors : undefined });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   // ========================================
   // SERVICE TYPE ROUTES
   // ========================================

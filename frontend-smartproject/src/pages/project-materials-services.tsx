@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Trash2, GripVertical, Search, X, RefreshCw, AlertCircle } from "lucide-react";
+import { Trash2, GripVertical, Search, X, RefreshCw, AlertCircle, Upload, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
@@ -64,6 +64,11 @@ export default function ProjectMaterialsServices() {
   const [draggedItem, setDraggedItem] = useState<Material | Service | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [isQuantityDialogOpen, setIsQuantityDialogOpen] = useState(false);
+  const [bulkUploadPending, setBulkUploadPending] = useState(false);
+  const bulkCsvInputRef = useRef<HTMLInputElement>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<{ type: "material" | "service"; id: number; quantity: string; baseRate: number } | null>(null);
+  const [editQuantity, setEditQuantity] = useState("");
 
   // Sync tab from URL (Materials & Services only; Manpower & Equipment is in header and goes to /resources)
   useEffect(() => {
@@ -210,6 +215,168 @@ export default function ProjectMaterialsServices() {
     },
   });
 
+  const updateMaterialMutation = useMutation({
+    mutationFn: async ({ id, quantity, estimatedValue }: { id: number; quantity: string; estimatedValue: string }) => {
+      return apiRequest("PATCH", `/api/work-package-materials/${id}`, { quantity, estimatedValue });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wp-materials", selectedWpId] });
+      queryClient.invalidateQueries({ queryKey: ["project-wp-materials", projectId] });
+      toast({ title: "Material updated" });
+      setEditDialogOpen(false);
+      setEditingRow(null);
+    },
+    onError: (e: Error) => toast({ title: "Error updating material", description: e.message, variant: "destructive" }),
+  });
+
+  const updateServiceMutation = useMutation({
+    mutationFn: async ({ id, quantity, estimatedValue }: { id: number; quantity: string; estimatedValue: string }) => {
+      return apiRequest("PATCH", `/api/work-package-services/${id}`, { quantity, estimatedValue });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wp-services", selectedWpId] });
+      queryClient.invalidateQueries({ queryKey: ["project-wp-services", projectId] });
+      toast({ title: "Service updated" });
+      setEditDialogOpen(false);
+      setEditingRow(null);
+    },
+    onError: (e: Error) => toast({ title: "Error updating service", description: e.message, variant: "destructive" }),
+  });
+
+  const handleOpenEdit = (type: "material" | "service", r: { id: number; quantity: string; baseRate?: string | number }) => {
+    setEditingRow({ type, id: r.id, quantity: String(r.quantity), baseRate: Number(r.baseRate ?? 0) });
+    setEditQuantity(String(r.quantity));
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSave = () => {
+    if (!editingRow) return;
+    const qty = parseFloat(editQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      toast({ title: "Invalid quantity", variant: "destructive" });
+      return;
+    }
+    const estimatedValue = (qty * editingRow.baseRate).toFixed(2);
+    if (editingRow.type === "material") {
+      updateMaterialMutation.mutate({ id: editingRow.id, quantity: editQuantity, estimatedValue });
+    } else {
+      updateServiceMutation.mutate({ id: editingRow.id, quantity: editQuantity, estimatedValue });
+    }
+  };
+
+  const bulkUploadMaterialsMutation = useMutation({
+    mutationFn: async (csvData: { materialCode: string; quantity: string; wpIdOrCode: string }[]) => {
+      const res = await fetch(`/api/projects/${projectId}/work-package-materials/bulk-upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvData }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || "Bulk upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: { created: number; errors?: { row: number; message: string }[] }) => {
+      queryClient.invalidateQueries({ queryKey: ["wp-materials", selectedWpId] });
+      queryClient.invalidateQueries({ queryKey: ["project-wp-materials", projectId] });
+      if (data.errors?.length) {
+        toast({
+          title: `${data.created} material(s) added`,
+          description: `${data.errors.length} row(s) skipped: ${data.errors.slice(0, 3).map((e) => `Row ${e.row}: ${e.message}`).join("; ")}${data.errors.length > 3 ? "…" : ""}`,
+          variant: "default",
+        });
+      } else {
+        toast({ title: `${data.created} material(s) added to work packages` });
+      }
+      setBulkUploadPending(false);
+      bulkCsvInputRef.current?.form?.reset();
+    },
+    onError: (e: Error) => {
+      toast({ title: "Bulk upload failed", description: e.message, variant: "destructive" });
+      setBulkUploadPending(false);
+    },
+  });
+
+  const bulkUploadServicesMutation = useMutation({
+    mutationFn: async (csvData: { serviceCode: string; quantity: string; wpIdOrCode: string }[]) => {
+      const res = await fetch(`/api/projects/${projectId}/work-package-services/bulk-upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvData }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || "Bulk upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: { created: number; errors?: { row: number; message: string }[] }) => {
+      queryClient.invalidateQueries({ queryKey: ["wp-services", selectedWpId] });
+      queryClient.invalidateQueries({ queryKey: ["project-wp-services", projectId] });
+      if (data.errors?.length) {
+        toast({
+          title: `${data.created} service(s) added`,
+          description: `${data.errors.length} row(s) skipped: ${data.errors.slice(0, 3).map((e) => `Row ${e.row}: ${e.message}`).join("; ")}${data.errors.length > 3 ? "…" : ""}`,
+          variant: "default",
+        });
+      } else {
+        toast({ title: `${data.created} service(s) added to work packages` });
+      }
+      setBulkUploadPending(false);
+      bulkCsvInputRef.current?.form?.reset();
+    },
+    onError: (e: Error) => {
+      toast({ title: "Bulk upload failed", description: e.message, variant: "destructive" });
+      setBulkUploadPending(false);
+    },
+  });
+
+  const handleBulkCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !projectId) return;
+    setBulkUploadPending(true);
+    e.target.value = "";
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = (event.target?.result as string) || "";
+        const lines = text.split(/\r?\n/).filter((line) => line.trim());
+        if (lines.length === 0) {
+          toast({ title: "CSV is empty", variant: "destructive" });
+          setBulkUploadPending(false);
+          return;
+        }
+        const first = lines[0].split(",").map((c) => c.trim().toLowerCase());
+        const isHeader = first.some((c) => /^(code|material|service|quantity|qty|wp|work package|id)$/.test(c));
+        const dataLines = isHeader ? lines.slice(1) : lines;
+        const csvData = dataLines.map((line) => {
+          const cols = line.split(",").map((c) => c.trim());
+          const code = cols[0] ?? "";
+          const qty = cols[1] ?? "1";
+          const wpIdOrCode = cols[2] ?? "";
+          return activeTab === "materials"
+            ? { materialCode: code, quantity: qty, wpIdOrCode }
+            : { serviceCode: code, quantity: qty, wpIdOrCode };
+        }).filter((r) => (activeTab === "materials" ? r.materialCode : r.serviceCode) && r.wpIdOrCode);
+        if (csvData.length === 0) {
+          toast({ title: "No valid rows (need code, quantity, work package id or code)", variant: "destructive" });
+          setBulkUploadPending(false);
+          return;
+        }
+        if (activeTab === "materials") {
+          bulkUploadMaterialsMutation.mutate(csvData as { materialCode: string; quantity: string; wpIdOrCode: string }[]);
+        } else {
+          bulkUploadServicesMutation.mutate(csvData as { serviceCode: string; quantity: string; wpIdOrCode: string }[]);
+        }
+      } catch {
+        toast({ title: "Error parsing CSV", variant: "destructive" });
+        setBulkUploadPending(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleDragStart = (e: React.DragEvent, item: Material | Service, tab: "materials" | "services") => {
     e.dataTransfer.setData("application/json", JSON.stringify({ item, tab }));
     setDraggedItem(item);
@@ -346,16 +513,41 @@ export default function ProjectMaterialsServices() {
               <Card className="flex-shrink-0">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle>Work Packages</CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => refetchWorkPackages()}
-                    disabled={workPackagesFetching}
-                    className="shrink-0"
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-1 ${workPackagesFetching ? "animate-spin" : ""}`} />
-                    {workPackagesLoading || workPackagesFetching ? "Loading…" : "Show work packages"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <form
+                      onSubmit={(e) => e.preventDefault()}
+                      className="inline"
+                    >
+                      <input
+                        ref={bulkCsvInputRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleBulkCsvUpload}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => bulkCsvInputRef.current?.click()}
+                        disabled={bulkUploadPending || bulkUploadMaterialsMutation.isPending || bulkUploadServicesMutation.isPending || workPackages.length === 0}
+                        className="shrink-0"
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        Bulk upload CSV
+                      </Button>
+                    </form>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetchWorkPackages()}
+                      disabled={workPackagesFetching}
+                      className="shrink-0"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1 ${workPackagesFetching ? "animate-spin" : ""}`} />
+                      {workPackagesLoading || workPackagesFetching ? "Loading…" : "Refresh"}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {workPackagesLoading && !workPackagesFetching ? (
@@ -384,7 +576,11 @@ export default function ProjectMaterialsServices() {
                       </Button>
                     </div>
                   ) : (
-                    <ScrollArea className="h-28">
+                    <>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Bulk CSV: column 1 = {activeTab === "materials" ? "material" : "service"} code, 2 = quantity, 3 = work package id or code (e.g. 1.2.1.1).
+                      </p>
+                      <ScrollArea className="h-28">
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant={selectedWpId === null ? "default" : "outline"}
@@ -402,12 +598,14 @@ export default function ProjectMaterialsServices() {
                             onDrop={(e) => handleDrop(e, wp.id)}
                             onDragOver={handleDragOver}
                             className="cursor-pointer"
+                            title={`Work package ID: ${wp.id} (use in CSV column 3)`}
                           >
-                            {wp.code} – {wp.name}
+                            {wp.code} – {wp.name} <span className="text-muted-foreground">({wp.id})</span>
                           </Button>
                         ))}
                       </div>
                     </ScrollArea>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -457,7 +655,7 @@ export default function ProjectMaterialsServices() {
                                   <TableHead>UOM</TableHead>
                                   <TableHead className="text-right">Quantity</TableHead>
                                   <TableHead className="text-right">Est. Value</TableHead>
-                                  <TableHead className="w-[80px]"></TableHead>
+                                  <TableHead className="w-[100px]"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -469,14 +667,24 @@ export default function ProjectMaterialsServices() {
                                     <TableCell className="text-right">{r.quantity}</TableCell>
                                     <TableCell className="text-right font-mono">{formatCurrency(Number(r.estimatedValue))}</TableCell>
                                     <TableCell>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-red-500"
-                                        onClick={() => deleteMaterialMutation.mutate(r.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          title="Edit quantity"
+                                          onClick={() => handleOpenEdit("material", { id: r.id, quantity: r.quantity, baseRate: r.baseRate })}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-red-500"
+                                          onClick={() => deleteMaterialMutation.mutate(r.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -500,7 +708,7 @@ export default function ProjectMaterialsServices() {
                                   <TableHead>UOM</TableHead>
                                   <TableHead className="text-right">Quantity</TableHead>
                                   <TableHead className="text-right">Est. Value</TableHead>
-                                  <TableHead className="w-[80px]"></TableHead>
+                                  <TableHead className="w-[100px]"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -512,14 +720,24 @@ export default function ProjectMaterialsServices() {
                                     <TableCell className="text-right">{r.quantity}</TableCell>
                                     <TableCell className="text-right font-mono">{formatCurrency(Number(r.estimatedValue))}</TableCell>
                                     <TableCell>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-red-500"
-                                        onClick={() => deleteServiceMutation.mutate(r.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          title="Edit quantity"
+                                          onClick={() => handleOpenEdit("service", { id: r.id, quantity: r.quantity, baseRate: r.baseRate })}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-red-500"
+                                          onClick={() => deleteServiceMutation.mutate(r.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -570,6 +788,46 @@ export default function ProjectMaterialsServices() {
                   (window as any).__pendingMaterialDrop = null;
                   (window as any).__pendingServiceDrop = null;
                 }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit quantity dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setEditingRow(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit quantity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(e.target.value)}
+              />
+            </div>
+            {editingRow !== null && (
+              <p className="text-sm text-muted-foreground">
+                Estimated value = quantity × {formatCurrency(editingRow.baseRate)} (consumes from work package budget).
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button
+                onClick={handleEditSave}
+                disabled={!editQuantity || parseFloat(editQuantity) <= 0 || updateMaterialMutation.isPending || updateServiceMutation.isPending}
+              >
+                Save
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}
               >
                 Cancel
               </Button>
