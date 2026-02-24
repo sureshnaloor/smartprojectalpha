@@ -64,6 +64,7 @@ interface Material {
   materialType: string;
   materialGroup: string;
   materialClass: string;
+  baseRate: number | string;
   createdAt: string;
   updatedAt: string;
 }
@@ -136,6 +137,7 @@ export default function MaterialMaster() {
     materialType: "",
     materialGroup: "",
     materialClass: "common",
+    baseRate: "",
   });
 
   // Fetch materials
@@ -233,6 +235,7 @@ export default function MaterialMaster() {
       materialType: "",
       materialGroup: "",
       materialClass: "common",
+      baseRate: "",
     });
     setEditingMaterial(null);
   };
@@ -255,6 +258,7 @@ export default function MaterialMaster() {
       materialType: material.materialType,
       materialGroup: material.materialGroup,
       materialClass: material.materialClass,
+      baseRate: material.baseRate !== undefined && material.baseRate !== null ? String(material.baseRate) : "",
     });
     setIsDialogOpen(true);
   };
@@ -278,6 +282,7 @@ export default function MaterialMaster() {
 
         const csvData = lines.slice(1).map((line) => {
           const values = line.split(",").map((v) => v.trim());
+          const baseRateIdx = headers.findIndex((h) => h.trim().toLowerCase() === "baserate" || h.trim().toLowerCase() === "base_rate");
           return {
             materialCode: values[headers.indexOf("materialCode")],
             materialDescription: values[headers.indexOf("materialDescription")],
@@ -285,6 +290,7 @@ export default function MaterialMaster() {
             materialType: values[headers.indexOf("materialType")],
             materialGroup: values[headers.indexOf("materialGroup")],
             materialClass: values[headers.indexOf("materialClass")] || "common",
+            ...(baseRateIdx >= 0 && values[baseRateIdx] !== undefined ? { baseRate: values[baseRateIdx] || "0" } : {}),
           };
         });
 
@@ -464,6 +470,20 @@ export default function MaterialMaster() {
                       </div>
                     </div>
 
+                    <div>
+                      <Label htmlFor="baseRate" className="font-semibold text-green-700">Base Rate (per UOM) *</Label>
+                      <Input
+                        id="baseRate"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        value={formData.baseRate}
+                        onChange={(e) => setFormData({ ...formData, baseRate: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Unit rate for estimating value when added to work packages.</p>
+                    </div>
+
                     <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                       {editingMaterial ? "Update" : "Create"}
                     </Button>
@@ -526,6 +546,7 @@ export default function MaterialMaster() {
                     <TableHead className="text-gray-900 font-bold">Code</TableHead>
                     <TableHead className="text-gray-900 font-bold">Description</TableHead>
                     <TableHead className="text-gray-900 font-bold">UOM</TableHead>
+                    <TableHead className="text-gray-900 font-bold">Base Rate</TableHead>
                     <TableHead className="text-gray-900 font-bold">Type</TableHead>
                     <TableHead className="text-gray-900 font-bold">Group</TableHead>
                     <TableHead className="text-gray-900 font-bold">Class</TableHead>
@@ -544,6 +565,11 @@ export default function MaterialMaster() {
                       <TableCell className="font-medium">{material.materialCode}</TableCell>
                       <TableCell>{material.materialDescription}</TableCell>
                       <TableCell>{material.uom}</TableCell>
+                      <TableCell className="font-mono">
+                        {typeof material.baseRate === "number"
+                          ? material.baseRate.toFixed(2)
+                          : Number(material.baseRate || 0).toFixed(2)}
+                      </TableCell>
                       <TableCell>{material.materialType}</TableCell>
                       <TableCell>{material.materialGroup}</TableCell>
                       <TableCell>

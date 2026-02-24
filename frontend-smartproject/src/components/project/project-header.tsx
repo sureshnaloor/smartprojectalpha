@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Project, WbsItem } from "@shared/schema";
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
-import { FileSpreadsheet, ChartLine, GanttChart, Menu, MoreHorizontal, BarChart2, PencilIcon, ArrowLeft, DollarSign } from "lucide-react";
+import { FileSpreadsheet, ChartLine, GanttChart, Menu, MoreHorizontal, BarChart2, PencilIcon, ArrowLeft, DollarSign, Package, Wrench, Users, LayoutDashboard, Activity, Calendar, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportWbsModal } from "./import-wbs-modal";
 import { DeleteProjectDialog } from "./delete-project-dialog";
@@ -50,6 +50,21 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
   };
 
   const routeContext = getRouteContext();
+  const isMaterialsServicesRoute = location.includes("/materials-services");
+  const isResourcesRoute = location.includes("/resources") && !location.includes("/materials-services");
+  const showMaterialsServicesTabs = isMaterialsServicesRoute || isResourcesRoute;
+
+  const isProjectRoot = typeof location === "string" && new RegExp(`^/projects/${projectId}$`).test(location);
+  const [wbsTabHash, setWbsTabHash] = useState("");
+  useEffect(() => {
+    if (!isProjectRoot) return;
+    const hash = (window.location.hash || "#home").slice(1);
+    setWbsTabHash(hash || "home");
+    const onHashChange = () => setWbsTabHash((window.location.hash || "#home").slice(1));
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [isProjectRoot, projectId]);
+  const activeWbsTab = (wbsTabHash || "home") as string;
 
   // Fetch project data
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
@@ -190,59 +205,125 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs: Project root = Home|Activities|Cost|Schedule|Progress; Materials & Services = Materials|Services|Manpower; else Tab1–Tab5 */}
       <div className="px-6 sm:px-8 border-t border-zinc-200 bg-zinc-50/50">
         <nav className="-mb-px flex space-x-8 overflow-x-auto">
-          <Link href={`/projects/${projectId}/${routeContext}/page1`}>
-            <a
-              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page1`
-                ? "border-zinc-900 text-zinc-900"
-                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                }`}
-            >
-              Tab1
-            </a>
-          </Link>
-          <Link href={`/projects/${projectId}/${routeContext}/page2`}>
-            <a
-              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page2`
-                ? "border-zinc-900 text-zinc-900"
-                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                }`}
-            >
-              Tab2
-            </a>
-          </Link>
-          <Link href={`/projects/${projectId}/${routeContext}/page3`}>
-            <a
-              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page3`
-                ? "border-zinc-900 text-zinc-900"
-                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                }`}
-            >
-              Tab3
-            </a>
-          </Link>
-          <Link href={`/projects/${projectId}/${routeContext}/page4`}>
-            <a
-              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page4`
-                ? "border-zinc-900 text-zinc-900"
-                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                }`}
-            >
-              Tab4
-            </a>
-          </Link>
-          <Link href={`/projects/${projectId}/${routeContext}/page5`}>
-            <a
-              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page5`
-                ? "border-zinc-900 text-zinc-900"
-                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                }`}
-            >
-              Tab5
-            </a>
-          </Link>
+          {isProjectRoot ? (
+            <>
+              {(["home", "activities", "cost", "schedule", "progress"] as const).map((tab) => (
+                <a
+                  key={tab}
+                  href={`/projects/${projectId}#${tab}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.location.hash = tab;
+                    setWbsTabHash(tab);
+                    window.dispatchEvent(new HashChangeEvent("hashchange"));
+                  }}
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${activeWbsTab === tab
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  {tab === "home" && <LayoutDashboard className="h-4 w-4" />}
+                  {tab === "activities" && <Activity className="h-4 w-4" />}
+                  {tab === "cost" && <DollarSign className="h-4 w-4" />}
+                  {tab === "schedule" && <Calendar className="h-4 w-4" />}
+                  {tab === "progress" && <TrendingUp className="h-4 w-4" />}
+                  <span className="capitalize">{tab}</span>
+                </a>
+              ))}
+            </>
+          ) : showMaterialsServicesTabs ? (
+            <>
+              <Link href={`/projects/${projectId}/materials-services/materials`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${location.includes("/materials-services/materials") || (location.includes("/materials-services") && !location.includes("/materials-services/services") && !location.includes("/materials-services/manpower") && !location.includes("/materials-services/equipment"))
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  <Package className="h-4 w-4" />
+                  Materials
+                </a>
+              </Link>
+              <Link href={`/projects/${projectId}/materials-services/services`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${location.includes("/materials-services/services")
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  <Wrench className="h-4 w-4" />
+                  Services
+                </a>
+              </Link>
+              <Link href={`/projects/${projectId}/resources`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${isResourcesRoute
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  <Users className="h-4 w-4" />
+                  Manpower &amp; Equipment
+                </a>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href={`/projects/${projectId}/${routeContext}/page1`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page1`
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  Tab1
+                </a>
+              </Link>
+              <Link href={`/projects/${projectId}/${routeContext}/page2`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page2`
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  Tab2
+                </a>
+              </Link>
+              <Link href={`/projects/${projectId}/${routeContext}/page3`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page3`
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  Tab3
+                </a>
+              </Link>
+              <Link href={`/projects/${projectId}/${routeContext}/page4`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page4`
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  Tab4
+                </a>
+              </Link>
+              <Link href={`/projects/${projectId}/${routeContext}/page5`}>
+                <a
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page5`
+                    ? "border-zinc-900 text-zinc-900"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                    }`}
+                >
+                  Tab5
+                </a>
+              </Link>
+            </>
+          )}
         </nav>
       </div>
 

@@ -41,7 +41,8 @@ import {
   MoreHorizontal,
   MessageSquareText as MessageSquareTextIcon,
   LayoutDashboard,
-  Briefcase
+  Briefcase,
+  Package
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -180,7 +181,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                             location === `/projects/${currentProjectId}` && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
                           )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: location === `/projects/${currentProjectId}` ? 600 : 500, letterSpacing: '0.12em' }}>
                             <LayoutDashboard className="mr-3 h-4 w-4" />
-                            <span>WBS and activities</span>
+                            <span>WBS and work packages</span>
                           </a>
                         </Link>
                       </li>
@@ -218,13 +219,13 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
-                        <Link href={`/projects/${currentProjectId}/resources`}>
+                        <Link href={`/projects/${currentProjectId}/materials-services/materials`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
-                            isActive('/resources') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/resources') ? 600 : 500, letterSpacing: '0.12em' }}>
-                            <Users className="mr-3 h-4 w-4" />
-                            <span>Resources</span>
+                            isActive('/materials-services') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/materials-services') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <Package className="mr-3 h-4 w-4" />
+                            <span>Materials, Services &amp; Resources</span>
                           </a>
                         </Link>
                       </li>

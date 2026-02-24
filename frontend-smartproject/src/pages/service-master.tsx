@@ -36,6 +36,7 @@ interface Service {
   uom: string;
   serviceType: string;
   serviceGroup: string;
+  baseRate: number | string;
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +100,7 @@ export default function ServiceMaster() {
     uom: "",
     serviceType: "",
     serviceGroup: "",
+    baseRate: "",
   });
 
   const { data: services = [], isLoading } = useQuery({
@@ -181,6 +183,7 @@ export default function ServiceMaster() {
       uom: "",
       serviceType: "",
       serviceGroup: "",
+      baseRate: "",
     });
     setEditingService(null);
   };
@@ -202,6 +205,7 @@ export default function ServiceMaster() {
       uom: service.uom,
       serviceType: service.serviceType,
       serviceGroup: service.serviceGroup,
+      baseRate: service.baseRate !== undefined && service.baseRate !== null ? String(service.baseRate) : "",
     });
     setIsDialogOpen(true);
   };
@@ -215,6 +219,7 @@ export default function ServiceMaster() {
         const csv = (event.target?.result as string) || "";
         const lines = csv.split("\n").filter((line) => line.trim());
         const headers = lines[0].split(",").map((h) => h.trim());
+        const baseRateIdx = headers.findIndex((h) => h.trim().toLowerCase() === "baserate" || h.trim().toLowerCase() === "base_rate");
         const csvData = lines.slice(1).map((line) => {
           const values = line.split(",").map((v) => v.trim());
           return {
@@ -223,6 +228,7 @@ export default function ServiceMaster() {
             uom: values[headers.indexOf("uom")],
             serviceType: values[headers.indexOf("serviceType")],
             serviceGroup: values[headers.indexOf("serviceGroup")],
+            ...(baseRateIdx >= 0 && values[baseRateIdx] !== undefined ? { baseRate: values[baseRateIdx] || "0" } : {}),
           };
         });
         bulkUploadMutation.mutate(csvData);
@@ -283,7 +289,7 @@ export default function ServiceMaster() {
                       onChange={(e) => setFormData({ ...formData, serviceDescription: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>UOM *</Label>
                       <Select value={formData.uom || undefined} onValueChange={(v) => setFormData({ ...formData, uom: v })} required>
@@ -327,6 +333,18 @@ export default function ServiceMaster() {
                       </Select>
                     </div>
                   </div>
+                  <div>
+                    <Label>Base Rate (per UOM) *</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.baseRate}
+                      onChange={(e) => setFormData({ ...formData, baseRate: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Unit rate for estimating value when added to work packages.</p>
+                  </div>
                   <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                     {editingService ? "Update" : "Create"}
                   </Button>
@@ -365,6 +383,7 @@ export default function ServiceMaster() {
                   <TableHead>Code</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>UOM</TableHead>
+                  <TableHead>Base Rate</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Group</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
@@ -376,6 +395,9 @@ export default function ServiceMaster() {
                     <TableCell className="font-medium">{s.serviceCode}</TableCell>
                     <TableCell>{s.serviceDescription}</TableCell>
                     <TableCell>{s.uom}</TableCell>
+                    <TableCell className="font-mono">
+                      {typeof s.baseRate === "number" ? s.baseRate.toFixed(2) : Number(s.baseRate || 0).toFixed(2)}
+                    </TableCell>
                     <TableCell>{s.serviceType}</TableCell>
                     <TableCell>{s.serviceGroup}</TableCell>
                     <TableCell>

@@ -57,6 +57,10 @@ import {
   insertRentalManpowerSchema,
   materialMaster,
   serviceMaster,
+  workPackageMaterials,
+  workPackageServices,
+  insertWorkPackageMaterialSchema,
+  insertWorkPackageServiceSchema,
   serviceTypes,
   serviceGroups,
   vendorMaster,
@@ -5246,6 +5250,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const services = csvData.map((row: any) => insertServiceMasterSchema.parse(row));
       const created = await db.insert(serviceMaster).values(services as any).returning();
       res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // WORK PACKAGE MATERIALS (assign materials to WP; estimated value = quantity * base_rate)
+  // ========================================
+
+  app.get("/api/projects/:projectId/work-package-materials", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      const rows = await db.select().from(workPackageMaterials).where(eq(workPackageMaterials.projectId, projectId));
+      const materials = await db.select().from(materialMaster);
+      const byId = new Map(materials.map((m: { id: number }) => [m.id, m]));
+      const result = rows.map((r: typeof workPackageMaterials.$inferSelect) => {
+        const mat = byId.get(r.materialId);
+        return {
+          ...r,
+          materialCode: mat?.materialCode,
+          materialDescription: mat?.materialDescription,
+          uom: mat?.uom,
+          baseRate: mat?.baseRate,
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/work-packages/:wpId/materials", async (req: Request, res: Response) => {
+    try {
+      const wpId = parseInt(req.params.wpId);
+      if (isNaN(wpId)) return res.status(400).json({ message: "Invalid work package ID" });
+      const rows = await db.select().from(workPackageMaterials).where(eq(workPackageMaterials.wpId, wpId));
+      const materials = await db.select().from(materialMaster);
+      const byId = new Map(materials.map((m: { id: number }) => [m.id, m]));
+      const result = rows.map((r: typeof workPackageMaterials.$inferSelect) => {
+        const mat = byId.get(r.materialId);
+        return {
+          ...r,
+          materialCode: mat?.materialCode,
+          materialDescription: mat?.materialDescription,
+          uom: mat?.uom,
+          baseRate: mat?.baseRate,
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/work-package-materials", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      const body = { ...req.body, projectId };
+      const data = insertWorkPackageMaterialSchema.parse(body);
+      const [row] = await db.insert(workPackageMaterials).values({
+        projectId: data.projectId,
+        wpId: data.wpId,
+        materialId: data.materialId,
+        quantity: data.quantity,
+        estimatedValue: data.estimatedValue,
+        updatedAt: new Date(),
+      } as any).returning();
+      res.status(201).json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/work-package-materials/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const body = req.body as { quantity?: string | number; estimatedValue?: string | number };
+      const updates: { quantity?: string; estimatedValue?: string; updatedAt: Date } = { updatedAt: new Date() };
+      if (body.quantity !== undefined) updates.quantity = String(body.quantity);
+      if (body.estimatedValue !== undefined) updates.estimatedValue = String(body.estimatedValue);
+      const [updated] = await db.update(workPackageMaterials).set(updates).where(eq(workPackageMaterials.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/work-package-materials/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(workPackageMaterials).where(eq(workPackageMaterials.id, id));
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
+  // WORK PACKAGE SERVICES
+  // ========================================
+
+  app.get("/api/projects/:projectId/work-package-services", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      const rows = await db.select().from(workPackageServices).where(eq(workPackageServices.projectId, projectId));
+      const services = await db.select().from(serviceMaster);
+      const byId = new Map(services.map((s: { id: number }) => [s.id, s]));
+      const result = rows.map((r: typeof workPackageServices.$inferSelect) => {
+        const svc = byId.get(r.serviceId);
+        return {
+          ...r,
+          serviceCode: svc?.serviceCode,
+          serviceDescription: svc?.serviceDescription,
+          uom: svc?.uom,
+          baseRate: svc?.baseRate,
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/work-packages/:wpId/services", async (req: Request, res: Response) => {
+    try {
+      const wpId = parseInt(req.params.wpId);
+      if (isNaN(wpId)) return res.status(400).json({ message: "Invalid work package ID" });
+      const rows = await db.select().from(workPackageServices).where(eq(workPackageServices.wpId, wpId));
+      const services = await db.select().from(serviceMaster);
+      const byId = new Map(services.map((s: { id: number }) => [s.id, s]));
+      const result = rows.map((r: typeof workPackageServices.$inferSelect) => {
+        const svc = byId.get(r.serviceId);
+        return {
+          ...r,
+          serviceCode: svc?.serviceCode,
+          serviceDescription: svc?.serviceDescription,
+          uom: svc?.uom,
+          baseRate: svc?.baseRate,
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/work-package-services", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      const body = { ...req.body, projectId };
+      const data = insertWorkPackageServiceSchema.parse(body);
+      const [row] = await db.insert(workPackageServices).values({
+        projectId: data.projectId,
+        wpId: data.wpId,
+        serviceId: data.serviceId,
+        quantity: data.quantity,
+        estimatedValue: data.estimatedValue,
+        updatedAt: new Date(),
+      } as any).returning();
+      res.status(201).json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/work-package-services/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const body = req.body as { quantity?: string | number; estimatedValue?: string | number };
+      const updates: { quantity?: string; estimatedValue?: string; updatedAt: Date } = { updatedAt: new Date() };
+      if (body.quantity !== undefined) updates.quantity = String(body.quantity);
+      if (body.estimatedValue !== undefined) updates.estimatedValue = String(body.estimatedValue);
+      const [updated] = await db.update(workPackageServices).set(updates).where(eq(workPackageServices.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/work-package-services/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await db.delete(workPackageServices).where(eq(workPackageServices.id, id));
+      res.status(204).end();
     } catch (err) {
       handleError(err, res);
     }

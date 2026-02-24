@@ -847,6 +847,7 @@ export const materialMaster = pgTable("material_master", {
   materialType: text("material_type").notNull(), // Type of material
   materialGroup: text("material_group").notNull(), // Group classification
   materialClass: text("material_class").notNull(), // mrp, common, project
+  baseRate: numeric("base_rate", { precision: 12, scale: 2 }).notNull().default("0"), // Unit rate per UOM for estimated value in work packages
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -877,6 +878,31 @@ export const serviceMaster = pgTable("service_master", {
   uom: text("uom").notNull(),
   serviceType: text("service_type").notNull(),
   serviceGroup: text("service_group").notNull(),
+  baseRate: numeric("base_rate", { precision: 12, scale: 2 }).notNull().default("0"), // Unit rate per UOM for estimated value in work packages
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Work Package Materials (material assigned to WP; quantity * base_rate = estimated value)
+export const workPackageMaterials = pgTable("work_package_materials", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  wpId: integer("wp_id").notNull().references(() => workPackages.id, { onDelete: "cascade" }),
+  materialId: integer("material_id").notNull().references(() => materialMaster.id, { onDelete: "cascade" }),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  estimatedValue: numeric("estimated_value", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Work Package Services (service assigned to WP; quantity * base_rate = estimated value)
+export const workPackageServices = pgTable("work_package_services", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  wpId: integer("wp_id").notNull().references(() => workPackages.id, { onDelete: "cascade" }),
+  serviceId: integer("service_id").notNull().references(() => serviceMaster.id, { onDelete: "cascade" }),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  estimatedValue: numeric("estimated_value", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1038,11 +1064,39 @@ export const insertPlannedActivityTaskSchema = createInsertSchema(plannedActivit
 
 // Material Master Schema
 export const insertMaterialMasterSchema = createInsertSchema(materialMaster)
-  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    baseRate: z.union([z.string(), z.number()]).optional().transform((v) => (v !== undefined && v !== "" && !Number.isNaN(Number(v)) ? String(Number(v)) : "0")),
+  });
 
 // Service Master Schema
 export const insertServiceMasterSchema = createInsertSchema(serviceMaster)
-  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    baseRate: z.union([z.string(), z.number()]).optional().transform((v) => (v !== undefined && v !== "" && !Number.isNaN(Number(v)) ? String(Number(v)) : "0")),
+  });
+
+// Work Package Materials Schema
+export const insertWorkPackageMaterialSchema = createInsertSchema(workPackageMaterials)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    projectId: z.number(),
+    wpId: z.number(),
+    materialId: z.number(),
+    quantity: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
+    estimatedValue: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
+  });
+
+// Work Package Services Schema
+export const insertWorkPackageServiceSchema = createInsertSchema(workPackageServices)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    projectId: z.number(),
+    wpId: z.number(),
+    serviceId: z.number(),
+    quantity: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
+    estimatedValue: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
+  });
 
 // Vendor Master Schema
 export const insertVendorMasterSchema = createInsertSchema(vendorMaster)
@@ -1101,6 +1155,11 @@ export type InsertMaterialMaster = z.infer<typeof insertMaterialMasterSchema>;
 
 export type ServiceMaster = typeof serviceMaster.$inferSelect;
 export type InsertServiceMaster = z.infer<typeof insertServiceMasterSchema>;
+
+export type WorkPackageMaterial = typeof workPackageMaterials.$inferSelect;
+export type InsertWorkPackageMaterial = z.infer<typeof insertWorkPackageMaterialSchema>;
+export type WorkPackageService = typeof workPackageServices.$inferSelect;
+export type InsertWorkPackageService = z.infer<typeof insertWorkPackageServiceSchema>;
 
 export type VendorMaster = typeof vendorMaster.$inferSelect;
 export type InsertVendorMaster = z.infer<typeof insertVendorMasterSchema>;

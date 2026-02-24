@@ -6,7 +6,7 @@ import { AuthProvider } from "@/contexts/auth-context";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard";
+import ProjectWbsWorkPackages from "@/pages/project-wbs-work-packages";
 import Landing from '@/pages/landing';
 import WbsStructure from "@/pages/wbs-structure";
 import Schedule from "@/pages/schedule";
@@ -58,6 +58,7 @@ import ThreadDetailPage from "@/pages/thread-detail";
 import ProjectActivities from "@/pages/project-activities";
 import ProjectTasks from "@/pages/project-tasks";
 import ProjectResources from "@/pages/project-resources";
+import ProjectMaterialsServices from "@/pages/project-materials-services";
 import ProjectResourcesPage1 from "@/pages/project-resources-page1";
 import ProjectResourcesPage2 from "@/pages/project-resources-page2";
 import ProjectResourcesPage3 from "@/pages/project-resources-page3";
@@ -99,11 +100,11 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/playground" component={Home} />
 
-      {/* Project Dashboard */}
+      {/* Project WBS & Work Packages (project home) */}
       <Route path="/projects/:projectId">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
-            <Dashboard />
+            <ProjectWbsWorkPackages />
           </ProjectLayout>
         )}
       </Route>
@@ -442,6 +443,22 @@ function Router() {
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectResources />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      {/* Project Materials & Services (Materials, Services, Manpower, Equipment tabs) */}
+      <Route path="/projects/:projectId/materials-services/:tab">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectMaterialsServices />
+          </ProjectLayout>
+        )}
+      </Route>
+      <Route path="/projects/:projectId/materials-services">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectMaterialsServices />
           </ProjectLayout>
         )}
       </Route>
