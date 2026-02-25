@@ -10,6 +10,7 @@
     "check": "tsc"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "^1.2.1",
     "@radix-ui/react-alert-dialog": "^1.1.2",
@@ -45,6 +46,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
+    "drizzle-zod": "^0.7.0",
     "echarts": "^5.4.3",
     "echarts-for-react": "^3.0.2",
     "embla-carousel-react": "^8.3.0",
@@ -64,7 +66,6 @@
     "vaul": "^1.1.0",
     "wouter": "^3.3.5",
     "xlsx": "^0.18.5",
-    "drizzle-zod": "^0.7.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

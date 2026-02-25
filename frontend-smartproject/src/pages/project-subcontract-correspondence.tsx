@@ -144,7 +144,9 @@ export default function ProjectSubcontractCorrespondence() {
                 )}
             </div>
 
-            {/* Input Section */}
+            {/* Input Section - narrow centered */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md">
             <Card className="border-2 border-dashed shadow-sm hover:border-primary/50 transition-colors">
                 <CardHeader>
                     <CardTitle className="text-lg">Add New Subcontract Link</CardTitle>
@@ -175,6 +177,8 @@ export default function ProjectSubcontractCorrespondence() {
                     </div>
                 </CardContent>
             </Card>
+              </div>
+            </div>
 
             {/* List Grid */}
             {isLoading ? (

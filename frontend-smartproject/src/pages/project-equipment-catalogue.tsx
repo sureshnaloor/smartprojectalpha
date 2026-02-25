@@ -165,7 +165,9 @@ export default function ProjectEquipmentCatalogue() {
                 )}
             </div>
 
-            {/* Upload Section */}
+            {/* Upload Section - narrow centered */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md">
             <Card className="border-2 border-dashed shadow-sm hover:border-primary/50 transition-colors">
                 <CardHeader>
                     <CardTitle className="text-lg">Upload New Document</CardTitle>
@@ -208,6 +210,8 @@ export default function ProjectEquipmentCatalogue() {
                     </div>
                 </CardContent>
             </Card>
+              </div>
+            </div>
 
             {/* Files Grid */}
             {isLoading ? (

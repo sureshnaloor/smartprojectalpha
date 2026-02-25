@@ -55,6 +55,7 @@ import IndirectManpowerList from "@/pages/indirect-manpower-list";
 import PlannedActivityTasks from "@/pages/planned-activity-tasks";
 import CollabPage from "@/pages/collab";
 import ThreadDetailPage from "@/pages/thread-detail";
+import KanbanPage from "@/pages/kanban";
 import ProjectActivities from "@/pages/project-activities";
 import ProjectTasks from "@/pages/project-tasks";
 import ProjectResources from "@/pages/project-resources";
@@ -633,6 +634,14 @@ function Router() {
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <CollabPage />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/kanban">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <KanbanPage />
           </ProjectLayout>
         )}
       </Route>

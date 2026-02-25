@@ -168,7 +168,9 @@ export default function ProjectRequestForInspection() {
                 )}
             </div>
 
-            {/* Upload Section */}
+            {/* Upload Section - narrow centered */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md">
             <Card className="border-2 border-dashed shadow-sm hover:border-primary/50 transition-colors">
                 <CardHeader>
                     <CardTitle className="text-lg">Upload New RFI</CardTitle>
@@ -211,6 +213,8 @@ export default function ProjectRequestForInspection() {
                     </div>
                 </CardContent>
             </Card>
+              </div>
+            </div>
 
             {/* Files Grid */}
             {isLoading ? (

@@ -1375,3 +1375,25 @@ export const employeeTrades = pgTable("employee_trades", {
 export const insertEmployeeTradeSchema = createInsertSchema(employeeTrades).omit({ id: true, createdAt: true, updatedAt: true } as any);
 export type EmployeeTrade = typeof employeeTrades.$inferSelect;
 export type InsertEmployeeTrade = z.infer<typeof insertEmployeeTradeSchema>;
+
+// Kanban cards (project-scoped; columns: wish, ready, doing, done; archived = removed from board)
+export const kanbanCards = pgTable("kanban_cards", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  column: text("column").notNull(), // 'wish' | 'ready' | 'doing' | 'done'
+  position: integer("position").notNull().default(0),
+  archivedAt: timestamp("archived_at"), // set when card is archived from done
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertKanbanCardSchema = createInsertSchema(kanbanCards)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    column: z.enum(["wish", "ready", "doing", "done"]).default("wish"),
+    position: z.number().int().min(0).default(0),
+  });
+export type KanbanCard = typeof kanbanCards.$inferSelect;
+export type InsertKanbanCard = z.infer<typeof insertKanbanCardSchema>;

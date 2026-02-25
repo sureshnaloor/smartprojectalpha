@@ -42,11 +42,13 @@ import {
   type PlannedActivityTask,
   type InsertPlannedActivityTask,
   type WorkPackage,
-  type InsertWorkPackage
+  type InsertWorkPackage,
+  type KanbanCard,
+  type InsertKanbanCard,
 } from "./schema";
 import { db } from "./db";
-import { and, eq, or, inArray, sql, gte, lte } from "drizzle-orm";
-import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources, dailyProgress, resourcePlans, riskRegister, lessonLearntRegister, directManpowerPositions, directManpowerEntries, indirectManpowerPositions, indirectManpowerEntries, plannedActivities, plannedActivityTasks, workPackages } from "./schema";
+import { and, eq, or, inArray, sql, gte, lte, isNull, asc } from "drizzle-orm";
+import { projects, wbsItems, dependencies, costEntries, tasks, activities, resources, taskResources, projectActivities, projectTasks, projectResources, dailyProgress, resourcePlans, riskRegister, lessonLearntRegister, directManpowerPositions, directManpowerEntries, indirectManpowerPositions, indirectManpowerEntries, plannedActivities, plannedActivityTasks, workPackages, kanbanCards } from "./schema";
 
 // Storage interface
 export interface IStorage {
@@ -228,6 +230,12 @@ export interface IStorage {
   createPlannedActivityTask(data: InsertPlannedActivityTask): Promise<PlannedActivityTask>;
   updatePlannedActivityTask(id: number, data: Partial<InsertPlannedActivityTask>): Promise<PlannedActivityTask | undefined>;
   deletePlannedActivityTask(id: number): Promise<void>;
+
+  // Kanban methods
+  getKanbanCards(projectId: number): Promise<KanbanCard[]>;
+  getKanbanCard(id: number): Promise<KanbanCard | undefined>;
+  createKanbanCard(data: InsertKanbanCard): Promise<KanbanCard>;
+  updateKanbanCard(id: number, data: Partial<{ title: string; description: string | null; column: string; position: number; archivedAt: Date | null }>): Promise<KanbanCard | undefined>;
 }
 
 // Database storage implementation using Drizzle ORM
@@ -1376,6 +1384,43 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlannedActivityTask(id: number): Promise<void> {
     await db.delete(plannedActivityTasks).where(eq(plannedActivityTasks.id, id));
+  }
+
+  async getKanbanCards(projectId: number): Promise<KanbanCard[]> {
+    const rows = await db
+      .select()
+      .from(kanbanCards)
+      .where(and(eq(kanbanCards.projectId, projectId), isNull(kanbanCards.archivedAt)))
+      .orderBy(asc(kanbanCards.column), asc(kanbanCards.position));
+    return rows as KanbanCard[];
+  }
+
+  async getKanbanCard(id: number): Promise<KanbanCard | undefined> {
+    const [row] = await db.select().from(kanbanCards).where(eq(kanbanCards.id, id)).limit(1);
+    return row as KanbanCard | undefined;
+  }
+
+  async createKanbanCard(data: InsertKanbanCard): Promise<KanbanCard> {
+    const [inserted] = await db
+      .insert(kanbanCards)
+      .values({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .returning();
+    return inserted as KanbanCard;
+  }
+
+  async updateKanbanCard(
+    id: number,
+    data: Partial<{ title: string; description: string | null; column: string; position: number; archivedAt: Date | null }>
+  ): Promise<KanbanCard | undefined> {
+    const [updated] = await db
+      .update(kanbanCards)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(kanbanCards.id, id))
+      .returning();
+    return updated as KanbanCard | undefined;
   }
 }
 

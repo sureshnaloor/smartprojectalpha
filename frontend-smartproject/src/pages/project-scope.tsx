@@ -177,7 +177,9 @@ export default function ProjectScope() {
                 )}
             </div>
 
-            {/* Upload Section */}
+            {/* Upload Section - narrow centered */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md">
             <Card className="border-2 border-dashed shadow-sm hover:border-primary/50 transition-colors">
                 <CardHeader>
                     <CardTitle className="text-lg">Upload New Scope Document</CardTitle>
@@ -216,6 +218,8 @@ export default function ProjectScope() {
                     </div>
                 </CardContent>
             </Card>
+              </div>
+            </div>
 
             {/* Files Grid */}
             {isLoading ? (

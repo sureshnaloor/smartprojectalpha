@@ -241,13 +241,13 @@ export default function ProjectWbsWorkPackages() {
 
           <Card className="flex-1 flex flex-col min-h-0">
             <CardHeader>
-              <CardTitle className="text-base">
+              <CardTitle className="text-lg font-extrabold tracking-tight text-amber-800">
                 {selectedWP
                   ? `${selectedWP.code} – ${selectedWP.name}`
                   : "Select a work package"}
               </CardTitle>
               {selectedWP && (
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-zinc-600">
                   Materials, services and resources mapped to this work package
                 </p>
               )}
@@ -259,10 +259,15 @@ export default function ProjectWbsWorkPackages() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div>
-                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                      <Package className="h-4 w-4" />
-                      Materials
+                  {/* Materials */}
+                  <div className="group rounded-xl border border-zinc-200 bg-white/80 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-150 p-4">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-zinc-700">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                        <Package className="h-4 w-4" />
+                      </span>
+                      <span className="tracking-wide uppercase text-xs font-semibold text-amber-700">
+                        Materials
+                      </span>
                     </h4>
                     {wpMaterials.length === 0 ? (
                       <p className="text-sm text-zinc-500">No materials assigned.</p>
@@ -270,21 +275,39 @@ export default function ProjectWbsWorkPackages() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>UOM</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Est. Value</TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              Code
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              Description
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              UOM
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Qty
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Est. Value
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {wpMaterials.map((r: any) => (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-medium">{r.materialCode}</TableCell>
-                              <TableCell>{r.materialDescription}</TableCell>
-                              <TableCell>{r.uom}</TableCell>
-                              <TableCell className="text-right">{r.quantity}</TableCell>
-                              <TableCell className="text-right font-mono">
+                            <TableRow key={r.id} className="hover:bg-amber-50/40">
+                              <TableCell className="font-semibold text-zinc-800">
+                                {r.materialCode}
+                              </TableCell>
+                              <TableCell className="text-zinc-700">
+                                {r.materialDescription}
+                              </TableCell>
+                              <TableCell className="text-zinc-600">
+                                {r.uom}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-zinc-800">
+                                {r.quantity}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-emerald-700">
                                 {formatCurrency(Number(r.estimatedValue || 0))}
                               </TableCell>
                             </TableRow>
@@ -293,10 +316,16 @@ export default function ProjectWbsWorkPackages() {
                       </Table>
                     )}
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                      <Wrench className="h-4 w-4" />
-                      Services
+
+                  {/* Services */}
+                  <div className="group rounded-xl border border-zinc-200 bg-white/80 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-150 p-4">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-zinc-700">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+                        <Wrench className="h-4 w-4" />
+                      </span>
+                      <span className="tracking-wide uppercase text-xs font-semibold text-sky-700">
+                        Services
+                      </span>
                     </h4>
                     {wpServices.length === 0 ? (
                       <p className="text-sm text-zinc-500">No services assigned.</p>
@@ -304,21 +333,39 @@ export default function ProjectWbsWorkPackages() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>UOM</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Est. Value</TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              Code
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              Description
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              UOM
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Qty
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Est. Value
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {wpServices.map((r: any) => (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-medium">{r.serviceCode}</TableCell>
-                              <TableCell>{r.serviceDescription}</TableCell>
-                              <TableCell>{r.uom}</TableCell>
-                              <TableCell className="text-right">{r.quantity}</TableCell>
-                              <TableCell className="text-right font-mono">
+                            <TableRow key={r.id} className="hover:bg-sky-50/40">
+                              <TableCell className="font-semibold text-zinc-800">
+                                {r.serviceCode}
+                              </TableCell>
+                              <TableCell className="text-zinc-700">
+                                {r.serviceDescription}
+                              </TableCell>
+                              <TableCell className="text-zinc-600">
+                                {r.uom}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-zinc-800">
+                                {r.quantity}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-emerald-700">
                                 {formatCurrency(Number(r.estimatedValue || 0))}
                               </TableCell>
                             </TableRow>
@@ -327,10 +374,16 @@ export default function ProjectWbsWorkPackages() {
                       </Table>
                     )}
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                      <Users className="h-4 w-4" />
-                      Resources (Manpower & Equipment)
+
+                  {/* Resources */}
+                  <div className="group rounded-xl border border-zinc-200 bg-white/80 shadow-sm hover:shadow-md hover:-translate-y-[1px] transition-all duration-150 p-4">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-zinc-700">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                        <Users className="h-4 w-4" />
+                      </span>
+                      <span className="tracking-wide uppercase text-xs font-semibold text-emerald-700">
+                        Resources (Manpower &amp; Equipment)
+                      </span>
                     </h4>
                     {wpResources.length === 0 ? (
                       <p className="text-sm text-zinc-500">No resources assigned.</p>
@@ -338,19 +391,35 @@ export default function ProjectWbsWorkPackages() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>UOM</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              Name
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              Type
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+                              UOM
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Qty
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {wpResources.map((r: any) => (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-medium">{r.name}</TableCell>
-                              <TableCell>{r.type}</TableCell>
-                              <TableCell>{r.unitOfMeasure}</TableCell>
-                              <TableCell className="text-right">{r.quantity}</TableCell>
+                            <TableRow key={r.id} className="hover:bg-emerald-50/40">
+                              <TableCell className="font-semibold text-zinc-800">
+                                {r.name}
+                              </TableCell>
+                              <TableCell className="text-zinc-700">
+                                {r.type}
+                              </TableCell>
+                              <TableCell className="text-zinc-600">
+                                {r.unitOfMeasure}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-zinc-800">
+                                {r.quantity}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -15,11 +14,17 @@ import {
   User,
   Clock,
   MessageSquare,
-  Lock
+  Lock,
+  Bold,
+  Italic,
+  List,
+  Palette,
+  Type
 } from "lucide-react";
 import { Thread, Message } from "@/types";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
 const threadTypeConfig = {
   issue: {
@@ -63,7 +68,10 @@ export default function ThreadDetail() {
   const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const [editorFocused, setEditorFocused] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const backUrl = projectId ? `/projects/${projectId}/collab` : '/collab';
 
@@ -138,7 +146,9 @@ export default function ThreadDetail() {
   const handleSubmitMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!newMessage.trim()) {
+    // Strip HTML tags to validate actual text content
+    const plainText = newMessage.replace(/<[^>]*>/g, "").trim();
+    if (!plainText) {
       toast({
         title: "Validation Error",
         description: "Please enter a message.",
@@ -172,8 +182,8 @@ export default function ThreadDetail() {
         },
         body: JSON.stringify({
           content: newMessage,
-          authorId: `user_${Date.now()}`,
-          authorName: 'Anonymous User',
+          authorId: user ? String(user.id) : `user_${Date.now()}`,
+          authorName: user?.name || user?.email || "Anonymous User",
         }),
       });
 
@@ -185,6 +195,10 @@ export default function ThreadDetail() {
       console.log('New message posted:', newMsg);
       setMessages([...messages, newMsg]);
       setNewMessage("");
+      if (editorRef.current) {
+        editorRef.current.innerHTML = "";
+      }
+      setEditorFocused(false);
 
       toast({
         title: "Success",
@@ -320,7 +334,10 @@ export default function ThreadDetail() {
                       <span className="font-semibold text-gray-900">{message.authorName}</span>
                       <span className="text-xs text-gray-500">{formatTimestamp(message.createdAt)}</span>
                     </div>
-                    <p className="text-gray-700 whitespace-pre-wrap break-words">{message.content}</p>
+                    <div
+                      className="text-gray-700 whitespace-pre-wrap break-words text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: message.content }}
+                    />
                   </div>
                 </div>
               ))
@@ -334,15 +351,128 @@ export default function ThreadDetail() {
       <Card>
         <CardContent className="p-6">
           <form onSubmit={handleSubmitMessage} className="space-y-4">
-            <div>
-              <Textarea
-                id="message"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder={thread.isClosed ? "This thread is closed" : "Type your message..."}
-                rows={4}
-                disabled={thread.isClosed || isSubmitting}
-                required
+            <div className="space-y-2">
+              <div
+                className={`flex items-center justify-between rounded-t-lg border px-3 py-1 text-xs transition-all ${
+                  editorFocused || newMessage
+                    ? "opacity-100"
+                    : "opacity-0 pointer-events-none"
+                }`}
+              >
+                <span className="text-[11px] uppercase tracking-wide text-gray-400">
+                  Formatting
+                </span>
+                <div className="flex items-center gap-1 text-gray-500">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand("bold");
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <Bold className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand("italic");
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <Italic className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand("insertUnorderedList");
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <List className="h-3 w-3" />
+                  </Button>
+                  {/* Text color presets */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+                    title="Red text"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand("foreColor", false, "#dc2626");
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <Palette className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-sky-500 hover:text-sky-700 hover:bg-sky-50"
+                    title="Blue text"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand("foreColor", false, "#0284c7");
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <Palette className="h-3 w-3" />
+                  </Button>
+                  {/* Font size tweak */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    title="Larger text"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      // 3 ≈ 12px, 4 ≈ 14px, 5 ≈ 18px (browser dependent)
+                      document.execCommand("fontSize", false, "4");
+                      editorRef.current?.focus();
+                    }}
+                  >
+                    <Type className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <div
+                ref={editorRef}
+                contentEditable={!thread.isClosed && !isSubmitting}
+                data-placeholder={thread.isClosed ? "This thread is closed" : "Type your message..."}
+                onInput={() => {
+                  if (editorRef.current) {
+                    setNewMessage(editorRef.current.innerHTML);
+                  }
+                }}
+                onFocus={() => setEditorFocused(true)}
+                onBlur={() => {
+                  // Delay so toolbar buttons using mousedown can run without immediately hiding
+                  setTimeout(() => setEditorFocused(false), 100);
+                }}
+                className={`
+                  min-h-[96px] rounded-b-lg border border-t-0 px-3 py-2 text-sm
+                  bg-white outline-none focus-visible:ring-2 focus-visible:ring-blue-200
+                  focus-visible:border-blue-400 transition-all
+                  ${thread.isClosed ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "text-gray-800"}
+                  relative
+                `}
+                style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                suppressContentEditableWarning
               />
             </div>
             <div className="flex justify-end">

@@ -42,7 +42,8 @@ import {
   MessageSquareText as MessageSquareTextIcon,
   LayoutDashboard,
   Briefcase,
-  Package
+  Package,
+  LayoutGrid
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -55,8 +56,6 @@ interface SideNavigationProps {
 export function SideNavigation({ currentProjectId }: SideNavigationProps) {
   const [location, setLocation] = useLocation();
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
-  const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(false);
-  const [isWikiExpanded, setIsWikiExpanded] = useState(false);
   const isMobile = useMobile();
   const [isOpen, setIsOpen] = useState(!isMobile);
 
@@ -77,6 +76,31 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
   const isActive = (path: string) => {
     return location.includes(path);
   };
+
+  // Treat any of the project document routes as \"Project Documents\" active
+  const isDocumentsRoute = [
+    '/under-construction/ProjectDrawings',
+    '/under-construction/ProjectBOQ',
+    '/under-construction/ProjectScope',
+    '/under-construction/EquipmentCatalogue',
+    '/under-construction/ClientCorrespondence',
+    '/under-construction/SupplierCorrespondence',
+    '/under-construction/SubcontractCorrespondence',
+    '/under-construction/RequestForInspection',
+    '/under-construction/ITPAndReports',
+    '/under-construction/OtherDocuments',
+  ].some((p) => location.includes(p));
+
+  const isWikiRoute = [
+    "/project-daily-progress",
+    "/resource-plan",
+    "/risk-register",
+    "/lesson-learnt-register",
+    "/direct-manpower-list",
+    "/indirect-manpower-list",
+    "/planned-activity-tasks",
+    "/under-construction/OtherWiki",
+  ].some((p) => location.includes(p));
 
   if (isMobile && !isOpen) {
     return (
@@ -219,6 +243,17 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
+                        <Link href={`/projects/${currentProjectId}/kanban`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                            isActive('/kanban') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/kanban') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <LayoutGrid className="mr-3 h-4 w-4" />
+                            <span>Kanban</span>
+                          </a>
+                        </Link>
+                      </li>
+                      <li>
                         <Link href={`/projects/${currentProjectId}/materials-services/materials`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
@@ -230,260 +265,47 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
 
-                      {/* Project Documents Section */}
+                      {/* Project Documents Section - single entry, details handled via tabs on page */}
                       <li>
-                        <button
-                          onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
-                          className={cn(
-                            "flex items-center justify-between w-full px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
-                            isActive('/documents') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                          )}
-                          style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/documents') ? 600 : 500, letterSpacing: '0.12em' }}
-                        >
-                          <div className="flex items-center">
+                        <Link href={`/projects/${currentProjectId}/under-construction/ProjectDrawings`}>
+                          <a
+                            className={cn(
+                              "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                              isDocumentsRoute && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                            )}
+                            style={{
+                              fontFamily:
+                                'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                              fontSize: "0.65rem",
+                              fontWeight: isDocumentsRoute ? 600 : 500,
+                              letterSpacing: "0.12em",
+                            }}
+                          >
                             <FolderOpen className="mr-3 h-4 w-4" />
                             <span>Project Documents</span>
-                          </div>
-                          {isDocumentsExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </button>
-
-                        {/* Documents Sub-menu */}
-                        {isDocumentsExpanded && (
-                          <ul className="ml-6 border-l border-gray-200">
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/ProjectDrawings`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
-                                  isActive('/project-drawings') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-drawings') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <FileImage className="mr-3 h-3.5 w-3.5" />
-                                  <span>Project Drawings</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/ProjectBOQ`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/project-boq') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-boq') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <FileSpreadsheet className="mr-3 h-3.5 w-3.5" />
-                                  <span>Project BOQ</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/ProjectScope`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/project-scope') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-scope') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <FileTextIcon className="mr-3 h-3.5 w-3.5" />
-                                  <span>Project Scope Document (PTS)</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/EquipmentCatalogue`}>
-                                <a className={cn(
-                                  "flex items-center gap-3 rounded-lg px-3 py-2 font-medium transition-all hover:text-primary uppercase",
-                                  location.includes('/under-construction/EquipmentCatalogue')
-                                    ? "bg-muted text-primary"
-                                    : "text-muted-foreground"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', letterSpacing: '0.12em' }}>
-                                  <FolderOpen className="h-3.5 w-3.5" />
-                                  <span>Equipment Catalogue</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/ClientCorrespondence`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/client-correspondence') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/client-correspondence') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <MessageSquare className="mr-3 h-3.5 w-3.5" />
-                                  <span>Client Correspondence</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/SupplierCorrespondence`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/supplier-correspondence') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/supplier-correspondence') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <MessageCircle className="mr-3 h-3.5 w-3.5" />
-                                  <span>Supplier Correspondence</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/SubcontractCorrespondence`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/subcontract-correspondence') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/subcontract-correspondence') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <MessageSquareText className="mr-3 h-3.5 w-3.5" />
-                                  <span>Subcontract Correspondence</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/RequestForInspection`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/request-for-inspection') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/request-for-inspection') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <ClipboardCheck className="mr-3 h-3.5 w-3.5" />
-                                  <span>Request for Inspection</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/ITPAndReports`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/itp-and-reports') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/itp-and-reports') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <FileCheck className="mr-3 h-3.5 w-3.5" />
-                                  <span>ITP and Reports</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/OtherDocuments`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/other-documents') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/other-documents') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <FolderOpenIcon className="mr-3 h-3.5 w-3.5" />
-                                  <span>Others</span>
-                                </a>
-                              </Link>
-                            </li>
-                          </ul>
-                        )}
+                          </a>
+                        </Link>
                       </li>
 
-                      {/* Project Wiki Section */}
+                      {/* Project Wiki - single link; tabs in page header */}
                       <li>
-                        <button
-                          onClick={() => setIsWikiExpanded(!isWikiExpanded)}
-                          className={cn(
-                            "flex items-center justify-between w-full px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                            isActive('/wiki') && "text-teal-600 font-medium bg-teal-50"
-                          )}
-                          style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/wiki') ? 600 : 500, letterSpacing: '0.12em' }}
-                        >
-                          <div className="flex items-center">
+                        <Link href={`/projects/${currentProjectId}/project-daily-progress`}>
+                          <a
+                            className={cn(
+                              "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                              isWikiRoute && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                            )}
+                            style={{
+                              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                              fontSize: "0.65rem",
+                              fontWeight: isWikiRoute ? 600 : 500,
+                              letterSpacing: "0.12em",
+                            }}
+                          >
                             <BookOpen className="mr-3 h-4 w-4" />
                             <span>Project Wiki</span>
-                          </div>
-                          {isWikiExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </button>
-
-                        {/* Wiki Sub-menu */}
-                        {isWikiExpanded && (
-                          <ul className="ml-6 border-l border-gray-200">
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/project-daily-progress`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/project-daily-progress') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/project-daily-progress') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <Calendar className="mr-3 h-3.5 w-3.5" />
-                                  <span>Project Daily Progress</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/resource-plan`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/resource-plan') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/resource-plan') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <UserCheck className="mr-3 h-3.5 w-3.5" />
-                                  <span>Resource Plan</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/risk-register`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/risk-register') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/risk-register') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <AlertTriangle className="mr-3 h-3.5 w-3.5" />
-                                  <span>Risk Register</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/lesson-learnt-register`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/lesson-learnt-register') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/lesson-learnt-register') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <Lightbulb className="mr-3 h-3.5 w-3.5" />
-                                  <span>Lesson Learnt Register</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/direct-manpower-list`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/direct-manpower-list') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/direct-manpower-list') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <User className="mr-3 h-3.5 w-3.5" />
-                                  <span>Direct Manpower List</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/indirect-manpower-list`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/indirect-manpower-list') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/indirect-manpower-list') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <UserPlus className="mr-3 h-3.5 w-3.5" />
-                                  <span>Indirect Manpower List</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/planned-activity-tasks`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/planned-activity-tasks') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/planned-activity-tasks') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <ClipboardList className="mr-3 h-3.5 w-3.5" />
-                                  <span>Daily Activity/Tasks Planned</span>
-                                </a>
-                              </Link>
-                            </li>
-                            <li>
-                              <Link href={`/projects/${currentProjectId}/under-construction/OtherWiki`}>
-                                <a className={cn(
-                                  "flex items-center px-4 py-2 text-gray-600 hover:bg-gray-50 uppercase",
-                                  isActive('/other-wiki') && "text-teal-600 font-medium bg-teal-50"
-                                )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.625rem', fontWeight: isActive('/other-wiki') ? 600 : 500, letterSpacing: '0.12em' }}>
-                                  <MoreHorizontal className="mr-3 h-3.5 w-3.5" />
-                                  <span>Others</span>
-                                </a>
-                              </Link>
-                            </li>
-                          </ul>
-                        )}
+                          </a>
+                        </Link>
                       </li>
                     </ul>
                   </>

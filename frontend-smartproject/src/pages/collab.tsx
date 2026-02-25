@@ -53,6 +53,8 @@ const threadTypeConfig = {
   }
 };
 
+type FilterTab = 'all' | 'pinned' | ThreadType;
+
 export default function CollabPage() {
   const [, projectParams] = useRoute<{ projectId: string }>("/projects/:projectId/collab");
   const [, generalParams] = useRoute("/collab");
@@ -60,7 +62,7 @@ export default function CollabPage() {
 
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<ThreadType | 'all'>('all');
+  const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [threads, setThreads] = useState<Thread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,36 @@ export default function CollabPage() {
   useEffect(() => {
     fetchThreads();
   }, [projectId]);
+
+  // Sync filter tab from URL hash (used by project header tabs on project collab page)
+  useEffect(() => {
+    const updateFromHash = () => {
+      if (typeof window === "undefined") return;
+      const hash = (window.location.hash || "#all").slice(1).toLowerCase();
+      switch (hash) {
+        case "pinned":
+          setFilterTab("pinned");
+          break;
+        case "issues":
+          setFilterTab("issue");
+          break;
+        case "awards":
+          setFilterTab("awards");
+          break;
+        case "info":
+          setFilterTab("info");
+          break;
+        case "announcements":
+          setFilterTab("announcement");
+          break;
+        default:
+          setFilterTab("all");
+      }
+    };
+    updateFromHash();
+    window.addEventListener("hashchange", updateFromHash);
+    return () => window.removeEventListener("hashchange", updateFromHash);
+  }, []);
 
   const fetchThreads = async () => {
     try {
@@ -194,9 +226,20 @@ export default function CollabPage() {
   };
 
   const filteredThreads = threads.filter(thread => {
-    const matchesSearch = thread.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      thread.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       thread.createdByName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || thread.type === filterType;
+
+    let matchesType = true;
+    if (filterTab === "all") {
+      matchesType = true;
+    } else if (filterTab === "pinned") {
+      // For now, treat Issues and Announcements as \"urgent\" threads
+      matchesType = thread.type === "issue" || thread.type === "announcement";
+    } else {
+      matchesType = thread.type === filterTab;
+    }
+
     return matchesSearch && matchesType;
   });
 
@@ -325,18 +368,6 @@ export default function CollabPage() {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Select value={filterType} onValueChange={(value) => setFilterType(value as ThreadType | 'all')}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="issue">Issues</SelectItem>
-              <SelectItem value="info">Info</SelectItem>
-              <SelectItem value="announcement">Announcements</SelectItem>
-              <SelectItem value="awards">Awards</SelectItem>
-            </SelectContent>
-          </Select>
           <div className="flex border rounded-md">
             <Button
               variant={layout === 'grid' ? 'default' : 'ghost'}

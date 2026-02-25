@@ -181,7 +181,9 @@ export default function ProjectDrawings() {
                 )}
             </div>
 
-            {/* Upload Section */}
+            {/* Upload Section - narrow centered */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md">
             <Card className="border-2 border-dashed shadow-sm hover:border-primary/50 transition-colors">
                 <CardHeader>
                     <CardTitle className="text-lg">Upload New Drawing</CardTitle>
@@ -220,6 +222,8 @@ export default function ProjectDrawings() {
                     </div>
                 </CardContent>
             </Card>
+              </div>
+            </div>
 
             {/* Drawings Grid */}
             {isLoading ? (

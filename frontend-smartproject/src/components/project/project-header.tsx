@@ -56,6 +56,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
 
   const isProjectRoot = typeof location === "string" && new RegExp(`^/projects/${projectId}$`).test(location);
   const [wbsTabHash, setWbsTabHash] = useState("");
+  const [collabTabHash, setCollabTabHash] = useState("");
   useEffect(() => {
     if (!isProjectRoot) return;
     const hash = (window.location.hash || "#home").slice(1);
@@ -64,6 +65,14 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, [isProjectRoot, projectId]);
+  useEffect(() => {
+    if (routeContext !== "collab") return;
+    const hash = (typeof window !== "undefined" && (window.location.hash || "#all").slice(1)) || "all";
+    setCollabTabHash(hash);
+    const onHashChange = () => setCollabTabHash((window.location.hash || "#all").slice(1) || "all");
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [routeContext]);
   const activeWbsTab = (wbsTabHash || "home") as string;
 
   // Fetch project data
@@ -205,9 +214,21 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
         </div>
       </div>
 
-      {/* Navigation Tabs: Project root = Home|Activities|Cost|Schedule|Progress; Materials & Services = Materials|Services|Manpower; else Tab1–Tab5 */}
-      <div className="px-6 sm:px-8 border-t border-zinc-200 bg-zinc-50/50">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto">
+      {/* Navigation Tabs: Project root = Home|Activities|Cost|Schedule|Progress; Materials & Services = Materials|Services|Manpower; Collab = dark bar like docs/wiki; else Tab1–Tab5 */}
+      <div
+        className={
+          routeContext === "collab"
+            ? "px-4 sm:px-6 border-t border-slate-700 bg-slate-800 shadow-inner"
+            : "px-6 sm:px-8 border-t border-zinc-200 bg-zinc-50/50"
+        }
+      >
+        <nav
+          className={
+            routeContext === "collab"
+              ? "-mb-px flex flex-wrap gap-1 sm:gap-2 py-2 overflow-x-auto"
+              : "-mb-px flex space-x-8 overflow-x-auto"
+          }
+        >
           {isProjectRoot ? (
             <>
               {(["home", "activities", "cost", "schedule", "progress"] as const).map((tab) => (
@@ -269,6 +290,43 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                   Manpower &amp; Equipment
                 </a>
               </Link>
+            </>
+          ) : routeContext === "collab" ? (
+            <>
+              {[
+                { key: "pinned", hash: "pinned", line1: "Pinned &", line2: "Urgent" },
+                { key: "issues", hash: "issues", line1: "Issues", line2: "" },
+                { key: "awards", hash: "awards", line1: "Awards", line2: "" },
+                { key: "info", hash: "info", line1: "Info", line2: "" },
+                { key: "announcements", hash: "announcements", line1: "Announce-", line2: "ments" },
+              ].map((tab) => {
+                const active = (collabTabHash || "all") === tab.hash;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      window.location.hash = tab.hash;
+                      setCollabTabHash(tab.hash);
+                      window.dispatchEvent(new HashChangeEvent("hashchange"));
+                    }}
+                    className={`min-w-[4.5rem] sm:min-w-[5rem] rounded-t-md border-b-2 px-2 sm:px-3 py-2 text-center transition-all ${
+                      active
+                        ? "border-amber-400 bg-slate-700/80 text-amber-200 font-semibold"
+                        : "border-transparent text-slate-300 hover:bg-slate-700/50 hover:text-white hover:border-slate-500"
+                    }`}
+                  >
+                    <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider leading-tight text-inherit opacity-90">
+                      {tab.line1}
+                    </span>
+                    {tab.line2 ? (
+                      <span className="block text-[11px] sm:text-xs font-semibold leading-tight mt-0.5">
+                        {tab.line2}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </>
           ) : (
             <>

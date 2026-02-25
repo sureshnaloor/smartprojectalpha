@@ -184,7 +184,9 @@ export default function ProjectBoq() {
                 )}
             </div>
 
-            {/* Upload Section */}
+            {/* Upload Section - narrow centered */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md">
             <Card className="border-2 border-dashed shadow-sm hover:border-primary/50 transition-colors">
                 <CardHeader>
                     <CardTitle className="text-lg">Upload New BOQ / Spec</CardTitle>
@@ -223,6 +225,8 @@ export default function ProjectBoq() {
                     </div>
                 </CardContent>
             </Card>
+              </div>
+            </div>
 
             {/* Files Grid */}
             {isLoading ? (

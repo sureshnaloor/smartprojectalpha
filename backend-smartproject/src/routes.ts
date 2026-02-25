@@ -97,6 +97,9 @@ import {
   insertEmployeePositionSchema,
   insertEmployeeGradeSchema,
   insertEmployeeTradeSchema,
+  kanbanCards,
+  insertKanbanCardSchema,
+  type KanbanCard,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -4796,6 +4799,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await storage.deleteIndirectManpowerEntry(id);
       res.sendStatus(204);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Kanban board routes
+  const KANBAN_COLUMNS = ["wish", "ready", "doing", "done"] as const;
+  app.get("/api/projects/:projectId/kanban", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const cards = await storage.getKanbanCards(projectId);
+      const lanes = KANBAN_COLUMNS.map((col) => ({
+        id: col,
+        title: col.charAt(0).toUpperCase() + col.slice(1),
+        cards: cards
+          .filter((c) => c.column === col)
+          .sort((a, b) => a.position - b.position)
+          .map((c) => ({
+            id: String(c.id),
+            title: c.title,
+            description: c.description ?? undefined,
+          })),
+      }));
+      res.json({ lanes });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/kanban/cards", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const existing = await storage.getKanbanCards(projectId);
+      const wishCards = existing.filter((c) => c.column === "wish");
+      const nextPosition = wishCards.length ? Math.max(...wishCards.map((c) => c.position)) + 1 : 0;
+      const body = insertKanbanCardSchema.parse({
+        ...req.body,
+        projectId,
+        column: "wish",
+        position: nextPosition,
+      });
+      const card = await storage.createKanbanCard(body);
+      res.status(201).json(card);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/projects/:projectId/kanban/cards/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+      const body = req.body as { column?: string; position?: number; title?: string; description?: string };
+      const update: Parameters<typeof storage.updateKanbanCard>[1] = {};
+      if (body.column !== undefined) {
+        if (!KANBAN_COLUMNS.includes(body.column as any)) {
+          return res.status(400).json({ message: "Invalid column" });
+        }
+        update.column = body.column;
+      }
+      if (body.position !== undefined) update.position = body.position;
+      if (body.title !== undefined) update.title = body.title;
+      if (body.description !== undefined) update.description = body.description;
+      const card = await storage.updateKanbanCard(id, update);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+      res.json(card);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/projects/:projectId/kanban/cards/:id/archive", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+      const card = await storage.updateKanbanCard(id, { archivedAt: new Date() });
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+      res.json(card);
     } catch (err) {
       handleError(err, res);
     }
