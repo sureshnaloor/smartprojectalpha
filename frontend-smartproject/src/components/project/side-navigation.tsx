@@ -254,6 +254,17 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
+                        <Link href={`/projects/${currentProjectId}/charts`}>
+                          <a className={cn(
+                            "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",
+                            isActive('/charts') && "text-teal-700 font-semibold bg-teal-50 border-r-2 border-teal-500"
+                          )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/charts') ? 600 : 500, letterSpacing: '0.12em' }}>
+                            <PieChart className="mr-3 h-4 w-4" />
+                            <span>PERT & Gantt Charts</span>
+                          </a>
+                        </Link>
+                      </li>
+                      <li>
                         <Link href={`/projects/${currentProjectId}/materials-services/materials`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 uppercase",

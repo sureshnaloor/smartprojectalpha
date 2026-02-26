@@ -22,6 +22,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2, GripVertical, Search, X, Calendar, Pencil } from "lucide-react";
+import { SelectValue } from "@/components/ui/select";
+import {
+    Tabs,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -60,6 +66,7 @@ interface ProjectActivity {
     remarks: string | null;
     plannedFromDate: string | null;
     plannedToDate: string | null;
+    duration: number | null;
     estimatedStartDate: string | null;
     estimatedEndDate: string | null;
     actualStartDate: string | null;
@@ -76,6 +83,8 @@ export default function ProjectActivities() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | null>(null);
     const [quantity, setQuantity] = useState<string>("1");
+    const [duration, setDuration] = useState<string>("0");
+    const [mappingMode, setMappingMode] = useState<"duration" | "date-range">("duration");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingActivity, setEditingActivity] = useState<ProjectActivity | null>(null);
 
@@ -93,7 +102,7 @@ export default function ProjectActivities() {
             // Fetch all WBS items and then get their work packages
             const wbsResponse = await get(`/projects/${projectId}/wbs`);
             const allWps: WorkPackage[] = [];
-            
+
             for (const wbs of wbsResponse) {
                 try {
                     const wpResponse = await fetch(`/api/wbs/${wbs.id}/work-packages`).then(r => r.json());
@@ -104,7 +113,7 @@ export default function ProjectActivities() {
                     // Skip if no work packages found
                 }
             }
-            
+
             return allWps;
         },
         enabled: !!projectId,
@@ -174,12 +183,12 @@ export default function ProjectActivities() {
 
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
-        
+
         if (!selectedWpId) {
-            toast({ 
-                title: "Warning", 
-                description: "Please select a work package first", 
-                variant: "destructive" 
+            toast({
+                title: "Warning",
+                description: "Please select a work package first",
+                variant: "destructive"
             });
             return;
         }
@@ -193,10 +202,10 @@ export default function ProjectActivities() {
                 pa => pa.globalActivityId === activity.id && pa.wpId === selectedWpId
             );
             if (exists) {
-                toast({ 
-                    title: "Warning", 
-                    description: "Activity already exists in this work package", 
-                    variant: "destructive" 
+                toast({
+                    title: "Warning",
+                    description: "Activity already exists in this work package",
+                    variant: "destructive"
                 });
                 return;
             }
@@ -208,20 +217,38 @@ export default function ProjectActivities() {
     };
 
     const handleDateRangeConfirm = () => {
-        if (!draggedActivity || !selectedWpId || !dateRange?.from || !dateRange?.to) {
-            toast({ 
-                title: "Error", 
-                description: "Please select both start and end dates", 
-                variant: "destructive" 
+        if (!draggedActivity || !selectedWpId) {
+            toast({
+                title: "Error",
+                description: "Drag an activity first",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        if (mappingMode === "date-range" && (!dateRange?.from || !dateRange?.to)) {
+            toast({
+                title: "Error",
+                description: "Please select both start and end dates",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        if (mappingMode === "duration" && (!duration || parseInt(duration) <= 0)) {
+            toast({
+                title: "Error",
+                description: "Please enter a valid duration",
+                variant: "destructive"
             });
             return;
         }
 
         if (!quantity || parseFloat(quantity) <= 0) {
-            toast({ 
-                title: "Error", 
-                description: "Please enter a valid quantity", 
-                variant: "destructive" 
+            toast({
+                title: "Error",
+                description: "Please enter a valid quantity",
+                variant: "destructive"
             });
             return;
         }
@@ -235,8 +262,9 @@ export default function ProjectActivities() {
             unitRate: draggedActivity.unitRate,
             quantity: quantity,
             remarks: draggedActivity.remarks,
-            plannedFromDate: format(dateRange.from, "yyyy-MM-dd"),
-            plannedToDate: format(dateRange.to, "yyyy-MM-dd"),
+            plannedFromDate: mappingMode === "date-range" ? format(dateRange!.from!, "yyyy-MM-dd") : null,
+            plannedToDate: mappingMode === "date-range" ? format(dateRange!.to!, "yyyy-MM-dd") : null,
+            duration: mappingMode === "duration" ? parseInt(duration) : null,
         });
     };
 
@@ -294,8 +322,14 @@ export default function ProjectActivities() {
             <div className="flex-1 flex flex-col gap-4">
                 {/* Work Packages List */}
                 <Card className="flex-shrink-0">
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Work Packages</CardTitle>
+                        <Tabs value={mappingMode} onValueChange={(val) => setMappingMode(val as any)}>
+                            <TabsList>
+                                <TabsTrigger value="duration" className="text-xs">Duration</TabsTrigger>
+                                <TabsTrigger value="date-range" className="text-xs">Date Range</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-32">
@@ -316,14 +350,14 @@ export default function ProjectActivities() {
                 </Card>
 
                 {/* Selected WP Activities Window */}
-                <Card 
-                    className="flex-1 flex flex-col" 
-                    onDrop={handleDrop} 
+                <Card
+                    className="flex-1 flex flex-col"
+                    onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>
-                            {selectedWorkPackage 
+                            {selectedWorkPackage
                                 ? `${selectedWorkPackage.code} - ${selectedWorkPackage.name}`
                                 : "Select a Work Package"}
                         </CardTitle>
@@ -373,19 +407,33 @@ export default function ProjectActivities() {
                                             Rate: {draggedActivity.unitRate} / {draggedActivity.unitOfMeasure}
                                         </p>
                                     </div>
-                                    <div>
-                                        <Label className="text-sm font-semibold mb-2 block">Date Range *</Label>
-                                        <DateRangePicker
-                                            value={dateRange || undefined}
-                                            onChange={setDateRange}
-                                            placeholder="Select date range"
-                                        />
-                                    </div>
+                                    {mappingMode === "duration" ? (
+                                        <div>
+                                            <Label className="text-sm font-semibold mb-2 block">Duration (Days) *</Label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                value={duration}
+                                                onChange={(e) => setDuration(e.target.value)}
+                                                placeholder="Enter duration"
+                                                className="w-full"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <Label className="text-sm font-semibold mb-2 block">Date Range *</Label>
+                                            <DateRangePicker
+                                                value={dateRange || undefined}
+                                                onChange={setDateRange}
+                                                placeholder="Select date range"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         onClick={handleDateRangeConfirm}
-                                        disabled={!dateRange?.from || !dateRange?.to || !quantity || createMutation.isPending}
+                                        disabled={(mappingMode === "date-range" && (!dateRange?.from || !dateRange?.to)) || (mappingMode === "duration" && !duration) || !quantity || createMutation.isPending}
                                     >
                                         <Calendar className="h-4 w-4 mr-2" />
                                         Confirm Assignment
@@ -420,6 +468,7 @@ export default function ProjectActivities() {
                                         <TableHead className="text-right">Quantity</TableHead>
                                         <TableHead className="text-right">Total</TableHead>
                                         <TableHead>Planned Dates</TableHead>
+                                        <TableHead className="text-right">Dur (Days)</TableHead>
                                         <TableHead>Remarks</TableHead>
                                         <TableHead className="w-[100px]">Actions</TableHead>
                                     </TableRow>
@@ -449,6 +498,9 @@ export default function ProjectActivities() {
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground">Not set</span>
                                                 )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {activity.duration ? `${activity.duration}` : "-"}
                                             </TableCell>
                                             <TableCell className="max-w-[200px] truncate" title={activity.remarks || ""}>
                                                 {activity.remarks}
@@ -506,6 +558,9 @@ export default function ProjectActivities() {
                                     unitRate: formData.get("unitRate") as string,
                                     quantity: formData.get("quantity") as string,
                                     remarks: formData.get("remarks") as string,
+                                    duration: formData.get("duration") ? parseInt(formData.get("duration") as string) : null,
+                                    plannedFromDate: editingActivity.plannedFromDate,
+                                    plannedToDate: editingActivity.plannedToDate,
                                 };
                                 updateMutation.mutate({ id: editingActivity.id, data });
                             }}
@@ -560,6 +615,33 @@ export default function ProjectActivities() {
                                     defaultValue={editingActivity.quantity}
                                     required
                                 />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Planned Date Range</Label>
+                                    <DateRangePicker
+                                        value={{
+                                            from: editingActivity.plannedFromDate ? new Date(editingActivity.plannedFromDate) : undefined,
+                                            to: editingActivity.plannedToDate ? new Date(editingActivity.plannedToDate) : undefined,
+                                        }}
+                                        onChange={(range) => {
+                                            setEditingActivity({
+                                                ...editingActivity,
+                                                plannedFromDate: range?.from ? format(range.from, "yyyy-MM-dd") : null,
+                                                plannedToDate: range?.to ? format(range.to, "yyyy-MM-dd") : null,
+                                            });
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-duration">Duration (Days)</Label>
+                                    <Input
+                                        id="edit-duration"
+                                        name="duration"
+                                        type="number"
+                                        defaultValue={editingActivity.duration || 0}
+                                    />
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="remarks">Remarks</Label>

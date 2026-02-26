@@ -91,6 +91,7 @@ import ProjectOtherDocuments from "@/pages/project-other-documents";
 import ProjectEquipmentCatalogue from "@/pages/project-equipment-catalogue";
 import NewLanding from "@/pages/new-landing";
 import NewProject from "@/pages/new-project";
+import ProjectCharts from "@/pages/project-charts";
 
 
 // Implementing a flatter routing approach without nesting
@@ -142,6 +143,15 @@ function Router() {
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <Reports />
+          </ProjectLayout>
+        )}
+      </Route>
+
+      {/* PERT and Gantt Charts */}
+      <Route path="/projects/:projectId/charts">
+        {params => (
+          <ProjectLayout projectId={parseInt(params.projectId)}>
+            <ProjectCharts />
           </ProjectLayout>
         )}
       </Route>

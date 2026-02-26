@@ -5,7 +5,7 @@ import { ProjectHeader } from "@/components/project/project-header";
 import { SimpleProjectHeader } from "@/components/project/simple-project-header";
 import { useMobile } from "@/hooks/use-mobile";
 import { Toaster } from "sonner";
-import { AlertTriangle, FolderOpen, Calendar, UserCheck, Lightbulb, User, UserPlus, ClipboardList, MessageSquareText } from "lucide-react";
+import { AlertTriangle, FolderOpen, Calendar, UserCheck, Lightbulb, User, UserPlus, ClipboardList, MessageSquareText, PieChart } from "lucide-react";
 import { SharedNavigation } from "@/components/shared-navigation";
 
 interface ProjectLayoutProps {
@@ -45,7 +45,8 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
     location.includes('/lesson-learnt-register') ||
     location.includes('/direct-manpower-list') ||
     location.includes('/indirect-manpower-list') ||
-    location.includes('/planned-activity-tasks');
+    location.includes('/planned-activity-tasks') ||
+    location.includes('/charts');
 
   const isDocumentPage = location.includes('/under-construction/ProjectDrawings') ||
     location.includes('/under-construction/ProjectBOQ') ||
@@ -83,6 +84,9 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
     }
     if (location.includes('/planned-activity-tasks')) {
       return { title: 'Planned Activity/Tasks', icon: <ClipboardList className="h-4 w-4" /> };
+    }
+    if (location.includes('/charts')) {
+      return { title: 'PERT & Gantt Charts', icon: <PieChart className="h-4 w-4" /> };
     }
     if (location.includes('/under-construction/RiskRegister')) {
       return { title: 'Risk Register', icon: <AlertTriangle className="h-4 w-4" /> };
@@ -154,7 +158,7 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
       <Toaster position="top-right" />
       {/* Top Navigation - Fixed */}
       <SharedNavigation variant="app" />
-      
+
       <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 4rem)', paddingTop: '4rem' }}>
         <div className="flex flex-1 overflow-hidden">
           {/* Left Sidebar Navigation */}

@@ -193,6 +193,7 @@ export const projectActivities = pgTable("project_activities", {
   estimatedEndDate: date("estimated_end_date"),
   actualStartDate: date("actual_start_date"),
   actualToDate: date("actual_to_date"),
+  duration: integer("duration"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -381,6 +382,7 @@ export const insertProjectActivitySchema = createInsertSchema(projectActivities)
     estimatedEndDate: z.string().optional().nullable(),
     actualStartDate: z.string().optional().nullable(),
     actualToDate: z.string().optional().nullable(),
+    duration: z.number().optional().nullable(),
   });
 
 // Collaboration Thread schema
@@ -1397,3 +1399,24 @@ export const insertKanbanCardSchema = createInsertSchema(kanbanCards)
   });
 export type KanbanCard = typeof kanbanCards.$inferSelect;
 export type InsertKanbanCard = z.infer<typeof insertKanbanCardSchema>;
+
+// Project Activity Dependencies Table
+export const projectActivityDependencies = pgTable("project_activity_dependencies", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  predecessorId: integer("predecessor_id").notNull().references(() => projectActivities.id, { onDelete: "cascade" }),
+  successorId: integer("successor_id").notNull().references(() => projectActivities.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // FS, SS, FF, SF
+  lag: integer("lag").default(0), // lag (positive) or lead (negative) in days
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProjectActivityDependencySchema = createInsertSchema(projectActivityDependencies)
+  .omit({ id: true, createdAt: true } as any)
+  .extend({
+    type: z.enum(["FS", "SS", "FF", "SF"]),
+    lag: z.number().int().default(0),
+  });
+
+export type ProjectActivityDependency = typeof projectActivityDependencies.$inferSelect;
+export type InsertProjectActivityDependency = z.infer<typeof insertProjectActivityDependencySchema>;

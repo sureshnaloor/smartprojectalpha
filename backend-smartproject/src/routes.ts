@@ -43,8 +43,8 @@ import {
   insertIndirectManpowerPositionSchema,
   insertIndirectManpowerEntrySchema,
   insertPlannedActivitySchema,
-  insertPlannedActivityTaskSchema,
   insertWorkPackageSchema,
+  insertProjectActivityDependencySchema,
   insertMaterialMasterSchema,
   insertServiceMasterSchema,
   insertServiceTypeSchema,
@@ -99,7 +99,9 @@ import {
   insertEmployeeTradeSchema,
   kanbanCards,
   insertKanbanCardSchema,
+  insertPlannedActivityTaskSchema,
   type KanbanCard,
+  type InsertPlannedActivityTask,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -513,7 +515,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activityData = insertProjectActivitySchema.parse({
         ...req.body,
-        projectId // Ensure projectId is preserved
+        projectId, // Ensure projectId is preserved
+        wpId: req.body.wpId ?? activity.wpId // Ensure wpId is present
       });
 
       const updatedActivity = await storage.updateProjectActivity(activityId, activityData);
@@ -1068,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actualEndDate: req.body.actualEndDate
       };
 
-      const updatedWbsItem = await storage.updateWbsItem(id, updateData);
+      const updatedWbsItem = await storage.updateWbsItem(id, updateData as any);
       res.json(updatedWbsItem);
     } catch (err) {
       handleError(err, res);
@@ -1612,7 +1615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Level-2 WBS: children must be either all WBS or all WorkPackage (not mixed)
-      for (const [parentCode, children] of childrenByParent) {
+      for (const [parentCode, children] of Array.from(childrenByParent.entries())) {
         const parentParts = parentCode.split(".");
         if (parentParts.length !== 2) continue;
         const types = new Set(children.map((c: { wbsType: string }) => (c.wbsType || "").trim()));
@@ -1706,10 +1709,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const existingItem = wbsItemsByCode.get(code);
           let result;
           if (existingItem) {
-            result = await storage.updateWbsItem(existingItem.id, wbsItemData);
+            result = await storage.updateWbsItem(existingItem.id, wbsItemData as any);
             results.push({ ...result, status: "updated" });
           } else {
-            result = await storage.createWbsItem(wbsItemData);
+            result = await storage.createWbsItem(wbsItemData as any);
             results.push({ ...result, status: "created" });
             wbsItemsByCode.set((result as { code: string }).code, result as { code: string; id: number });
           }
@@ -1760,6 +1763,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Flatten and return all dependencies
       const dependencies = allDependencies.flat();
       res.json(dependencies);
+    } catch (err: unknown) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/projects/:projectId/activity-dependencies", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      const dependencies = await storage.getProjectActivityDependencies(projectId);
+      res.json(dependencies);
+    } catch (err: unknown) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/activity-dependencies", async (req: Request, res: Response) => {
+    try {
+      const data = insertProjectActivityDependencySchema.parse(req.body);
+      const newDependency = await storage.createProjectActivityDependency(data as any);
+      res.status(201).json(newDependency);
+    } catch (err: unknown) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/activity-dependencies/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid dependency ID" });
+      }
+      await storage.deleteProjectActivityDependency(id);
+      res.sendStatus(204);
     } catch (err: unknown) {
       handleError(err, res);
     }
@@ -1843,7 +1882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
 
             // Update the existing activity
-            const updatedItem = await storage.updateWbsItem(existingItem.id, activityData);
+            const updatedItem = await storage.updateWbsItem(existingItem.id, activityData as any);
             results.push({ ...updatedItem, status: "updated" });
           } else {
             // Create new activity
@@ -1873,7 +1912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
 
             // Create the new activity
-            const createdItem = await storage.createWbsItem(newActivity);
+            const createdItem = await storage.createWbsItem(newActivity as any);
             results.push({ ...createdItem, status: "created" });
           }
         } catch (error) {
@@ -1923,7 +1962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID" });
       }
 
-      const tasks = await storage.getTasks(projectId);
+      const tasks = await storage.getProjectTasks(projectId);
       res.json(tasks);
     } catch (err) {
       handleError(err, res);
@@ -1995,14 +2034,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Validated task data:", JSON.stringify(taskData, null, 2));
 
         // Check if the activity exists
-        const activity = await storage.getActivity(taskData.activityId);
+        const activity = await storage.getActivity((taskData as any).activityId);
         if (!activity) {
           return res.status(404).json({ message: "Activity not found" });
         }
 
 
 
-        const task = await storage.createTask(taskData);
+        const task = await storage.createTask(taskData as any);
         res.status(201).json(task);
       } catch (validationError) {
         console.error("Validation processing error:", validationError);
@@ -2044,7 +2083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           startDate?: string;
           endDate?: string;
           duration?: number;
-        }) => storage.createTask(task))
+        }) => storage.createTask(task as any))
       );
 
       res.status(201).json(createdTasks);
@@ -2177,7 +2216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: string;
           description: string;
           entryDate: string;
-        }) => storage.createCostEntry(entry))
+        }) => storage.createCostEntry(entry as any))
       );
 
       res.status(201).json(createdEntries);
@@ -2280,7 +2319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/resources", async (req: Request, res: Response) => {
     try {
       const resourceData = insertResourceSchema.parse(req.body);
-      const resource = await storage.createResource(resourceData);
+      const resource = await storage.createResource(resourceData as any);
       res.status(201).json(resource);
     } catch (err) {
       handleError(err, res);
@@ -2300,7 +2339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const resourceData = insertResourceSchema.partial().parse(req.body);
-      const updatedResource = await storage.updateResource(id, resourceData);
+      const updatedResource = await storage.updateResource(id, resourceData as any);
       res.json(updatedResource);
     } catch (err) {
       handleError(err, res);
@@ -2352,7 +2391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         taskId
       });
-      const taskResource = await storage.createTaskResource(taskResourceData);
+      const taskResource = await storage.createTaskResource(taskResourceData as any);
       res.status(201).json(taskResource);
     } catch (err) {
       handleError(err, res);
@@ -2367,7 +2406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const taskResourceData = insertTaskResourceSchema.partial().parse(req.body);
-      const updatedTaskResource = await storage.updateTaskResource(id, taskResourceData);
+      const updatedTaskResource = await storage.updateTaskResource(id, taskResourceData as any);
       res.json(updatedTaskResource);
     } catch (err) {
       handleError(err, res);
@@ -2405,7 +2444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply filters
       if (type && typeof type === 'string') {
-        query = query.where(eq(collaborationThreads.type, type));
+        query = (query as any).where(eq(collaborationThreads.type, type));
       }
 
       // Note: Search filtering would need to be done after fetching
@@ -2473,7 +2512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply type filter
       if (type && typeof type === 'string') {
-        query = query.where(eq(collaborationThreads.type, type));
+        query = (query as any).where(eq(collaborationThreads.type, type));
       }
 
       const allThreads = await query;
@@ -2543,7 +2582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [thread] = await db
         .insert(collaborationThreads)
-        .values(threadData)
+        .values(threadData as any)
         .returning();
 
       res.status(201).json(thread);
@@ -2569,7 +2608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [updatedThread] = await db
         .update(collaborationThreads)
-        .set({ ...updateData, updatedAt: new Date() })
+        .set({ ...updateData, updatedAt: new Date() } as any)
         .where(eq(collaborationThreads.id, id))
         .returning();
 
@@ -2658,7 +2697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [message] = await db
         .insert(collaborationMessages)
-        .values(messageData)
+        .values(messageData as any)
         .returning();
 
       // Update thread's updatedAt timestamp
@@ -2711,7 +2750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply type filter
       if (type && typeof type === 'string') {
-        query = query.where(eq(projectCollaborationThreads.type, type));
+        query = (query as any).where(eq(projectCollaborationThreads.type, type));
       }
 
       const allThreads = await query;
@@ -2784,7 +2823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [thread] = await db
         .insert(projectCollaborationThreads)
-        .values(threadData)
+        .values(threadData as any)
         .returning();
 
       res.status(201).json(thread);
@@ -2812,7 +2851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [updatedThread] = await db
         .update(projectCollaborationThreads)
-        .set({ ...updateData, updatedAt: new Date() })
+        .set({ ...updateData, updatedAt: new Date() } as any)
         .where(eq(projectCollaborationThreads.id, id))
         .returning();
 
@@ -2887,7 +2926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [message] = await db
         .insert(projectCollaborationMessages)
-        .values(messageData)
+        .values(messageData as any)
         .returning();
 
       // Update thread's updatedAt timestamp
@@ -3007,7 +3046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         wpId
       });
 
-      const resource = await storage.createProjectResource(resourceData);
+      const resource = await storage.createProjectResource(resourceData as any);
       res.status(201).json(resource);
     } catch (err) {
       handleError(err, res);
@@ -3045,7 +3084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         wpId: req.body.wpId ?? resource.wpId, // Preserve existing wpId if not provided
       });
 
-      const updatedResource = await storage.updateProjectResource(resourceId, resourceData);
+      const updatedResource = await storage.updateProjectResource(resourceId, resourceData as any);
       res.json(updatedResource);
     } catch (err) {
       handleError(err, res);
@@ -3140,7 +3179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -3279,7 +3318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -3404,7 +3443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -3521,7 +3560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -3804,7 +3843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -3919,7 +3958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -4034,7 +4073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -4149,7 +4188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uploadedById,
         uploadedByName,
         uploadedByEmail,
-      });
+      } as any);
 
       res.status(201).json(result);
     } catch (err) {
@@ -4240,7 +4279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Inject projectId into body for validation
       const bodyWithId = { ...req.body, projectId };
       const entryData = insertDailyProgressSchema.parse(bodyWithId);
-      const entry = await storage.createDailyProgress(entryData);
+      const entry = await storage.createDailyProgress(entryData as any);
       res.json(entry);
     } catch (err) {
       handleError(err, res);
@@ -4261,7 +4300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bodiesWithId = req.body.map((item: any) => ({ ...item, projectId }));
 
       const entriesData = z.array(insertDailyProgressSchema).parse(bodiesWithId);
-      const entries = await storage.createDailyProgressBulk(entriesData);
+      const entries = await storage.createDailyProgressBulk(entriesData as any);
       res.json(entries);
     } catch (err) {
       handleError(err, res);
@@ -4276,7 +4315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updateData = insertDailyProgressSchema.partial().parse(req.body);
-      const updatedEntry = await storage.updateDailyProgress(entryId, updateData);
+      const updatedEntry = await storage.updateDailyProgress(entryId, updateData as any);
 
       if (!updatedEntry) {
         return res.status(404).json({ message: "Entry not found" });
@@ -4325,7 +4364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Inject projectId into body for validation
       const bodyWithId = { ...req.body, projectId };
       const entryData = insertResourcePlanSchema.parse(bodyWithId);
-      const entry = await storage.createResourcePlan(entryData);
+      const entry = await storage.createResourcePlan(entryData as any);
       res.json(entry);
     } catch (err) {
       handleError(err, res);
@@ -4346,7 +4385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bodiesWithId = req.body.map((item: any) => ({ ...item, projectId }));
 
       const entriesData = z.array(insertResourcePlanSchema).parse(bodiesWithId);
-      const entries = await storage.createResourcePlanBulk(entriesData);
+      const entries = await storage.createResourcePlanBulk(entriesData as any);
       res.json(entries);
     } catch (err) {
       handleError(err, res);
@@ -4361,7 +4400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updateData = insertResourcePlanSchema.partial().parse(req.body);
-      const updatedEntry = await storage.updateResourcePlan(id, updateData);
+      const updatedEntry = await storage.updateResourcePlan(id, updateData as any);
 
       if (!updatedEntry) {
         return res.status(404).json({ message: "Entry not found" });
@@ -4410,7 +4449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Inject projectId into body for validation
       const bodyWithId = { ...req.body, projectId };
       const entryData = insertRiskRegisterSchema.parse(bodyWithId);
-      const entry = await storage.createRiskRegister(entryData);
+      const entry = await storage.createRiskRegister(entryData as any);
       res.json(entry);
     } catch (err) {
       handleError(err, res);
@@ -4425,7 +4464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID or risk register ID" });
       }
       const updateData = insertRiskRegisterSchema.partial().parse(req.body);
-      const updatedEntry = await storage.updateRiskRegister(id, updateData);
+      const updatedEntry = await storage.updateRiskRegister(id, updateData as any);
       if (!updatedEntry) {
         return res.status(404).json({ message: "Risk register entry not found" });
       }
@@ -4471,7 +4510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Inject projectId into body for validation
       const bodyWithId = { ...req.body, projectId };
       const entryData = insertLessonLearntRegisterSchema.parse(bodyWithId);
-      const entry = await storage.createLessonLearntRegister(entryData);
+      const entry = await storage.createLessonLearntRegister(entryData as any);
       res.json(entry);
     } catch (err) {
       handleError(err, res);
@@ -4486,7 +4525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID or lesson learnt register ID" });
       }
       const updateData = insertLessonLearntRegisterSchema.partial().parse(req.body);
-      const updatedEntry = await storage.updateLessonLearntRegister(id, updateData);
+      const updatedEntry = await storage.updateLessonLearntRegister(id, updateData as any);
       if (!updatedEntry) {
         return res.status(404).json({ message: "Lesson learnt register entry not found" });
       }
@@ -4531,7 +4570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bodyWithId = { ...req.body, projectId };
       const positionData = insertDirectManpowerPositionSchema.parse(bodyWithId);
-      const position = await storage.createDirectManpowerPosition(positionData);
+      const position = await storage.createDirectManpowerPosition(positionData as any);
       res.json(position);
     } catch (err) {
       handleError(err, res);
@@ -4547,7 +4586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const positionsData = z.array(insertDirectManpowerPositionSchema).parse(
         req.body.map((p: any) => ({ ...p, projectId }))
       );
-      const positions = await storage.updateDirectManpowerPositions(projectId, positionsData);
+      const positions = await storage.updateDirectManpowerPositions(projectId, positionsData as any);
       res.json(positions);
     } catch (err) {
       handleError(err, res);
@@ -4561,7 +4600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid position ID" });
       }
       const updateData = insertDirectManpowerPositionSchema.partial().parse(req.body);
-      const updatedPosition = await storage.updateDirectManpowerPosition(id, updateData);
+      const updatedPosition = await storage.updateDirectManpowerPosition(id, updateData as any);
       if (!updatedPosition) {
         return res.status(404).json({ message: "Position not found" });
       }
@@ -4595,7 +4634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse JSON positions field
       const entries = data.map(entry => ({
         ...entry,
-        positions: JSON.parse(entry.positions)
+        positions: JSON.parse(entry.positions as string)
       }));
       res.json(entries);
     } catch (err) {
@@ -4611,10 +4650,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bodyWithId = { ...req.body, projectId };
       const entryData = insertDirectManpowerEntrySchema.parse(bodyWithId);
-      const entry = await storage.createDirectManpowerEntry(entryData);
+      const entry = await storage.createDirectManpowerEntry(entryData as any);
       res.json({
         ...entry,
-        positions: JSON.parse(entry.positions)
+        positions: JSON.parse(entry.positions as string)
       });
     } catch (err) {
       handleError(err, res);
@@ -4629,13 +4668,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID or entry ID" });
       }
       const updateData = insertDirectManpowerEntrySchema.partial().parse(req.body);
-      const updatedEntry = await storage.updateDirectManpowerEntry(id, updateData);
+      const updatedEntry = await storage.updateDirectManpowerEntry(id, updateData as any);
       if (!updatedEntry) {
         return res.status(404).json({ message: "Manpower entry not found" });
       }
       res.json({
         ...updatedEntry,
-        positions: JSON.parse(updatedEntry.positions)
+        positions: JSON.parse(updatedEntry.positions as string)
       });
     } catch (err) {
       handleError(err, res);
@@ -4677,7 +4716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bodyWithId = { ...req.body, projectId };
       const positionData = insertIndirectManpowerPositionSchema.parse(bodyWithId);
-      const position = await storage.createIndirectManpowerPosition(positionData);
+      const position = await storage.createIndirectManpowerPosition(positionData as any);
       res.json(position);
     } catch (err) {
       handleError(err, res);
@@ -4693,7 +4732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const positionsData = z.array(insertIndirectManpowerPositionSchema).parse(
         req.body.map((p: any) => ({ ...p, projectId }))
       );
-      const positions = await storage.updateIndirectManpowerPositions(projectId, positionsData);
+      const positions = await storage.updateIndirectManpowerPositions(projectId, positionsData as any);
       res.json(positions);
     } catch (err) {
       handleError(err, res);
@@ -4707,7 +4746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid position ID" });
       }
       const updateData = insertIndirectManpowerPositionSchema.partial().parse(req.body);
-      const updatedPosition = await storage.updateIndirectManpowerPosition(id, updateData);
+      const updatedPosition = await storage.updateIndirectManpowerPosition(id, updateData as any);
       if (!updatedPosition) {
         return res.status(404).json({ message: "Position not found" });
       }
@@ -4741,8 +4780,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse JSON positions field
       const entries = data.map(entry => ({
         ...entry,
-        positions: JSON.parse(entry.positions),
-        totalOverhead: parseFloat(entry.totalOverhead)
+        positions: JSON.parse(entry.positions as string),
+        totalOverhead: parseFloat(entry.totalOverhead as string)
       }));
       res.json(entries);
     } catch (err) {
@@ -4758,11 +4797,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bodyWithId = { ...req.body, projectId };
       const entryData = insertIndirectManpowerEntrySchema.parse(bodyWithId);
-      const entry = await storage.createIndirectManpowerEntry(entryData);
+      const entry = await storage.createIndirectManpowerEntry(entryData as any);
       res.json({
         ...entry,
-        positions: JSON.parse(entry.positions),
-        totalOverhead: parseFloat(entry.totalOverhead)
+        positions: JSON.parse(entry.positions as string),
+        totalOverhead: parseFloat(entry.totalOverhead as string)
       });
     } catch (err) {
       handleError(err, res);
@@ -4777,14 +4816,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID or entry ID" });
       }
       const updateData = insertIndirectManpowerEntrySchema.partial().parse(req.body);
-      const updatedEntry = await storage.updateIndirectManpowerEntry(id, updateData);
+      const updatedEntry = await storage.updateIndirectManpowerEntry(id, updateData as any);
       if (!updatedEntry) {
         return res.status(404).json({ message: "Manpower entry not found" });
       }
       res.json({
         ...updatedEntry,
-        positions: JSON.parse(updatedEntry.positions),
-        totalOverhead: parseFloat(updatedEntry.totalOverhead)
+        positions: JSON.parse(updatedEntry.positions as string),
+        totalOverhead: parseFloat(updatedEntry.totalOverhead as string)
       });
     } catch (err) {
       handleError(err, res);
@@ -4846,7 +4885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         column: "wish",
         position: nextPosition,
       });
-      const card = await storage.createKanbanCard(body);
+      const card = await storage.createKanbanCard(body as any);
       res.status(201).json(card);
     } catch (err) {
       handleError(err, res);
@@ -4870,7 +4909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (body.position !== undefined) update.position = body.position;
       if (body.title !== undefined) update.title = body.title;
       if (body.description !== undefined) update.description = body.description;
-      const card = await storage.updateKanbanCard(id, update);
+      const card = await storage.updateKanbanCard(id, update as any);
       if (!card) {
         return res.status(404).json({ message: "Card not found" });
       }
@@ -4886,7 +4925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid card ID" });
       }
-      const card = await storage.updateKanbanCard(id, { archivedAt: new Date() });
+      const card = await storage.updateKanbanCard(id, { archivedAt: new Date() } as any);
       if (!card) {
         return res.status(404).json({ message: "Card not found" });
       }
@@ -4929,7 +4968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bodyWithId = { ...req.body, projectId };
       const activityData = insertPlannedActivitySchema.parse(bodyWithId);
-      const activity = await storage.createPlannedActivity(activityData);
+      const activity = await storage.createPlannedActivity(activityData as any);
       res.json({ ...activity, tasks: [] });
     } catch (err) {
       handleError(err, res);
@@ -4944,7 +4983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID or activity ID" });
       }
       const updateData = insertPlannedActivitySchema.partial().parse(req.body);
-      const updatedActivity = await storage.updatePlannedActivity(id, updateData);
+      const updatedActivity = await storage.updatePlannedActivity(id, updateData as any);
       if (!updatedActivity) {
         return res.status(404).json({ message: "Activity not found" });
       }
@@ -4990,7 +5029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const bodyWithId = { ...req.body, activityId };
       const taskData = insertPlannedActivityTaskSchema.parse(bodyWithId);
-      const task = await storage.createPlannedActivityTask(taskData);
+      const task = await storage.createPlannedActivityTask(taskData as any);
       res.json(task);
     } catch (err) {
       handleError(err, res);
@@ -5004,7 +5043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid task ID" });
       }
       const updateData = insertPlannedActivityTaskSchema.partial().parse(req.body);
-      const updatedTask = await storage.updatePlannedActivityTask(id, updateData);
+      const updatedTask = await storage.updatePlannedActivityTask(id, updateData as any);
       if (!updatedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -5059,8 +5098,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/material-masters", async (req: Request, res: Response) => {
     try {
       const materialData = insertMaterialMasterSchema.parse(req.body);
-      const [material] = await db.insert(materialMaster).values(materialData).returning();
-      res.status(201).json(material);
+      const [inserted] = await db.insert(materialMaster).values(materialData as any).returning();
+      res.status(201).json(inserted);
     } catch (err) {
       handleError(err, res);
     }
@@ -5132,7 +5171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/uoms", async (req: Request, res: Response) => {
     try {
       const uomData = insertUomSchema.parse(req.body);
-      const [uom] = await db.insert(uoms).values(uomData).returning();
+      const [uom] = await db.insert(uoms).values(uomData as any).returning();
       res.status(201).json(uom);
     } catch (err) {
       handleError(err, res);
@@ -5360,15 +5399,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
       const rows = await db.select().from(workPackageMaterials).where(eq(workPackageMaterials.projectId, projectId));
       const materials = await db.select().from(materialMaster);
-      const byId = new Map(materials.map((m: { id: number }) => [m.id, m]));
+      const byId = new Map(materials.map((m: any) => [m.id, m]));
       const result = rows.map((r: typeof workPackageMaterials.$inferSelect) => {
         const mat = byId.get(r.materialId);
         return {
           ...r,
-          materialCode: mat?.materialCode,
-          materialDescription: mat?.materialDescription,
-          uom: mat?.uom,
-          baseRate: mat?.baseRate,
+          materialCode: (mat as any)?.materialCode,
+          materialDescription: (mat as any)?.materialDescription,
+          uom: (mat as any)?.uom,
+          baseRate: (mat as any)?.baseRate,
         };
       });
       res.json(result);
@@ -5383,15 +5422,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(wpId)) return res.status(400).json({ message: "Invalid work package ID" });
       const rows = await db.select().from(workPackageMaterials).where(eq(workPackageMaterials.wpId, wpId));
       const materials = await db.select().from(materialMaster);
-      const byId = new Map(materials.map((m: { id: number }) => [m.id, m]));
+      const byId = new Map(materials.map((m: any) => [m.id, m]));
       const result = rows.map((r: typeof workPackageMaterials.$inferSelect) => {
         const mat = byId.get(r.materialId);
         return {
           ...r,
-          materialCode: mat?.materialCode,
-          materialDescription: mat?.materialDescription,
-          uom: mat?.uom,
-          baseRate: mat?.baseRate,
+          materialCode: (mat as any)?.materialCode,
+          materialDescription: (mat as any)?.materialDescription,
+          uom: (mat as any)?.uom,
+          baseRate: (mat as any)?.baseRate,
         };
       });
       res.json(result);
@@ -5457,15 +5496,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
       const rows = await db.select().from(workPackageServices).where(eq(workPackageServices.projectId, projectId));
       const services = await db.select().from(serviceMaster);
-      const byId = new Map(services.map((s: { id: number }) => [s.id, s]));
+      const byId = new Map(services.map((s: any) => [s.id, s]));
       const result = rows.map((r: typeof workPackageServices.$inferSelect) => {
         const svc = byId.get(r.serviceId);
         return {
           ...r,
-          serviceCode: svc?.serviceCode,
-          serviceDescription: svc?.serviceDescription,
-          uom: svc?.uom,
-          baseRate: svc?.baseRate,
+          serviceCode: (svc as any)?.serviceCode,
+          serviceDescription: (svc as any)?.serviceDescription,
+          uom: (svc as any)?.uom,
+          baseRate: (svc as any)?.baseRate,
         };
       });
       res.json(result);
@@ -5480,15 +5519,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(wpId)) return res.status(400).json({ message: "Invalid work package ID" });
       const rows = await db.select().from(workPackageServices).where(eq(workPackageServices.wpId, wpId));
       const services = await db.select().from(serviceMaster);
-      const byId = new Map(services.map((s: { id: number }) => [s.id, s]));
+      const byId = new Map(services.map((s: any) => [s.id, s]));
       const result = rows.map((r: typeof workPackageServices.$inferSelect) => {
         const svc = byId.get(r.serviceId);
         return {
           ...r,
-          serviceCode: svc?.serviceCode,
-          serviceDescription: svc?.serviceDescription,
-          uom: svc?.uom,
-          baseRate: svc?.baseRate,
+          serviceCode: (svc as any)?.serviceCode,
+          serviceDescription: (svc as any)?.serviceDescription,
+          uom: (svc as any)?.uom,
+          baseRate: (svc as any)?.baseRate,
         };
       });
       res.json(result);
@@ -5698,7 +5737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/service-types", async (req: Request, res: Response) => {
     try {
       const data = insertServiceTypeSchema.parse(req.body);
-      const [row] = await db.insert(serviceTypes).values(data).returning();
+      const [row] = await db.insert(serviceTypes).values(data as any).returning();
       res.status(201).json(row);
     } catch (err) {
       handleError(err, res);
@@ -5749,7 +5788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/service-groups", async (req: Request, res: Response) => {
     try {
       const data = insertServiceGroupSchema.parse(req.body);
-      const [row] = await db.insert(serviceGroups).values(data).returning();
+      const [row] = await db.insert(serviceGroups).values(data as any).returning();
       res.status(201).json(row);
     } catch (err) {
       handleError(err, res);
@@ -6504,7 +6543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resource = await db
         .select()
         .from(resources)
-        .where(eq(resources.id, mappingData.resourceId));
+        .where(eq(resources.id, (mappingData as any).resourceId));
 
       if (resource.length === 0) {
         return res.status(404).json({ message: "Resource not found" });
@@ -6526,7 +6565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedMapping = await db
           .update(employeeResourceMappings)
           .set({
-            resourceId: mappingData.resourceId,
+            resourceId: (mappingData as any).resourceId,
             updatedAt: new Date(),
           })
           .where(eq(employeeResourceMappings.employeeId, employeeId))
@@ -6537,7 +6576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create new mapping
       const newMapping = await db
         .insert(employeeResourceMappings)
-        .values(mappingData)
+        .values(mappingData as any)
         .returning();
       res.status(201).json(newMapping[0]);
     } catch (err) {
@@ -6913,7 +6952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resource = await db
         .select()
         .from(resources)
-        .where(eq(resources.id, mappingData.resourceId));
+        .where(eq(resources.id, (mappingData as any).resourceId));
 
       if (resource.length === 0) {
         return res.status(404).json({ message: "Resource not found" });
@@ -6935,7 +6974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedMapping = await db
           .update(equipmentResourceMappings)
           .set({
-            resourceId: mappingData.resourceId,
+            resourceId: (mappingData as any).resourceId,
             updatedAt: new Date(),
           })
           .where(eq(equipmentResourceMappings.equipmentId, equipmentId))
@@ -6946,7 +6985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create new mapping
       const newMapping = await db
         .insert(equipmentResourceMappings)
-        .values(mappingData)
+        .values(mappingData as any)
         .returning();
       res.status(201).json(newMapping[0]);
     } catch (err) {
