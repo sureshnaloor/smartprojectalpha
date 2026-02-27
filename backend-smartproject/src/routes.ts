@@ -556,6 +556,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper schema for project activity CSV import
+  const projectActivityCsvRowSchema = z.object({
+    workPackageCode: z.string().min(1, "workPackageCode is required"),
+    name: z.string().min(1, "name is required"),
+    description: z.string().optional().nullable(),
+    unitOfMeasure: z.string().min(1, "unitOfMeasure is required"),
+    unitRate: z.union([z.string(), z.number()]),
+    duration: z.union([z.string(), z.number()]).optional().nullable(),
+    startDate: z.string().optional().nullable(),
+    endDate: z.string().optional().nullable(),
+    quantity: z.union([z.string(), z.number()]).optional().nullable(),
+  });
+
+  // Bulk import project activities from CSV (parsed on frontend)
+  app.post("/api/projects/:projectId/activities/import-csv", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const { csvData } = req.body as { csvData?: unknown };
+      if (!csvData || !Array.isArray(csvData)) {
+        return res.status(400).json({ message: "Request body must include csvData array" });
+      }
+
+      // Preload work packages for this project to resolve workPackageCode
+      const workPackages = await storage.getWorkPackagesByProject(projectId);
+      const workPackagesByCode = new Map(workPackages.map(wp => [wp.code, wp]));
+
+      // Preload global activities to reuse where possible
+      const globalActivities = await storage.getActivities();
+      const globalActivitiesByKey = new Map(
+        globalActivities.map(act => [
+          `${act.name}|${act.unitOfMeasure}|${act.unitRate}`,
+          act,
+        ]),
+      );
+
+      const errors: string[] = [];
+      const createdActivities: any[] = [];
+
+      for (let i = 0; i < csvData.length; i++) {
+        const rawRow = csvData[i];
+
+        const parsed = projectActivityCsvRowSchema.safeParse(rawRow);
+        if (!parsed.success) {
+          const message = parsed.error.errors.map(e => e.message).join("; ");
+          errors.push(`Row ${i + 1}: ${message}`);
+          continue;
+        }
+
+        const row = parsed.data;
+
+        const workPackage = workPackagesByCode.get(row.workPackageCode);
+        if (!workPackage) {
+          errors.push(
+            `Row ${i + 1}: Work Package with code '${row.workPackageCode}' not found in this project`,
+          );
+          continue;
+        }
+
+        const hasDuration =
+          row.duration !== undefined &&
+          row.duration !== null &&
+          String(row.duration).trim() !== "";
+        const hasDates = !!row.startDate && !!row.endDate;
+
+        if (!hasDuration && !hasDates) {
+          errors.push(
+            `Row ${i + 1}: Either duration or both startDate and endDate must be provided`,
+          );
+          continue;
+        }
+
+        let duration: number | null = null;
+        let plannedFromDate: string | null = null;
+        let plannedToDate: string | null = null;
+
+        if (hasDuration) {
+          const durNum = Number(row.duration);
+          if (!Number.isFinite(durNum) || durNum <= 0) {
+            errors.push(`Row ${i + 1}: duration must be a positive number`);
+            continue;
+          }
+          duration = Math.round(durNum);
+        }
+
+        if (hasDates) {
+          const start = new Date(row.startDate as string);
+          const end = new Date(row.endDate as string);
+
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            errors.push(`Row ${i + 1}: Invalid startDate or endDate`);
+            continue;
+          }
+
+          if (end < start) {
+            errors.push(`Row ${i + 1}: endDate must be on or after startDate`);
+            continue;
+          }
+
+          plannedFromDate = start.toISOString().split("T")[0];
+          plannedToDate = end.toISOString().split("T")[0];
+
+          if (!duration) {
+            const msPerDay = 24 * 60 * 60 * 1000;
+            duration = Math.round((end.getTime() - start.getTime()) / msPerDay) + 1;
+          }
+        }
+
+        const unitRateNumber = Number(row.unitRate);
+        if (!Number.isFinite(unitRateNumber) || unitRateNumber < 0) {
+          errors.push(`Row ${i + 1}: unitRate must be a non-negative number`);
+          continue;
+        }
+        const unitRateString = unitRateNumber.toString();
+
+        const activityKey = `${row.name}|${row.unitOfMeasure}|${unitRateString}`;
+        let globalActivity = globalActivitiesByKey.get(activityKey);
+
+        if (!globalActivity) {
+          try {
+            globalActivity = await storage.createActivity({
+              name: row.name,
+              description: row.description ?? null,
+              unitOfMeasure: row.unitOfMeasure,
+              unitRate: unitRateString,
+              remarks: null,
+            } as any);
+
+            globalActivitiesByKey.set(activityKey, globalActivity);
+          } catch (err) {
+            const message =
+              err instanceof Error ? err.message : "Failed to create global activity";
+            errors.push(`Row ${i + 1}: ${message}`);
+            continue;
+          }
+        }
+
+        let quantityString = "1";
+        if (row.quantity !== undefined && row.quantity !== null && String(row.quantity).trim() !== "") {
+          const quantityNumber = Number(row.quantity);
+          if (!Number.isFinite(quantityNumber) || quantityNumber <= 0) {
+            errors.push(`Row ${i + 1}: quantity must be a positive number if provided`);
+            continue;
+          }
+          quantityString = quantityNumber.toString();
+        }
+
+        // Build payload for project activity creation
+        const payload: any = {
+          projectId,
+          wpId: workPackage.id,
+          globalActivityId: globalActivity.id,
+          name: row.name,
+          description: row.description ?? null,
+          unitOfMeasure: row.unitOfMeasure,
+          unitRate: unitRateString,
+          quantity: quantityString,
+          remarks: null,
+          plannedFromDate,
+          plannedToDate,
+        };
+
+        if (duration !== null) {
+          payload.duration = duration;
+        }
+
+        try {
+          const activityData = insertProjectActivitySchema.parse(payload);
+          const created = await storage.createProjectActivity(activityData);
+          createdActivities.push(created);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to create project activity";
+          errors.push(`Row ${i + 1}: ${message}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return res.status(400).json({
+          message: "Some activities could not be imported",
+          errors,
+          createdCount: createdActivities.length,
+        });
+      }
+
+      return res.status(201).json({
+        message: "Activities imported successfully",
+        createdCount: createdActivities.length,
+        activities: createdActivities,
+      });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   // Get categorized activities for a project (for page2 view)
   app.get("/api/projects/:projectId/activities/categorized", async (req: Request, res: Response) => {
     try {

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, GripVertical, Search, X, Calendar, Pencil } from "lucide-react";
+import { Trash2, GripVertical, Search, X, Calendar, Pencil, FileUp } from "lucide-react";
 import { SelectValue } from "@/components/ui/select";
 import {
     Tabs,
@@ -33,6 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
+import { ImportProjectActivitiesModal } from "@/components/project/import-project-activities-modal";
 
 interface Activity {
     id: number;
@@ -87,6 +88,7 @@ export default function ProjectActivities() {
     const [mappingMode, setMappingMode] = useState<"duration" | "date-range">("duration");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingActivity, setEditingActivity] = useState<ProjectActivity | null>(null);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     // Fetch global activities
     const { data: globalActivities = [] } = useQuery<Activity[]>({
@@ -322,8 +324,19 @@ export default function ProjectActivities() {
             <div className="flex-1 flex flex-col gap-4">
                 {/* Work Packages List */}
                 <Card className="flex-shrink-0">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Work Packages</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <CardTitle>Work Packages</CardTitle>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="ml-2"
+                                onClick={() => setIsImportModalOpen(true)}
+                            >
+                                <FileUp className="h-4 w-4 mr-1" />
+                                Import CSV
+                            </Button>
+                        </div>
                         <Tabs value={mappingMode} onValueChange={(val) => setMappingMode(val as any)}>
                             <TabsList>
                                 <TabsTrigger value="duration" className="text-xs">Duration</TabsTrigger>
@@ -663,6 +676,12 @@ export default function ProjectActivities() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <ImportProjectActivitiesModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                projectId={Number(projectId)}
+            />
         </div>
     );
 }
