@@ -17,9 +17,12 @@ import ActivityMaster from "@/pages/activity-master";
 import ActivityMasterLayout from "@/layouts/activity-master-layout";
 import ActivityMasterUom from "@/pages/activity-master-uom";
 import TaskMaster from "@/pages/task-master";
+import TaskMasterLayout from "@/layouts/task-master-layout";
 import ProjectLayout from "@/layouts/project-layout";
 import MasterLayout from "@/layouts/master-layout";
 import ResourceMaster from "@/pages/resource-master";
+import ResourceMasterLayout from "@/layouts/resource-master-layout";
+import GlobalToolsPlaceholder from "@/pages/global-tools-placeholder";
 import MaterialMaster from "@/pages/material-master";
 import MaterialMasterLayout from "@/layouts/material-master-layout";
 import MaterialMasterUom from "@/pages/material-master-uom";
@@ -33,6 +36,7 @@ import ServiceMasterGroup from "@/pages/service-master-group";
 import VendorMaster from "@/pages/vendor-master";
 import VendorMasterCountry from "@/pages/vendor-master-country";
 import VendorMasterCity from "@/pages/vendor-master-city";
+import VendorMasterLayout from "@/layouts/vendor-master-layout";
 import EmployeeMaster from "@/pages/employee-master";
 import EmployeeMasterRental from "@/pages/employee-master-rental";
 import EmployeeMasterLayout from "@/layouts/employee-master-layout";
@@ -156,71 +160,71 @@ function Router() {
         )}
       </Route>
 
-      {/* Project Drawings - Specific Route */}
-      <Route path="/projects/:projectId/under-construction/ProjectDrawings">
+      {/* Project Documents - Specific Routes */}
+      <Route path="/projects/:projectId/project-docs/ProjectDrawings">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectDrawings />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/ProjectBOQ">
+      <Route path="/projects/:projectId/project-docs/ProjectBOQ">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectBoq />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/ProjectScope">
+      <Route path="/projects/:projectId/project-docs/ProjectScope">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectScope />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/ClientCorrespondence">
+      <Route path="/projects/:projectId/project-docs/ClientCorrespondence">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectCorrespondence />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/SupplierCorrespondence">
+      <Route path="/projects/:projectId/project-docs/SupplierCorrespondence">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectSupplierCorrespondence />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/SubcontractCorrespondence">
+      <Route path="/projects/:projectId/project-docs/SubcontractCorrespondence">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectSubcontractCorrespondence />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/RequestForInspection">
+      <Route path="/projects/:projectId/project-docs/RequestForInspection">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectRequestForInspection />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/ITPAndReports">
+      <Route path="/projects/:projectId/project-docs/ITPAndReports">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectItpAndReports />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/OtherDocuments">
+      <Route path="/projects/:projectId/project-docs/OtherDocuments">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectOtherDocuments />
           </ProjectLayout>
         )}
       </Route>
-      <Route path="/projects/:projectId/under-construction/EquipmentCatalogue">
+      <Route path="/projects/:projectId/project-docs/EquipmentCatalogue">
         {(params) => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <ProjectEquipmentCatalogue />
@@ -228,8 +232,8 @@ function Router() {
         )}
       </Route>
 
-      {/* Project-specific Under Construction Pages */}
-      <Route path="/projects/:projectId/under-construction/:pageName">
+      {/* Project docs catch-all (e.g. OtherWiki) */}
+      <Route path="/projects/:projectId/project-docs/:pageName">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
             <UnderConstruction />
@@ -487,10 +491,38 @@ function Router() {
       </Route>
 
       {/* Task Master */}
-      <Route path="/task-master" component={TaskMaster} />
+      <Route path="/task-master/tab2">
+        <TaskMasterLayout>
+          <GlobalToolsPlaceholder />
+        </TaskMasterLayout>
+      </Route>
+      <Route path="/task-master/tab3">
+        <TaskMasterLayout>
+          <GlobalToolsPlaceholder />
+        </TaskMasterLayout>
+      </Route>
+      <Route path="/task-master">
+        <TaskMasterLayout>
+          <TaskMaster />
+        </TaskMasterLayout>
+      </Route>
 
       {/* Resource Master */}
-      <Route path="/resource-master" component={ResourceMaster} />
+      <Route path="/resource-master/tab2">
+        <ResourceMasterLayout>
+          <GlobalToolsPlaceholder />
+        </ResourceMasterLayout>
+      </Route>
+      <Route path="/resource-master/tab3">
+        <ResourceMasterLayout>
+          <GlobalToolsPlaceholder />
+        </ResourceMasterLayout>
+      </Route>
+      <Route path="/resource-master">
+        <ResourceMasterLayout>
+          <ResourceMaster />
+        </ResourceMasterLayout>
+      </Route>
 
       {/* Material Master */}
       <Route path="/material-master/uom">
@@ -537,9 +569,21 @@ function Router() {
       </Route>
 
       {/* Vendor Master */}
-      <Route path="/vendor-master" component={VendorMaster} />
-      <Route path="/vendor-master/country" component={VendorMasterCountry} />
-      <Route path="/vendor-master/city" component={VendorMasterCity} />
+      <Route path="/vendor-master/country">
+        <VendorMasterLayout>
+          <VendorMasterCountry />
+        </VendorMasterLayout>
+      </Route>
+      <Route path="/vendor-master/city">
+        <VendorMasterLayout>
+          <VendorMasterCity />
+        </VendorMasterLayout>
+      </Route>
+      <Route path="/vendor-master">
+        <VendorMasterLayout>
+          <VendorMaster />
+        </VendorMasterLayout>
+      </Route>
 
       {/* Employee Master */}
       <Route path="/employee-master/nationality" component={EmployeeMasterNationality} />

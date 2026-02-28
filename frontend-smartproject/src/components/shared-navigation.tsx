@@ -11,22 +11,24 @@ interface SharedNavigationProps {
 
 export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'app' }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const [location, setLocation] = useLocation()
   const { authenticated, user, login } = useAuth()
 
   useEffect(() => {
-    // Add scroll effect to header
     const handleScroll = () => {
-      const header = document.querySelector('nav')
-      if (header) {
-        if (window.scrollY > 100) {
-          header.style.boxShadow = '0 4px 20px rgba(44, 62, 80, 0.1)'
-        } else {
-          header.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }
+      const compact = window.scrollY > 40
+      setIsScrolled(compact)
+
+      const root = document.documentElement
+      if (compact) {
+        root.classList.add('header-compact')
+      } else {
+        root.classList.remove('header-compact')
       }
     }
 
+    handleScroll()
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -54,20 +56,28 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
 
   const isLanding = variant === 'landing'
   const navBgClass = isLanding
-    ? 'bg-white/95 backdrop-blur-sm'
-    : 'bg-white shadow-sm border-b border-gray-200'
+    ? 'bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-slate-100'
+    : 'bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-slate-100'
+  const navElevationClass = isScrolled ? 'shadow-md' : 'shadow-sm'
+  const navHeightClass = isScrolled ? 'h-12' : 'h-16'
+  const brandTextSizeClass = isScrolled ? 'text-xl' : 'text-2xl'
+  const logoSizeClass = isScrolled ? 'h-7' : 'h-8'
 
   return (
-    <nav className={`fixed top-0 w-full ${navBgClass} z-50 ${isLanding ? 'shadow-sm' : ''}`}>
+    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${navBgClass} ${navElevationClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className={`flex justify-between items-center ${navHeightClass} transition-all duration-300`}>
           <div className="flex items-center">
             <div
-              className="font-display text-2xl font-bold gradient-text cursor-pointer flex items-center gap-2"
+              className={`font-display font-bold gradient-text cursor-pointer flex items-center gap-2 transition-all duration-300 ${brandTextSizeClass}`}
               onClick={() => handleNavClick('/')}
             >
               {!isLanding && (
-                <img src="/smartproject.png" alt="ConstructPro Logo" className="h-8 w-auto mr-2" />
+                <img
+                  src="/smartproject.png"
+                  alt="ConstructPro Logo"
+                  className={`${logoSizeClass} w-auto mr-2 transition-all duration-300`}
+                />
               )}
               <span>ConstructPro</span>
             </div>
@@ -79,28 +89,28 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
               <>
                 <a
                   href="#features"
-                  className="nav-link"
+                  className="nav-link text-slate-100 hover:text-slate-50"
                   onClick={(e) => handleSmoothScroll(e, '#features')}
                 >
                   Features
                 </a>
                 <a
                   href="#demo"
-                  className="nav-link"
+                  className="nav-link text-slate-100 hover:text-slate-50"
                   onClick={(e) => handleSmoothScroll(e, '#demo')}
                 >
                   Demo
                 </a>
                 <a
                   href="#pricing"
-                  className="nav-link"
+                  className="nav-link text-slate-100 hover:text-slate-50"
                   onClick={(e) => handleSmoothScroll(e, '#pricing')}
                 >
                   Pricing
                 </a>
                 <a
                   href="#contact"
-                  className="nav-link"
+                  className="nav-link text-slate-100 hover:text-slate-50"
                   onClick={(e) => handleSmoothScroll(e, '#contact')}
                 >
                   Contact
@@ -112,7 +122,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                     if (authenticated) { setLocation('/newlanding'); }
                     else { setLocation('/login'); }
                   }}
-                  className="nav-link flex items-center gap-1.5 text-teal-600 font-semibold"
+                  className="nav-link flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold"
                 >
                   <span>Playground</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
@@ -127,7 +137,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                     if (authenticated) { setLocation('/newlanding'); }
                     else { setLocation('/login'); }
                   }}
-                  className="nav-link flex items-center gap-1.5 text-teal-600 font-semibold"
+                  className="nav-link flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold"
                 >
                   <span>Playground</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
@@ -195,15 +205,15 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
 
             {/* Auth Section */}
             {authenticated ? (
-              <div className="flex items-center gap-4 pl-4 border-l border-gray-200">
+              <div className="flex items-center gap-4 pl-4 border-l border-slate-700 text-slate-100">
                 <UserProfile />
               </div>
             ) : (
-              <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+              <div className="flex items-center gap-3 pl-4 border-l border-slate-700 text-slate-100">
                 <Button
                   variant="outline"
                   onClick={() => handleNavClick('/login')}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="border-slate-600 text-slate-100 hover:bg-slate-800/60"
                 >
                   Sign In
                 </Button>

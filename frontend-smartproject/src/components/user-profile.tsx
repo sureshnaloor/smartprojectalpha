@@ -30,11 +30,11 @@ export function UserProfile() {
   // Show loading state
   if (loading) {
     return (
-      <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+      <div className="flex items-center gap-2 text-slate-100">
+        <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-200" />
         </div>
-        <span className="text-sm font-medium hidden md:block text-gray-400">
+        <span className="text-sm font-medium hidden md:block text-slate-200">
           Loading...
         </span>
       </div>
@@ -96,7 +96,7 @@ export function UserProfile() {
         onMouseLeave={handleMouseLeave}
       >
         <button className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer focus:outline-none">
-          <Avatar className="h-8 w-8 border-2 border-gray-200">
+          <Avatar className="h-8 w-8 border-2 border-slate-200">
             {user.picture ? (
               <AvatarImage src={user.picture} alt={user.name} className="object-cover" />
             ) : null}
@@ -104,7 +104,7 @@ export function UserProfile() {
               {getInitials(user.name)}
             </AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium hidden md:block text-gray-700">
+          <span className="text-sm font-medium hidden md:block text-slate-100">
             {user.name}
           </span>
         </button>
@@ -134,11 +134,11 @@ export function UserProfile() {
 
   // Fallback if no user (shouldn't happen if authenticated, but just in case)
   return (
-    <div className="flex items-center gap-2">
-      <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-        <span className="text-xs text-gray-600">?</span>
+    <div className="flex items-center gap-2 text-slate-100">
+      <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center">
+        <span className="text-xs text-slate-200">?</span>
       </div>
-      <span className="text-sm font-medium hidden md:block text-gray-500">
+      <span className="text-sm font-medium hidden md:block text-slate-200">
         Guest
       </span>
     </div>

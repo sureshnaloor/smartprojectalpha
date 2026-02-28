@@ -20,7 +20,6 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import VendorMasterLayout from "@/layouts/vendor-master-layout";
 
 interface Country {
     id: number;
@@ -158,8 +157,7 @@ export default function VendorMasterCountry() {
     );
 
     return (
-        <VendorMasterLayout>
-            <div className="p-8 max-w-7xl mx-auto min-h-screen">
+        <div className="p-8 max-w-7xl mx-auto min-h-screen">
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-2">Vendors - Countries</h1>
@@ -261,7 +259,6 @@ export default function VendorMasterCountry() {
                         </Table>
                     )}
                 </div>
-            </div>
-        </VendorMasterLayout>
+        </div>
     );
 }

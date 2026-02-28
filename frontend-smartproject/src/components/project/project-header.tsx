@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Project, WbsItem } from "@shared/schema";
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
-import { FileSpreadsheet, ChartLine, GanttChart, Menu, MoreHorizontal, BarChart2, PencilIcon, ArrowLeft, DollarSign, Package, Wrench, Users, LayoutDashboard, Activity, Calendar, TrendingUp } from "lucide-react";
+import { FileSpreadsheet, ChartLine, GanttChart, Menu, MoreHorizontal, BarChart2, PencilIcon, ArrowLeft, DollarSign, Package, Wrench, Users, LayoutDashboard, Activity, Calendar, TrendingUp, Pin, AlertTriangle, Award, Info, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportWbsModal } from "./import-wbs-modal";
 import { DeleteProjectDialog } from "./delete-project-dialog";
@@ -214,21 +214,9 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
         </div>
       </div>
 
-      {/* Navigation Tabs: Project root = Home|Activities|Cost|Schedule|Progress; Materials & Services = Materials|Services|Manpower; Collab = dark bar like docs/wiki; else Tab1–Tab5 */}
-      <div
-        className={
-          routeContext === "collab"
-            ? "px-4 sm:px-6 border-t border-slate-700 bg-slate-800 shadow-inner"
-            : "px-6 sm:px-8 border-t border-zinc-200 bg-zinc-50/50"
-        }
-      >
-        <nav
-          className={
-            routeContext === "collab"
-              ? "-mb-px flex flex-wrap gap-1 sm:gap-2 py-2 overflow-x-auto"
-              : "-mb-px flex space-x-8 overflow-x-auto"
-          }
-        >
+      {/* Navigation Tabs: Project root = Home|Activities|Cost|Schedule|Progress; Materials & Services = Materials|Services|Manpower; Collab = same light strip with icons + underline; else Tab1–Tab5 */}
+      <div className="px-6 sm:px-8 border-t border-zinc-200 bg-zinc-50/50">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto">
           {isProjectRoot ? (
             <>
               {(["home", "activities", "cost", "schedule", "progress"] as const).map((tab) => (
@@ -294,13 +282,14 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
           ) : routeContext === "collab" ? (
             <>
               {[
-                { key: "pinned", hash: "pinned", line1: "Pinned &", line2: "Urgent" },
-                { key: "issues", hash: "issues", line1: "Issues", line2: "" },
-                { key: "awards", hash: "awards", line1: "Awards", line2: "" },
-                { key: "info", hash: "info", line1: "Info", line2: "" },
-                { key: "announcements", hash: "announcements", line1: "Announce-", line2: "ments" },
+                { key: "pinned", hash: "pinned", label: "Pinned & Urgent", Icon: Pin },
+                { key: "issues", hash: "issues", label: "Issues", Icon: AlertTriangle },
+                { key: "awards", hash: "awards", label: "Awards", Icon: Award },
+                { key: "info", hash: "info", label: "Info", Icon: Info },
+                { key: "announcements", hash: "announcements", label: "Announcements", Icon: Megaphone },
               ].map((tab) => {
                 const active = (collabTabHash || "all") === tab.hash;
+                const Icon = tab.Icon;
                 return (
                   <button
                     key={tab.key}
@@ -310,20 +299,14 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                       setCollabTabHash(tab.hash);
                       window.dispatchEvent(new HashChangeEvent("hashchange"));
                     }}
-                    className={`min-w-[4.5rem] sm:min-w-[5rem] rounded-t-md border-b-2 px-2 sm:px-3 py-2 text-center transition-all ${
+                    className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${
                       active
-                        ? "border-amber-400 bg-slate-700/80 text-amber-200 font-semibold"
-                        : "border-transparent text-slate-300 hover:bg-slate-700/50 hover:text-white hover:border-slate-500"
+                        ? "border-zinc-900 text-zinc-900"
+                        : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
                     }`}
                   >
-                    <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider leading-tight text-inherit opacity-90">
-                      {tab.line1}
-                    </span>
-                    {tab.line2 ? (
-                      <span className="block text-[11px] sm:text-xs font-semibold leading-tight mt-0.5">
-                        {tab.line2}
-                      </span>
-                    ) : null}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}

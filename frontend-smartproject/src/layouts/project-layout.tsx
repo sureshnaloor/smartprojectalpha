@@ -31,14 +31,14 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
 
   // Check if current page is a wiki or document page
   // Note: collab is excluded from isWikiPage so it can use ProjectHeader with tabs
-  const isWikiPage = location.includes('/under-construction/ProjectDailyProgress') ||
-    location.includes('/under-construction/ProjectDailyResourceDeployed') ||
-    location.includes('/under-construction/RiskRegister') ||
-    location.includes('/under-construction/LessonLearntRegister') ||
-    location.includes('/under-construction/DirectManpowerList') ||
-    location.includes('/under-construction/IndirectManpowerList') ||
-    location.includes('/under-construction/DailyActivityTasksPlanned') ||
-    location.includes('/under-construction/OtherWiki') ||
+  const isWikiPage = location.includes('/project-docs/ProjectDailyProgress') ||
+    location.includes('/project-docs/ProjectDailyResourceDeployed') ||
+    location.includes('/project-docs/RiskRegister') ||
+    location.includes('/project-docs/LessonLearntRegister') ||
+    location.includes('/project-docs/DirectManpowerList') ||
+    location.includes('/project-docs/IndirectManpowerList') ||
+    location.includes('/project-docs/DailyActivityTasksPlanned') ||
+    location.includes('/project-docs/OtherWiki') ||
     location.includes('/risk-register') ||
     location.includes('/project-daily-progress') ||
     location.includes('/resource-plan') ||
@@ -48,16 +48,16 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
     location.includes('/planned-activity-tasks') ||
     location.includes('/charts');
 
-  const isDocumentPage = location.includes('/under-construction/ProjectDrawings') ||
-    location.includes('/under-construction/ProjectBOQ') ||
-    location.includes('/under-construction/ProjectScope') ||
-    location.includes('/under-construction/EquipmentCatalogue') ||
-    location.includes('/under-construction/ClientCorrespondence') ||
-    location.includes('/under-construction/SupplierCorrespondence') ||
-    location.includes('/under-construction/SubcontractCorrespondence') ||
-    location.includes('/under-construction/RequestForInspection') ||
-    location.includes('/under-construction/ITPAndReports') ||
-    location.includes('/under-construction/OtherDocuments');
+  const isDocumentPage = location.includes('/project-docs/ProjectDrawings') ||
+    location.includes('/project-docs/ProjectBOQ') ||
+    location.includes('/project-docs/ProjectScope') ||
+    location.includes('/project-docs/EquipmentCatalogue') ||
+    location.includes('/project-docs/ClientCorrespondence') ||
+    location.includes('/project-docs/SupplierCorrespondence') ||
+    location.includes('/project-docs/SubcontractCorrespondence') ||
+    location.includes('/project-docs/RequestForInspection') ||
+    location.includes('/project-docs/ITPAndReports') ||
+    location.includes('/project-docs/OtherDocuments');
 
   // Determine page title and icon
   const getPageInfo = () => {
@@ -88,58 +88,58 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
     if (location.includes('/charts')) {
       return { title: 'PERT & Gantt Charts', icon: <PieChart className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/RiskRegister')) {
+    if (location.includes('/project-docs/RiskRegister')) {
       return { title: 'Risk Register', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ProjectDailyProgress')) {
+    if (location.includes('/project-docs/ProjectDailyProgress')) {
       return { title: 'Project Daily Progress', icon: <Calendar className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ProjectDailyResourceDeployed')) {
+    if (location.includes('/project-docs/ProjectDailyResourceDeployed')) {
       return { title: 'Project Daily Resource Deployed', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/LessonLearntRegister')) {
+    if (location.includes('/project-docs/LessonLearntRegister')) {
       return { title: 'Lesson Learnt Register', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/DirectManpowerList')) {
+    if (location.includes('/project-docs/DirectManpowerList')) {
       return { title: 'Direct Manpower List', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/IndirectManpowerList')) {
+    if (location.includes('/project-docs/IndirectManpowerList')) {
       return { title: 'Indirect Manpower List', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/DailyActivityTasksPlanned')) {
+    if (location.includes('/project-docs/DailyActivityTasksPlanned')) {
       return { title: 'Daily Activity/Tasks Planned', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/OtherWiki')) {
+    if (location.includes('/project-docs/OtherWiki')) {
       return { title: 'Other Wiki', icon: <AlertTriangle className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ProjectDrawings')) {
+    if (location.includes('/project-docs/ProjectDrawings')) {
       return { title: 'Project Drawings', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ProjectBOQ')) {
+    if (location.includes('/project-docs/ProjectBOQ')) {
       return { title: 'Project BOQ', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ProjectScope')) {
+    if (location.includes('/project-docs/ProjectScope')) {
       return { title: 'Project Scope Document (PTS)', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/EquipmentCatalogue')) {
+    if (location.includes('/project-docs/EquipmentCatalogue')) {
       return { title: 'Equipment Catalogue', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ClientCorrespondence')) {
+    if (location.includes('/project-docs/ClientCorrespondence')) {
       return { title: 'Client Correspondence', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/SupplierCorrespondence')) {
+    if (location.includes('/project-docs/SupplierCorrespondence')) {
       return { title: 'Supplier Correspondence', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/SubcontractCorrespondence')) {
+    if (location.includes('/project-docs/SubcontractCorrespondence')) {
       return { title: 'Subcontract Correspondence', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/RequestForInspection')) {
+    if (location.includes('/project-docs/RequestForInspection')) {
       return { title: 'Request for Inspection', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/ITPAndReports')) {
+    if (location.includes('/project-docs/ITPAndReports')) {
       return { title: 'ITP and Reports', icon: <FolderOpen className="h-4 w-4" /> };
     }
-    if (location.includes('/under-construction/OtherDocuments')) {
+    if (location.includes('/project-docs/OtherDocuments')) {
       return { title: 'Other Documents', icon: <FolderOpen className="h-4 w-4" /> };
     }
     if (isWikiPage) {
@@ -154,17 +154,17 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
   const pageInfo = getPageInfo();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Toaster position="top-right" />
       {/* Top Navigation - Fixed */}
       <SharedNavigation variant="app" />
 
-      <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 4rem)', paddingTop: '4rem' }}>
-        <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1" style={{ minHeight: 'calc(100vh - 4rem)', paddingTop: '4rem' }}>
+        <div className="flex flex-1">
           {/* Left Sidebar Navigation */}
           <SideNavigation currentProjectId={projectId} />
 
-          {/* Main Content Area - Updated to enable scrolling */}
+          {/* Main Content Area */}
           <main className="flex-1 flex flex-col">
             {/* Project Header & Tabs */}
             {projectId && (
@@ -182,13 +182,19 @@ export default function ProjectLayout({ children, projectId }: ProjectLayoutProp
               )
             )}
 
-            {/* Content - Updated to enable scrolling with overflow-y-auto */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1">
               {children}
             </div>
           </main>
         </div>
       </div>
+
+      <footer className="border-t border-gray-200 bg-gray-100/90 text-xs text-gray-500">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-center gap-2">
+          <img src="/smartproject.png" alt="ConstructPro Logo" className="h-4 w-auto" />
+          <span>© {new Date().getFullYear()} ConstructPro. All rights reserved.</span>
+        </div>
+      </footer>
     </div>
   );
 }

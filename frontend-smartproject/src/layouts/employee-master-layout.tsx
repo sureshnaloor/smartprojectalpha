@@ -1,49 +1,28 @@
-import { useLocation, Link } from "wouter";
+import { Users, UserCog, Globe, Briefcase, Building, Award, Wrench } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
+import { GlobalToolsHeader } from "@/components/global-tools-header";
 
 interface EmployeeMasterLayoutProps {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }
 
+const tabs = [
+  { label: "Employee Master", href: "/employee-master", Icon: Users },
+  { label: "Rental Manpower", href: "/employee-master/rental", Icon: UserCog },
+  { label: "Nationality", href: "/employee-master/nationality", Icon: Globe },
+  { label: "Title", href: "/employee-master/title", Icon: Briefcase },
+  { label: "Position", href: "/employee-master/position", Icon: Building },
+  { label: "Grade", href: "/employee-master/grade", Icon: Award },
+  { label: "Trade", href: "/employee-master/trade", Icon: Wrench },
+];
+
 export default function EmployeeMasterLayout({ children }: EmployeeMasterLayoutProps) {
-    const [location] = useLocation();
-
-    const tabs = [
-        { label: "Employee Master", href: "/employee-master" },
-        { label: "Rental Manpower", href: "/employee-master/rental" },
-        { label: "Nationality", href: "/employee-master/nationality" },
-        { label: "Title", href: "/employee-master/title" },
-        { label: "Position", href: "/employee-master/position" },
-        { label: "Grade", href: "/employee-master/grade" },
-        { label: "Trade", href: "/employee-master/trade" },
-    ];
-
-    return (
-        <MasterLayout>
-            <div className="flex flex-col h-full text-zinc-900">
-                {/* Navigation Tabs */}
-                <div className="bg-white border-b border-zinc-200 px-6 sm:px-8 shadow-sm">
-                    <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                        {tabs.map((tab) => (
-                            <Link key={tab.href} href={tab.href}>
-                                <a
-                                    className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === tab.href
-                                        ? "border-zinc-900 text-zinc-900"
-                                        : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                                        }`}
-                                >
-                                    {tab.label}
-                                </a>
-                            </Link>
-                        ))}
-                    </nav>
-                </div>
-
-                {/* Content Area */}
-                <div className="flex-1 overflow-auto">
-                    {children}
-                </div>
-            </div>
-        </MasterLayout>
-    );
+  return (
+    <MasterLayout>
+      <div className="flex flex-col h-full min-w-0 text-zinc-900">
+        <GlobalToolsHeader hubTitle="Global people hub" tabs={tabs} />
+        <div className="flex-1 overflow-auto min-w-0">{children}</div>
+      </div>
+    </MasterLayout>
+  );
 }
