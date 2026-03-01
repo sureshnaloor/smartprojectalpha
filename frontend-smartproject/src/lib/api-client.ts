@@ -105,10 +105,11 @@ export const patch = async (endpoint: string, data?: any) => {
 /**
  * Shorthand for making a DELETE request
  * @param endpoint - API endpoint
- * @returns The JSON response data
+ * @returns The JSON response data, or undefined for 204 No Content
  */
 export const del = async (endpoint: string) => {
   const response = await apiRequest('DELETE', endpoint);
+  if (response.status === 204) return undefined;
   return response.json();
 };
 

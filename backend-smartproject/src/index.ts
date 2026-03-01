@@ -89,7 +89,15 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
-  
+
+  // Unmatched /api requests (any method) → 404
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ message: 'API endpoint not found' });
+    }
+    next();
+  });
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -98,14 +106,8 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Handle SPA routing - serve index.html for all non-API routes
-  app.get('*', (req, res) => {
-    // Don't serve index.html for API routes
-    if (req.path.startsWith('/api')) {
-      return res.status(404).json({ message: 'API endpoint not found' });
-    }
-    
-    // Serve the React app for all other routes
+  // SPA fallback: serve index.html for non-API GET requests
+  app.get('*', (_req, res) => {
     res.sendFile(path.join(frontendBuildPath, 'index.html'));
   });
 

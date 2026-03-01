@@ -124,7 +124,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   }}
                   className="nav-link flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold"
                 >
-                  <span>Playground</span>
+                  <span>Project testbench</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
               </>
@@ -139,7 +139,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   }}
                   className="nav-link flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold"
                 >
-                  <span>Playground</span>
+                  <span>Project testbench</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
                 {/* {authenticated && (
@@ -285,7 +285,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   }}
                   className="block py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
-                  <span>Playground</span>
+                  <span>Project testbench</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
               </>
@@ -301,7 +301,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   }}
                   className="block w-full text-left py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
-                  <span>Playground</span>
+                  <span>Project testbench</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
                 {authenticated && (

@@ -167,7 +167,7 @@ export default function ProjectActivities() {
 
     // Delete project activity mutation
     const deleteMutation = useMutation({
-        mutationFn: (id: number) => del(`/projects/${projectId}/activities/${id}`),
+        mutationFn: (id: number) => del(`/api/projects/${projectId}/activities/${id}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["wp-activities", selectedWpId] });
             queryClient.invalidateQueries({ queryKey: ["project-activities", projectId] });

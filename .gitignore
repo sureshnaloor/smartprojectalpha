@@ -27,6 +27,8 @@ backend-smartproject/.nvmrc
 
 # common folder where markdown files are stored
 common/
+backend-smartproject/scripts/
+backend-smartproject/migrations/README_DIGITALOCEAN.md
 
 # Debug logs
 npm-debug.log*

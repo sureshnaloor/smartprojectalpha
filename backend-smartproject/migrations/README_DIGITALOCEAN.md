@@ -1,3 +1,48 @@
+# DigitalOcean PostgreSQL – migrations and schema sync
+
+## Sync full schema from local to remote (recommended if tables are out of sync)
+
+To make the **remote** database match your **local** schema (tables, columns, relations, indexes from `src/schema.ts`), use the push script. **All data on the remote DB will be dropped.**
+
+From your laptop (with the repo and remote DB reachable):
+
+```bash
+cd backend-smartproject
+# Set your DigitalOcean DB URL (get from DO control panel → Databases → connection string)
+export REMOTE_DATABASE_URL="postgresql://user:password@your-do-host:25060/defaultdb?sslmode=require"
+npm run db:push:remote
+```
+
+Or add `REMOTE_DATABASE_URL` to `.env` and run:
+
+```bash
+npm run db:push:remote
+```
+
+This will:
+1. Connect to the remote DB
+2. Drop the `public` schema (and all tables) on remote
+3. Run `drizzle-kit push` so remote gets the same schema as `src/schema.ts`
+
+Your local DB is unchanged. Use this when remote is missing tables/columns or has different structure.
+
+## Sync schema from the *actual local database* (source of truth = local Postgres)
+
+If you don’t want to rely on `src/schema.ts` and instead want to copy the schema from the **local PostgreSQL database itself**, use the clone script. This uses `pg_dump --schema-only` from local and applies it to remote via `psql`.
+
+**This drops the remote `public` schema and recreates it. Remote data will be lost.**
+
+Requirements: `pg_dump` and `psql` in PATH.
+
+```bash
+cd backend-smartproject
+export LOCAL_DATABASE_URL="postgresql://user:pass@localhost:5432/your_local_db"
+export REMOTE_DATABASE_URL="postgresql://user:pass@your-do-host:25060/defaultdb?sslmode=require"
+npm run db:clone:schema:to-remote
+```
+
+---
+
 # Fix "allocation_version does not exist" on DigitalOcean
 
 The `projects` table is **not** deleted. It is missing the **allocation_version** column that the app expects. Add it with one of the options below.
