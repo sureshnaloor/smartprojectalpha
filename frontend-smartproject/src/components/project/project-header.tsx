@@ -34,7 +34,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
   // Extract the base path from the current location
   const getRouteContext = () => {
     // Check if we're on a page route (e.g., /activities/page1, /tasks/page2, /resources/page3, /collab/page1)
-    const pageMatch = location.match(/\/projects\/\d+\/(activities|tasks|resources|collab)\/page\d+/);
+    const pageMatch = location.match(/\/projects\/\d+\/(activities|tasks|resources|collab)\/(page\d+|activity-plan)/);
     if (pageMatch) {
       return pageMatch[1]; // Return 'activities', 'tasks', 'resources', or 'collab'
     }
@@ -299,11 +299,10 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                       setCollabTabHash(tab.hash);
                       window.dispatchEvent(new HashChangeEvent("hashchange"));
                     }}
-                    className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${
-                      active
+                    className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all flex items-center gap-2 ${active
                         ? "border-zinc-900 text-zinc-900"
                         : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                    }`}
+                      }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     <span>{tab.label}</span>
@@ -313,14 +312,14 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
             </>
           ) : (
             <>
-              <Link href={`/projects/${projectId}/${routeContext}/page1`}>
+              <Link href={`/projects/${projectId}/${routeContext}/${routeContext === 'activities' ? 'activity-plan' : 'page1'}`}>
                 <a
-                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/page1`
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-bold transition-all ${location === `/projects/${projectId}/${routeContext}/${routeContext === 'activities' ? 'activity-plan' : 'page1'}`
                     ? "border-zinc-900 text-zinc-900"
                     : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
                     }`}
                 >
-                  Tab1
+                  {routeContext === 'activities' ? 'Activity Plan' : 'Tab1'}
                 </a>
               </Link>
               <Link href={`/projects/${projectId}/${routeContext}/page2`}>

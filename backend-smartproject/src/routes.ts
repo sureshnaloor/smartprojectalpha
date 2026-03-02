@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, inArray, isNull } from "drizzle-orm";
+import { eq, and, inArray, isNull, or } from "drizzle-orm";
 import {
   insertProjectSchema as projectSchema,
   insertWbsItemSchema as wbsItemSchema,
@@ -102,6 +102,8 @@ import {
   insertPlannedActivityTaskSchema,
   type KanbanCard,
   type InsertPlannedActivityTask,
+  projectActivityDependencies,
+  projectActivities,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -794,6 +796,424 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const activityResources = await storage.getActivityResources(projectId);
       res.json(activityResources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========== Activity Dependency Routes ==========
+
+  // Get all activity dependencies for a project
+  app.get("/api/projects/:projectId/activity-dependencies", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const dependencies = await db
+        .select()
+        .from(projectActivityDependencies)
+        .where(eq(projectActivityDependencies.projectId, projectId));
+
+      res.json(dependencies);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Create a new activity dependency
+  app.post("/api/projects/:projectId/activity-dependencies", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const depData = insertProjectActivityDependencySchema.parse({
+        ...req.body,
+        projectId,
+      }) as any;
+
+      const predecessorId = parseInt(req.body.predecessorId);
+      const successorId = parseInt(req.body.successorId);
+
+      if (isNaN(predecessorId) || isNaN(successorId)) {
+        return res.status(400).json({ message: "predecessorId and successorId are required" });
+      }
+
+      // Verify both activities exist and belong to this project
+      const [predecessor, successor] = await Promise.all([
+        db.select().from(projectActivities).where(
+          and(
+            eq(projectActivities.id, predecessorId),
+            eq(projectActivities.projectId, projectId)
+          )
+        ),
+        db.select().from(projectActivities).where(
+          and(
+            eq(projectActivities.id, successorId),
+            eq(projectActivities.projectId, projectId)
+          )
+        ),
+      ]);
+
+      if (predecessor.length === 0) {
+        return res.status(404).json({ message: "Predecessor activity not found in this project" });
+      }
+      if (successor.length === 0) {
+        return res.status(404).json({ message: "Successor activity not found in this project" });
+      }
+
+      // Prevent duplicate links
+      const existing = await db
+        .select()
+        .from(projectActivityDependencies)
+        .where(
+          and(
+            eq(projectActivityDependencies.projectId, projectId),
+            eq(projectActivityDependencies.predecessorId, predecessorId),
+            eq(projectActivityDependencies.successorId, successorId)
+          )
+        );
+
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "This dependency link already exists" });
+      }
+
+      const [created] = await db
+        .insert(projectActivityDependencies)
+        .values({
+          projectId,
+          predecessorId,
+          successorId,
+          type: depData.type || "FS",
+          lag: depData.lag || 0,
+        })
+        .returning();
+
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Delete an activity dependency
+  app.delete("/api/projects/:projectId/activity-dependencies/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const depId = parseInt(req.params.id);
+
+      if (isNaN(projectId) || isNaN(depId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const [dep] = await db
+        .select()
+        .from(projectActivityDependencies)
+        .where(
+          and(
+            eq(projectActivityDependencies.id, depId),
+            eq(projectActivityDependencies.projectId, projectId)
+          )
+        );
+
+      if (!dep) {
+        return res.status(404).json({ message: "Dependency not found" });
+      }
+
+      await db
+        .delete(projectActivityDependencies)
+        .where(eq(projectActivityDependencies.id, depId));
+
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========== CPM Scheduling Endpoint ==========
+
+  app.post("/api/projects/:projectId/schedule", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      if (!project.startDate) {
+        return res.status(400).json({ message: "Project must have a start date set before scheduling" });
+      }
+
+      const projectStartDate = new Date(project.startDate);
+
+      // Fetch all activities and dependencies
+      const activitiesRaw = await db
+        .select()
+        .from(projectActivities)
+        .where(eq(projectActivities.projectId, projectId));
+
+      const deps = await db
+        .select()
+        .from(projectActivityDependencies)
+        .where(eq(projectActivityDependencies.projectId, projectId));
+
+      if (activitiesRaw.length === 0) {
+        return res.status(400).json({ message: "No activities found for this project" });
+      }
+
+      // Build activity map with durations and firmed start offsets
+      const getDayOffset = (base: Date, targetStr: string | null): number => {
+        if (!targetStr) return 0;
+        const target = new Date(targetStr);
+        const diffTime = target.getTime() - base.getTime();
+        return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+      };
+
+      const actMap = new Map<number, { id: number; duration: number; name: string; firmedOffset: number }>();
+      for (const act of activitiesRaw) {
+        actMap.set(act.id, {
+          id: act.id,
+          duration: act.duration && act.duration > 0 ? act.duration : 1,
+          name: act.name,
+          firmedOffset: getDayOffset(projectStartDate, act.plannedFromDate),
+        });
+      }
+
+      // Build adjacency lists
+      const successors = new Map<number, { actId: number; type: string; lag: number }[]>();
+      const predecessors = new Map<number, { actId: number; type: string; lag: number }[]>();
+      const inDegree = new Map<number, number>();
+
+      for (const act of activitiesRaw) {
+        successors.set(act.id, []);
+        predecessors.set(act.id, []);
+        inDegree.set(act.id, 0);
+      }
+
+      for (const dep of deps) {
+        // Only process deps where both activities exist in this project
+        if (!actMap.has(dep.predecessorId) || !actMap.has(dep.successorId)) continue;
+
+        successors.get(dep.predecessorId)!.push({
+          actId: dep.successorId,
+          type: dep.type,
+          lag: dep.lag ?? 0,
+        });
+        predecessors.get(dep.successorId)!.push({
+          actId: dep.predecessorId,
+          type: dep.type,
+          lag: dep.lag ?? 0,
+        });
+        inDegree.set(dep.successorId, (inDegree.get(dep.successorId) || 0) + 1);
+      }
+
+      // ─── Topological Sort (Kahn's algorithm) ─────────────────
+      const topoOrder: number[] = [];
+      const queue: number[] = [];
+
+      for (const [actId, degree] of inDegree) {
+        if (degree === 0) queue.push(actId);
+      }
+
+      const tempInDegree = new Map(inDegree);
+      while (queue.length > 0) {
+        const curr = queue.shift()!;
+        topoOrder.push(curr);
+
+        for (const succ of successors.get(curr) || []) {
+          const newDeg = (tempInDegree.get(succ.actId) || 0) - 1;
+          tempInDegree.set(succ.actId, newDeg);
+          if (newDeg === 0) queue.push(succ.actId);
+        }
+      }
+
+      // Check for circular dependencies
+      if (topoOrder.length < activitiesRaw.length) {
+        for (const act of activitiesRaw) {
+          if (!topoOrder.includes(act.id)) {
+            topoOrder.push(act.id);
+          }
+        }
+      }
+
+      // ─── Forward Pass ────────────────────────────────────────
+      const es = new Map<number, number>(); // Early Start (day offset from project start)
+      const ef = new Map<number, number>(); // Early Finish
+
+      for (const actId of topoOrder) {
+        const act = actMap.get(actId)!;
+        const preds = predecessors.get(actId) || [];
+
+        let earliestStart = 0;
+
+        if (preds.length === 0) {
+          // ROOT activity - respect user-defined firmed date
+          earliestStart = act.firmedOffset;
+        } else {
+          for (const pred of preds) {
+            const predAct = actMap.get(pred.actId)!;
+            const predES = es.get(pred.actId) ?? 0;
+            const predEF = ef.get(pred.actId) ?? 0;
+
+            let constraint: number;
+            switch (pred.type) {
+              case "FS":
+                constraint = predEF + 1 + pred.lag;
+                break;
+              case "SS":
+                constraint = predES + pred.lag;
+                break;
+              case "FF":
+                constraint = predEF + pred.lag - act.duration + 1;
+                break;
+              case "SF":
+                constraint = predES + pred.lag - act.duration + 1;
+                break;
+              default:
+                constraint = predEF + 1 + pred.lag;
+            }
+            earliestStart = Math.max(earliestStart, constraint);
+          }
+        }
+
+        es.set(actId, earliestStart);
+        ef.set(actId, earliestStart + act.duration - 1);
+      }
+
+      // ─── Backward Pass ───────────────────────────────────────
+      let projectEndDay = 0;
+      for (const [, finish] of ef) {
+        projectEndDay = Math.max(projectEndDay, finish);
+      }
+
+      const ls = new Map<number, number>(); // Late Start
+      const lf = new Map<number, number>(); // Late Finish
+      const totalFloat = new Map<number, number>();
+
+      for (const act of activitiesRaw) {
+        lf.set(act.id, projectEndDay);
+      }
+
+      for (let i = topoOrder.length - 1; i >= 0; i--) {
+        const actId = topoOrder[i];
+        const act = actMap.get(actId)!;
+        const succs = successors.get(actId) || [];
+
+        let latestFinish = projectEndDay;
+
+        for (const succ of succs) {
+          const succLS = ls.get(succ.actId) ?? projectEndDay;
+          const succLF = lf.get(succ.actId) ?? projectEndDay;
+
+          let constraint: number;
+          switch (succ.type) {
+            case "FS":
+              constraint = (succLS) - 1 - succ.lag;
+              break;
+            case "SS":
+              constraint = (succLS) - succ.lag + act.duration - 1;
+              break;
+            case "FF":
+              constraint = (succLF) - succ.lag;
+              break;
+            case "SF":
+              constraint = (succLF) - succ.lag + act.duration - 1;
+              break;
+            default:
+              constraint = (succLS) - 1 - succ.lag;
+          }
+          latestFinish = Math.min(latestFinish, constraint);
+        }
+
+        lf.set(actId, latestFinish);
+        ls.set(actId, latestFinish - act.duration + 1);
+        totalFloat.set(actId, (latestFinish - act.duration + 1) - (es.get(actId) ?? 0));
+      }
+
+      // ─── Critical Path ───────────────────────────────────────
+      const criticalPath: number[] = [];
+      for (const actId of topoOrder) {
+        if ((totalFloat.get(actId) ?? Infinity) === 0) {
+          criticalPath.push(actId);
+        }
+      }
+
+      // ─── Convert day offsets to dates & update DB ────────────
+      const addDays = (base: Date, days: number): string => {
+        const d = new Date(base);
+        d.setDate(d.getDate() + days);
+        return d.toISOString().split("T")[0];
+      };
+
+      const results: any[] = [];
+
+      for (const actId of topoOrder) {
+        const act = actMap.get(actId)!;
+        const earlyStart = es.get(actId) ?? 0;
+        const earlyFinish = ef.get(actId) ?? 0;
+        const lateStart = ls.get(actId) ?? 0;
+        const lateFinish = lf.get(actId) ?? 0;
+        const float = totalFloat.get(actId) ?? 0;
+        const isCritical = float === 0;
+
+        const esDate = addDays(projectStartDate, earlyStart);
+        const efDate = addDays(projectStartDate, earlyFinish);
+        const lsDate = addDays(projectStartDate, lateStart);
+        const lfDate = addDays(projectStartDate, lateFinish);
+
+        await db
+          .update(projectActivities)
+          .set({
+            plannedFromDate: esDate,
+            plannedToDate: efDate,
+          })
+          .where(eq(projectActivities.id, actId));
+
+        results.push({
+          id: actId,
+          name: act.name,
+          duration: act.duration,
+          es: earlyStart,
+          ef: earlyFinish,
+          ls: lateStart,
+          lf: lateFinish,
+          es_date: esDate,
+          ef_date: efDate,
+          ls_date: lsDate,
+          lf_date: lfDate,
+          float,
+          isCritical,
+          plannedFromDate: esDate,
+          plannedToDate: efDate,
+        });
+      }
+
+      // Update project end date
+      const projectEndDate = addDays(projectStartDate, projectEndDay);
+
+      res.json({
+        projectStartDate: project.startDate,
+        projectEndDate,
+        totalDuration: projectEndDay + 1,
+        criticalPath,
+        activities: results,
+      });
     } catch (err) {
       handleError(err, res);
     }

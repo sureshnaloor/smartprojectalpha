@@ -69,7 +69,7 @@ import ProjectResourcesPage2 from "@/pages/project-resources-page2";
 import ProjectResourcesPage3 from "@/pages/project-resources-page3";
 import ProjectResourcesPage4 from "@/pages/project-resources-page4";
 import ProjectResourcesPage5 from "@/pages/project-resources-page5";
-import ProjectActivitiesPage1 from "@/pages/project-activities-page1";
+import ProjectActivityPlan from "@/pages/project-activity-plan";
 import ProjectActivitiesPage2 from "@/pages/project-activities-page2";
 import ProjectActivitiesPage3 from "@/pages/project-activities-page3";
 import ProjectActivitiesPage4 from "@/pages/project-activities-page4";
@@ -305,10 +305,10 @@ function Router() {
       </Route>
 
       {/* Project Activities - Tab Pages */}
-      <Route path="/projects/:projectId/activities/page1">
+      <Route path="/projects/:projectId/activities/activity-plan">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
-            <ProjectActivitiesPage1 />
+            <ProjectActivityPlan />
           </ProjectLayout>
         )}
       </Route>
