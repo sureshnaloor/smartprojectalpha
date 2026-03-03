@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "wouter";
-import { get, post, del } from "@/lib/api-client";
+import { get, post, put, del } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -22,7 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, Link as LinkIcon, Plus } from "lucide-react";
+import { Trash2, Link as LinkIcon, Plus, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ProjectActivity {
   id: number;
@@ -39,6 +46,12 @@ interface ProjectActivityDependency {
   lag: number;
 }
 
+interface ProjectSummary {
+  id: number;
+  planVersion?: number | null;
+  sequenceVersion?: number | null;
+}
+
 export default function ProjectActivitiesPage4() {
   const { projectId: projectIdStr } = useParams();
   const projectId = parseInt(projectIdStr || "0");
@@ -49,6 +62,15 @@ export default function ProjectActivitiesPage4() {
   const [successorId, setSuccessorId] = useState<string>("");
   const [type, setType] = useState<string>("FS");
   const [lag, setLag] = useState<string>("0");
+  const [editDep, setEditDep] = useState<ProjectActivityDependency | null>(null);
+  const [editType, setEditType] = useState<string>("FS");
+  const [editLag, setEditLag] = useState<string>("0");
+
+  // Fetch project for version info
+  const { data: project } = useQuery<ProjectSummary>({
+    queryKey: ["project", projectId],
+    queryFn: () => get(`/projects/${projectId}`),
+  });
 
   // Fetch activities for the project
   const { data: activities = [], isLoading: isLoadingActivities } = useQuery<ProjectActivity[]>({
@@ -63,9 +85,11 @@ export default function ProjectActivitiesPage4() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => post("/activity-dependencies", data),
+    mutationFn: (data: any) => post(`/projects/${projectId}/activity-dependencies`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-activity-dependencies", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["activity-dependencies", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
       toast({
         title: "Success",
         description: "Dependency created successfully",
@@ -84,12 +108,33 @@ export default function ProjectActivitiesPage4() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => del(`/activity-dependencies/${id}`),
+    mutationFn: (id: number) => del(`/projects/${projectId}/activity-dependencies/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-activity-dependencies", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["activity-dependencies", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
       toast({
         title: "Success",
         description: "Dependency deleted successfully",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, type: t, lag: l }: { id: number; type: string; lag: number }) =>
+      put(`/projects/${projectId}/activity-dependencies/${id}`, { type: t, lag: l }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-activity-dependencies", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["activity-dependencies", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      toast({ title: "Success", description: "Dependency updated successfully" });
+      setEditDep(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update dependency",
+        variant: "destructive",
       });
     },
   });
@@ -126,10 +171,38 @@ export default function ProjectActivitiesPage4() {
     return activities.find((a) => a.id === id)?.name || `ID: ${id}`;
   };
 
+  const openEdit = (dep: ProjectActivityDependency) => {
+    setEditDep(dep);
+    setEditType(dep.type);
+    setEditLag(String(dep.lag));
+  };
+
+  const handleSaveEdit = () => {
+    if (!editDep) return;
+    updateMutation.mutate({
+      id: editDep.id,
+      type: editType,
+      lag: parseInt(editLag, 10) || 0,
+    });
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Activity Dependencies</h1>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">Activity Dependencies</h1>
+        </div>
+        {((project?.planVersion ?? 0) >= 1 || (project?.sequenceVersion ?? 0) >= 1) && (
+          <p className="text-sm text-muted-foreground">
+            {(project?.planVersion ?? 0) >= 1 && (
+              <span>Plan version {(project?.planVersion ?? 0)} already completed.</span>
+            )}
+            {(project?.planVersion ?? 0) >= 1 && (project?.sequenceVersion ?? 0) >= 1 && " "}
+            {(project?.sequenceVersion ?? 0) >= 1 && (
+              <span>Sequence version {(project?.sequenceVersion ?? 0)}.</span>
+            )}
+          </p>
+        )}
       </div>
 
       <Card>
@@ -242,15 +315,26 @@ export default function ProjectActivitiesPage4() {
                       {dep.lag > 0 ? `+${dep.lag} days lag` : dep.lag < 0 ? `${dep.lag} days lead` : "None"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteMutation.mutate(dep.id)}
-                        disabled={deleteMutation.isPending}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(dep)}
+                          disabled={updateMutation.isPending}
+                          title="Edit dependency"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteMutation.mutate(dep.id)}
+                          disabled={deleteMutation.isPending}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -259,6 +343,58 @@ export default function ProjectActivitiesPage4() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editDep} onOpenChange={(open) => !open && setEditDep(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit dependency</DialogTitle>
+          </DialogHeader>
+          {editDep && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {getActivityName(editDep.predecessorId)} → {getActivityName(editDep.successorId)}
+              </p>
+              <div className="grid gap-4 py-2">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={editType} onValueChange={setEditType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FS">Finish-to-Start (FS)</SelectItem>
+                      <SelectItem value="SS">Start-to-Start (SS)</SelectItem>
+                      <SelectItem value="FF">Finish-to-Finish (FF)</SelectItem>
+                      <SelectItem value="SF">Start-to-Finish (SF)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-lag">Lag/Lead (Days)</Label>
+                  <Input
+                    id="edit-lag"
+                    type="number"
+                    value={editLag}
+                    onChange={(e) => setEditLag(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDep(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateMutation.isPending || !editDep}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

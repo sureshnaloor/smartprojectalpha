@@ -73,7 +73,6 @@ import ProjectActivityPlan from "@/pages/project-activity-plan";
 import ProjectActivitiesPage2 from "@/pages/project-activities-page2";
 import ProjectActivitiesPage3 from "@/pages/project-activities-page3";
 import ProjectActivitiesPage4 from "@/pages/project-activities-page4";
-import ProjectActivitiesPage5 from "@/pages/project-activities-page5";
 import ProjectTasksPage1 from "@/pages/project-tasks-page1";
 import ProjectTasksPage2 from "@/pages/project-tasks-page2";
 import ProjectTasksPage3 from "@/pages/project-tasks-page3";
@@ -340,7 +339,7 @@ function Router() {
       <Route path="/projects/:projectId/activities/page5">
         {params => (
           <ProjectLayout projectId={parseInt(params.projectId)}>
-            <ProjectActivitiesPage5 />
+            <ProjectActivities />
           </ProjectLayout>
         )}
       </Route>

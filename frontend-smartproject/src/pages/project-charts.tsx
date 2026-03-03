@@ -24,6 +24,13 @@ interface ProjectActivity {
     remarks: string | null;
     plannedFromDate: string | null;
     plannedToDate: string | null;
+    // Scheduling fields persisted in DB (day offsets from project start / float)
+    duration?: number | null;
+    earlyStartDay?: number | null;
+    earlyFinishDay?: number | null;
+    lateStartDay?: number | null;
+    lateFinishDay?: number | null;
+    totalFloatDays?: number | null;
 }
 
 interface Dependency {
@@ -86,7 +93,45 @@ export default function ProjectCharts() {
 
         if (!filteredActivities.length) return [];
 
-        // 2. Prepare data for CPM
+        const hasPersistedCpm = filteredActivities.some(a => a.totalFloatDays != null);
+
+        // Prefer persisted CPM fields from the backend so slack/float
+        // matches the Activity Plan and database.
+        if (hasPersistedCpm) {
+            const map = new Map<number, CPMActivity>();
+            filteredActivities.forEach(a => {
+                const duration =
+                    (a.duration != null && a.duration > 0)
+                        ? a.duration
+                        : a.plannedFromDate && a.plannedToDate
+                            ? Math.max(1, differenceInDays(parseISO(a.plannedToDate), parseISO(a.plannedFromDate)) + 1)
+                            : 1;
+
+                const es = a.earlyStartDay ?? 0;
+                const ls = a.lateStartDay ?? (es + (a.totalFloatDays ?? 0));
+                const ef = a.earlyFinishDay ?? (es + duration);
+                const lf = a.lateFinishDay ?? (ls + duration);
+                const slack = a.totalFloatDays ?? (ls - es);
+                const isCritical = slack === 0;
+
+                map.set(a.id, {
+                    ...a,
+                    duration,
+                    es,
+                    ef,
+                    ls,
+                    lf,
+                    slack,
+                    isCritical,
+                });
+            });
+            return Array.from(map.values());
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Fallback: compute CPM locally if no persisted data exists.
+        // ──────────────────────────────────────────────────────────────
+
         const activityMap = new Map<number, CPMActivity>();
         filteredActivities.forEach(a => {
             const duration = a.plannedFromDate && a.plannedToDate

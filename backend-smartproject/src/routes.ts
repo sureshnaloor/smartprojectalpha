@@ -104,6 +104,7 @@ import {
   type InsertPlannedActivityTask,
   projectActivityDependencies,
   projectActivities,
+  projectActivityPlanVersions,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -902,7 +903,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .returning();
 
+      const p = await storage.getProject(projectId);
+      if (p) {
+        const seq = ((p as any).sequenceVersion ?? 0) + 1;
+        await storage.updateProject(projectId, { sequenceVersion: seq });
+      }
+
       res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Update an activity dependency
+  app.put("/api/projects/:projectId/activity-dependencies/:id", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const depId = parseInt(req.params.id);
+      if (isNaN(projectId) || isNaN(depId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const [existing] = await db
+        .select()
+        .from(projectActivityDependencies)
+        .where(
+          and(
+            eq(projectActivityDependencies.id, depId),
+            eq(projectActivityDependencies.projectId, projectId)
+          )
+        );
+      if (!existing) return res.status(404).json({ message: "Dependency not found" });
+
+      const type = req.body.type != null ? String(req.body.type) : existing.type;
+      const lag = req.body.lag != null ? Number(req.body.lag) : existing.lag;
+      if (!["FS", "SS", "FF", "SF"].includes(type)) {
+        return res.status(400).json({ message: "Invalid type" });
+      }
+
+      const [updated] = await db
+        .update(projectActivityDependencies)
+        .set({ type, lag })
+        .where(eq(projectActivityDependencies.id, depId))
+        .returning();
+
+      const p2 = await storage.getProject(projectId);
+      if (p2) {
+        const seq = ((p2 as any).sequenceVersion ?? 0) + 1;
+        await storage.updateProject(projectId, { sequenceVersion: seq });
+      }
+
+      res.json(updated);
     } catch (err) {
       handleError(err, res);
     }
@@ -936,6 +989,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .delete(projectActivityDependencies)
         .where(eq(projectActivityDependencies.id, depId));
 
+      const p = await storage.getProject(projectId);
+      if (p) {
+        const seq = ((p as any).sequenceVersion ?? 0) + 1;
+        await storage.updateProject(projectId, { sequenceVersion: seq });
+      }
+
       res.status(204).end();
     } catch (err) {
       handleError(err, res);
@@ -961,6 +1020,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const projectStartDate = new Date(project.startDate);
+      const currentPlanVersion = (project as any).planVersion ?? 0;
+      const isInitialPlan = currentPlanVersion === 0;
 
       // Fetch all activities and dependencies
       const activitiesRaw = await db
@@ -1177,13 +1238,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lsDate = addDays(projectStartDate, lateStart);
         const lfDate = addDays(projectStartDate, lateFinish);
 
-        await db
-          .update(projectActivities)
-          .set({
-            plannedFromDate: esDate,
-            plannedToDate: efDate,
-          })
-          .where(eq(projectActivities.id, actId));
+        // Only persist schedule dates back to project_activities for the initial plan (baseline).
+        // Revised plans are stored in project_activity_plan_versions without overwriting baseline columns.
+        if (isInitialPlan) {
+          await db
+            .update(projectActivities)
+            .set({
+              plannedFromDate: esDate,
+              plannedToDate: efDate,
+              duration: act.duration,
+              earlyStartDay: earlyStart,
+              earlyFinishDay: earlyFinish,
+              lateStartDay: lateStart,
+              lateFinishDay: lateFinish,
+              totalFloatDays: float,
+            })
+            .where(eq(projectActivities.id, actId));
+        }
 
         results.push({
           id: actId,
@@ -1204,8 +1275,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Update project end date
+      // Persist this plan version (schedule + sequence) without overwriting previous versions
       const projectEndDate = addDays(projectStartDate, projectEndDay);
+      const nextVersion = currentPlanVersion + 1;
+
+      await db.insert(projectActivityPlanVersions).values({
+        projectId,
+        version: nextVersion,
+        activitiesJson: JSON.stringify(results),
+        dependenciesJson: JSON.stringify(deps),
+      });
+
+      // Update project with latest plan version and end date
+      await storage.updateProject(projectId, { planVersion: nextVersion, endDate: projectEndDate });
 
       res.json({
         projectStartDate: project.startDate,
@@ -1213,6 +1295,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalDuration: projectEndDay + 1,
         criticalPath,
         activities: results,
+      });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========== Plan Versions (Schedule History) ==========
+
+  // List all plan versions for a project (with basic summary)
+  app.get("/api/projects/:projectId/plan-versions", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const rows = await db
+        .select()
+        .from(projectActivityPlanVersions)
+        .where(eq(projectActivityPlanVersions.projectId, projectId))
+        .orderBy(projectActivityPlanVersions.version);
+
+      const summaries = rows.map(row => {
+        let activities: any[] = [];
+        let deps: any[] = [];
+        try {
+          activities = JSON.parse(row.activitiesJson || "[]");
+        } catch {
+          activities = [];
+        }
+        try {
+          deps = JSON.parse(row.dependenciesJson || "[]");
+        } catch {
+          deps = [];
+        }
+
+        const activityCount = activities.length;
+        const dependencyCount = deps.length;
+
+        let startDate: string | null = null;
+        let endDate: string | null = null;
+        for (const a of activities) {
+          const esDate = a.es_date ?? a.plannedFromDate;
+          const lfDate = a.lf_date ?? a.plannedToDate;
+          if (esDate) {
+            if (!startDate || new Date(esDate) < new Date(startDate)) startDate = esDate;
+          }
+          if (lfDate) {
+            if (!endDate || new Date(lfDate) > new Date(endDate)) endDate = lfDate;
+          }
+        }
+
+        return {
+          id: row.id,
+          version: row.version,
+          createdAt: (row as any).createdAt,
+          activityCount,
+          dependencyCount,
+          startDate,
+          endDate,
+        };
+      });
+
+      res.json(summaries);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get details for a specific plan version (activities + dependencies)
+  app.get("/api/projects/:projectId/plan-versions/:version", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const version = parseInt(req.params.version);
+      if (isNaN(projectId) || isNaN(version)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const [row] = await db
+        .select()
+        .from(projectActivityPlanVersions)
+        .where(
+          and(
+            eq(projectActivityPlanVersions.projectId, projectId),
+            eq(projectActivityPlanVersions.version, version),
+          )
+        );
+
+      if (!row) {
+        return res.status(404).json({ message: "Plan version not found" });
+      }
+
+      let activities: any[] = [];
+      let deps: any[] = [];
+      try {
+        activities = JSON.parse(row.activitiesJson || "[]");
+      } catch {
+        activities = [];
+      }
+      try {
+        deps = JSON.parse(row.dependenciesJson || "[]");
+      } catch {
+        deps = [];
+      }
+
+      res.json({
+        id: row.id,
+        projectId: row.projectId,
+        version: row.version,
+        createdAt: (row as any).createdAt,
+        activities,
+        dependencies: deps,
       });
     } catch (err) {
       handleError(err, res);

@@ -26,6 +26,8 @@ export const projects = pgTable("projects", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   allocationVersion: integer("allocation_version"),
+  planVersion: integer("plan_version").default(0),
+  sequenceVersion: integer("sequence_version").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -194,6 +196,12 @@ export const projectActivities = pgTable("project_activities", {
   actualStartDate: date("actual_start_date"),
   actualToDate: date("actual_to_date"),
   duration: integer("duration"),
+  // Scheduling fields (day offsets from project start / float in days)
+  earlyStartDay: integer("early_start_day"),
+  earlyFinishDay: integer("early_finish_day"),
+  lateStartDay: integer("late_start_day"),
+  lateFinishDay: integer("late_finish_day"),
+  totalFloatDays: integer("total_float_days"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1420,3 +1428,21 @@ export const insertProjectActivityDependencySchema = createInsertSchema(projectA
 
 export type ProjectActivityDependency = typeof projectActivityDependencies.$inferSelect;
 export type InsertProjectActivityDependency = z.infer<typeof insertProjectActivityDependencySchema>;
+
+// Project Activity Plan Versions Table - stores per-version schedule dates and sequence snapshot
+export const projectActivityPlanVersions = pgTable("project_activity_plan_versions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  // JSON-encoded array of activities with ES/EF/LS/LF/TF and dates
+  activitiesJson: text("activities_json").notNull(),
+  // JSON-encoded array of dependencies (sequence) used for this version
+  dependenciesJson: text("dependencies_json").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProjectActivityPlanVersionSchema = createInsertSchema(projectActivityPlanVersions)
+  .omit({ id: true, createdAt: true } as any);
+
+export type ProjectActivityPlanVersion = typeof projectActivityPlanVersions.$inferSelect;
+export type InsertProjectActivityPlanVersion = z.infer<typeof insertProjectActivityPlanVersionSchema>;

@@ -55,6 +55,12 @@ interface ProjectActivity {
     estimatedEndDate: string | null;
     actualStartDate: string | null;
     actualToDate: string | null;
+    // Scheduling fields persisted in DB (day offsets from project start / float)
+    earlyStartDay?: number | null;
+    earlyFinishDay?: number | null;
+    lateStartDay?: number | null;
+    lateFinishDay?: number | null;
+    totalFloatDays?: number | null;
 }
 
 interface ActivityDependency {
@@ -95,6 +101,13 @@ interface ScheduleResult {
     activities: ScheduleActivity[];
 }
 
+interface ProjectSummary {
+    id: number;
+    startDate: string | null;
+    planVersion?: number | null;
+    sequenceVersion?: number | null;
+}
+
 // ─── Constants ───────────────────────────────────────────────────
 
 const LINK_TYPE_LABELS: Record<LinkType, string> = {
@@ -104,14 +117,25 @@ const LINK_TYPE_LABELS: Record<LinkType, string> = {
     SF: "Start-to-Finish",
 };
 
+const LINK_COLORS: Record<LinkType, string> = {
+    FS: "#2563eb", // blue
+    SS: "#16a34a", // green
+    FF: "#f97316", // amber
+    SF: "#a855f7", // purple
+};
+
 const ACTIVITY_BOX_WIDTH = 220;
 const ACTIVITY_BOX_HEIGHT = 52;
 const WP_HEADER_HEIGHT = 40;
 const WP_PADDING_TOP = 12;
 const WP_PADDING_BOTTOM = 16;
-const ACTIVITY_GAP = 8;
+const ACTIVITY_GAP = 16;
 const HANDLE_RADIUS = 7;
 const WP_GAP = 24;
+const ACTIVITIES_PER_ROW = 5;
+const DIAGRAM_MARGIN_LEFT = 24;
+const DIAGRAM_WIDTH =
+    DIAGRAM_MARGIN_LEFT + ACTIVITIES_PER_ROW * (ACTIVITY_BOX_WIDTH + ACTIVITY_GAP) - ACTIVITY_GAP + DIAGRAM_MARGIN_LEFT;
 
 // ─── Component ───────────────────────────────────────────────────
 
@@ -140,6 +164,26 @@ export default function ProjectActivityPlan() {
     const [lagInput, setLagInput] = useState("0");
     const svgRef = useRef<SVGSVGElement>(null);
     const [scheduleResult, setScheduleResult] = useState<ScheduleResult | null>(null);
+    const [draggedActivityId, setDraggedActivityId] = useState<number | null>(null);
+    const [activeWpFilter, setActiveWpFilter] = useState<number | null>(null);
+    const [activityLayoutOverrides, setActivityLayoutOverrides] = useState<
+        Map<number, { col: number; row: number }>
+    >(() => {
+        if (typeof window === "undefined") return new Map();
+        try {
+            const key = `activity-layout-${projectId ?? "unknown"}`;
+            const raw = window.sessionStorage.getItem(key);
+            if (!raw) return new Map();
+            const obj = JSON.parse(raw) as Record<string, { col: number; row: number }>;
+            const map = new Map<number, { col: number; row: number }>();
+            Object.entries(obj).forEach(([id, value]) => {
+                map.set(Number(id), value);
+            });
+            return map;
+        } catch {
+            return new Map();
+        }
+    });
 
     // ─── Data Fetching ──────────────────────────────────────────────
 
@@ -174,6 +218,12 @@ export default function ProjectActivityPlan() {
         enabled: !!projectId,
     });
 
+    const { data: project } = useQuery<ProjectSummary>({
+        queryKey: ["project", projectId],
+        queryFn: () => get(`/projects/${projectId}`),
+        enabled: !!projectId,
+    });
+
     // ─── Mutations ──────────────────────────────────────────────────
 
     const updateActivityMutation = useMutation({
@@ -195,6 +245,8 @@ export default function ProjectActivityPlan() {
             post(`/projects/${projectId}/activity-dependencies`, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["activity-dependencies", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project-activity-dependencies", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
             toast({ title: "Success", description: "Link created" });
             setLinkDialog(null);
             setLagInput("0");
@@ -208,6 +260,8 @@ export default function ProjectActivityPlan() {
         mutationFn: (id: number) => del(`/projects/${projectId}/activity-dependencies/${id}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["activity-dependencies", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project-activity-dependencies", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
             toast({ title: "Success", description: "Link removed" });
         },
         onError: (error: Error) => {
@@ -220,6 +274,7 @@ export default function ProjectActivityPlan() {
         onSuccess: (data) => {
             setScheduleResult(data as ScheduleResult);
             queryClient.invalidateQueries({ queryKey: ["project-activities", projectId] });
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
             toast({ title: "Success", description: "Project schedule updated successfully" });
         },
         onError: (error: Error) => {
@@ -255,40 +310,69 @@ export default function ProjectActivityPlan() {
         [allActivities, linkedActivityIds]
     );
 
-    // ─── Sequence Layout Positions ──────────────────────────────────
+    // When a WP is selected, show only its activities plus directly linked neighbours
+    const visibleActivityIds = useMemo(() => {
+        if (!activeWpFilter) return null;
+        const selectedActs = activitiesByWp.get(activeWpFilter) || [];
+        const ids = new Set<number>(selectedActs.map((a) => a.id));
 
-    const activityPositions = useMemo(() => {
+        if (ids.size === 0) return null;
+
+        for (const dep of dependencies) {
+            if (ids.has(dep.predecessorId) || ids.has(dep.successorId)) {
+                ids.add(dep.predecessorId);
+                ids.add(dep.successorId);
+            }
+        }
+
+        return ids;
+    }, [activeWpFilter, activitiesByWp, dependencies]);
+
+    // ─── Sequence Layout Positions (horizontal grid: 5 per row, wrap) ─
+
+    const { activityPositions, wpLayout, svgHeight } = useMemo(() => {
         const positions = new Map<number, { x: number; y: number; wpId: number }>();
+        const layout = new Map<number, { groupY: number; groupHeight: number; rows: number }>();
         let currentY = 20;
-        const xStart = 40;
 
         for (const wp of workPackages) {
             const wpActivities = activitiesByWp.get(wp.id) || [];
             if (wpActivities.length === 0) continue;
 
-            currentY += WP_HEADER_HEIGHT + WP_PADDING_TOP;
+            let maxRow = 0;
+            const groupY = currentY;
 
             for (let i = 0; i < wpActivities.length; i++) {
-                positions.set(wpActivities[i].id, {
-                    x: xStart,
-                    y: currentY + i * (ACTIVITY_BOX_HEIGHT + ACTIVITY_GAP),
+                const act = wpActivities[i];
+                const baseCol = i % ACTIVITIES_PER_ROW;
+                const baseRow = Math.floor(i / ACTIVITIES_PER_ROW);
+                const override = activityLayoutOverrides.get(act.id);
+                const col = override?.col ?? baseCol;
+                const row = override?.row ?? baseRow;
+                if (row > maxRow) maxRow = row;
+                positions.set(act.id, {
+                    x: DIAGRAM_MARGIN_LEFT + col * (ACTIVITY_BOX_WIDTH + ACTIVITY_GAP),
+                    y: groupY + WP_HEADER_HEIGHT + WP_PADDING_TOP + row * (ACTIVITY_BOX_HEIGHT + ACTIVITY_GAP),
                     wpId: wp.id,
                 });
             }
 
-            currentY += wpActivities.length * (ACTIVITY_BOX_HEIGHT + ACTIVITY_GAP) + WP_PADDING_BOTTOM + WP_GAP;
+            const rows = maxRow + 1;
+            const groupHeight =
+                WP_HEADER_HEIGHT + WP_PADDING_TOP + rows * (ACTIVITY_BOX_HEIGHT + ACTIVITY_GAP) + WP_PADDING_BOTTOM;
+
+            layout.set(wp.id, { groupY, groupHeight, rows });
+
+            currentY += groupHeight + WP_GAP;
         }
 
-        return positions;
-    }, [workPackages, activitiesByWp]);
-
-    const svgHeight = useMemo(() => {
-        let maxY = 200;
-        activityPositions.forEach((pos) => {
-            maxY = Math.max(maxY, pos.y + ACTIVITY_BOX_HEIGHT + 60);
-        });
-        return maxY;
-    }, [activityPositions]);
+        let maxY = Math.max(currentY + 40, 200);
+        return {
+            activityPositions: positions,
+            wpLayout: layout,
+            svgHeight: maxY,
+        };
+    }, [workPackages, activitiesByWp, activityLayoutOverrides]);
 
     // ─── Drag-to-Link Handlers ──────────────────────────────────────
 
@@ -315,14 +399,63 @@ export default function ProjectActivityPlan() {
 
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<SVGSVGElement>) => {
-            if (!draggingFrom || !svgRef.current) return;
+            if (!svgRef.current) return;
             const rect = svgRef.current.getBoundingClientRect();
-            setMousePos({
+            const point = {
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top,
-            });
+            };
+
+            // Active link drag
+            if (draggingFrom) {
+                setMousePos(point);
+                return;
+            }
+
+            // Active activity drag (reposition within its WP grid)
+            if (draggedActivityId != null) {
+                const pos = activityPositions.get(draggedActivityId);
+                if (!pos) return;
+                const wpInfo = wpLayout.get(pos.wpId);
+                if (!wpInfo) return;
+
+                const { groupY } = wpInfo;
+
+                const colFloat =
+                    (point.x - DIAGRAM_MARGIN_LEFT) / (ACTIVITY_BOX_WIDTH + ACTIVITY_GAP);
+                let col = Math.round(colFloat);
+                col = Math.max(0, Math.min(ACTIVITIES_PER_ROW - 1, col));
+
+                const rowFloat =
+                    (point.y - (groupY + WP_HEADER_HEIGHT + WP_PADDING_TOP)) /
+                    (ACTIVITY_BOX_HEIGHT + ACTIVITY_GAP);
+                let row = Math.round(rowFloat);
+                row = Math.max(0, row);
+
+                setActivityLayoutOverrides((prev) => {
+                    const next = new Map(prev);
+                    next.set(draggedActivityId, { col, row });
+
+                    // Persist layout in this browser session
+                    if (typeof window !== "undefined") {
+                        try {
+                            const key = `activity-layout-${projectId ?? "unknown"}`;
+                            const obj: Record<string, { col: number; row: number }> = {};
+                            next.forEach((value, id) => {
+                                obj[String(id)] = value;
+                            });
+                            window.sessionStorage.setItem(key, JSON.stringify(obj));
+                        } catch {
+                            // ignore
+                        }
+                    }
+
+                    return next;
+                });
+                return;
+            }
         },
-        [draggingFrom]
+        [draggingFrom, draggedActivityId, activityPositions, wpLayout]
     );
 
     const handleMouseUp = useCallback(
@@ -362,7 +495,20 @@ export default function ProjectActivityPlan() {
             setDraggingFrom(null);
             setMousePos(null);
         }
-    }, [draggingFrom]);
+        if (draggedActivityId != null) {
+            setDraggedActivityId(null);
+        }
+    }, [draggingFrom, draggedActivityId]);
+
+    const handleActivityDragStart = useCallback(
+        (e: React.MouseEvent<SVGRectElement>, activityId: number) => {
+            // Avoid interfering with link-handle drags
+            e.stopPropagation();
+            e.preventDefault();
+            setDraggedActivityId(activityId);
+        },
+        []
+    );
 
     // ─── WP Color Palette ──────────────────────────────────────────
 
@@ -423,27 +569,40 @@ export default function ProjectActivityPlan() {
 
             {/* Right: Activities grouped by WP */}
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-zinc-800">Activity Plan</h2>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            onClick={() => scheduleMutation.mutate()}
-                            disabled={allActivities.length === 0 || orphanActivities.length > 0 || scheduleMutation.isPending}
-                            className="gap-2 bg-indigo-600 hover:bg-indigo-700"
-                        >
-                            <Calculator className="h-4 w-4" />
-                            Plan
-                        </Button>
-                        <Button
-                            onClick={() => setMode("sequence")}
-                            disabled={allActivities.length < 2}
-                            variant="outline"
-                            className="gap-2"
-                        >
-                            <Network className="h-4 w-4" />
-                            Sequence
-                        </Button>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-zinc-800">Activity Plan</h2>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                onClick={() => scheduleMutation.mutate()}
+                                disabled={allActivities.length === 0 || orphanActivities.length > 0 || scheduleMutation.isPending}
+                                className="gap-2 bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <Calculator className="h-4 w-4" />
+                                {(project?.planVersion ?? 0) >= 1 ? "Revise Plan" : "Plan"}
+                            </Button>
+                            <Button
+                                onClick={() => setMode("sequence")}
+                                disabled={allActivities.length < 2}
+                                variant="outline"
+                                className="gap-2"
+                            >
+                                <Network className="h-4 w-4" />
+                                {(project?.sequenceVersion ?? 0) >= 1 || dependencies.length > 0 ? "Revise Sequence" : "Sequence"}
+                            </Button>
+                        </div>
                     </div>
+                    {((project?.planVersion ?? 0) >= 1 || (project?.sequenceVersion ?? 0) >= 1) && (
+                        <p className="text-sm text-muted-foreground">
+                            {(project?.planVersion ?? 0) >= 1 && (
+                                <span>Plan version {(project?.planVersion ?? 0)} already completed.</span>
+                            )}
+                            {(project?.planVersion ?? 0) >= 1 && (project?.sequenceVersion ?? 0) >= 1 && " "}
+                            {(project?.sequenceVersion ?? 0) >= 1 && (
+                                <span>Sequence version {(project?.sequenceVersion ?? 0)}.</span>
+                            )}
+                        </p>
+                    )}
                 </div>
 
                 <ScrollArea className="flex-1">
@@ -510,17 +669,47 @@ export default function ProjectActivityPlan() {
                                                                 <td className="py-2.5 px-3 text-center text-xs">
                                                                     {(() => {
                                                                         const s = scheduleResult?.activities.find(a => a.id === act.id);
-                                                                        return s ? format(new Date(s.ls_date), "dd MMM yyyy") : <span className="text-muted-foreground">—</span>;
+                                                                        let date: Date | null = null;
+
+                                                                        if (s && s.ls_date) {
+                                                                            date = new Date(s.ls_date);
+                                                                        } else if (project?.startDate && act.lateStartDay != null) {
+                                                                            const d = new Date(project.startDate);
+                                                                            d.setDate(d.getDate() + act.lateStartDay);
+                                                                            date = d;
+                                                                        }
+
+                                                                        return date
+                                                                            ? format(date, "dd MMM yyyy")
+                                                                            : <span className="text-muted-foreground">—</span>;
                                                                     })()}
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-center text-xs">
                                                                     {(() => {
                                                                         const s = scheduleResult?.activities.find(a => a.id === act.id);
-                                                                        return s ? format(new Date(s.lf_date), "dd MMM yyyy") : <span className="text-muted-foreground">—</span>;
+                                                                        let date: Date | null = null;
+
+                                                                        if (s && s.lf_date) {
+                                                                            date = new Date(s.lf_date);
+                                                                        } else if (project?.startDate && act.lateFinishDay != null) {
+                                                                            const d = new Date(project.startDate);
+                                                                            d.setDate(d.getDate() + act.lateFinishDay);
+                                                                            date = d;
+                                                                        }
+
+                                                                        return date
+                                                                            ? format(date, "dd MMM yyyy")
+                                                                            : <span className="text-muted-foreground">—</span>;
                                                                     })()}
                                                                 </td>
                                                                 <td className="py-2.5 px-3 text-center text-xs">
-                                                                    {scheduleResult?.activities.find(a => a.id === act.id)?.float ?? <span className="text-muted-foreground">—</span>}
+                                                                    {(() => {
+                                                                        const s = scheduleResult?.activities.find(a => a.id === act.id);
+                                                                        const float = s?.float ?? act.totalFloatDays;
+                                                                        return float != null
+                                                                            ? float
+                                                                            : <span className="text-muted-foreground">—</span>;
+                                                                    })()}
                                                                 </td>
                                                                 <td className="py-2.5 pl-3 text-center">
                                                                     <Button
@@ -560,11 +749,55 @@ export default function ProjectActivityPlan() {
         </div>
     );
 
+    // ─── Orthogonal path for dependency links (straight + 90° rounded) ─
+
+    const getOrthogonalPath = useCallback(
+        (from: { x: number; y: number }, to: { x: number; y: number }, laneOffset: number): string => {
+            // Build a polyline that:
+            // - starts at the handle centre,
+            // - steps vertically to just below the activity box,
+            // - runs through a lane-specific horizontal corridor,
+            // - and comes back in to the target handle.
+            //
+            // laneOffset shifts the whole corridor so parallel links between the
+            // same activities appear side‑by‑side with a visible gap.
+
+            const baseFromX = from.x;
+            const baseToX = to.x;
+
+            // Always route below the activity boxes so we don't overlap straight
+            // mid‑height links between activities on the same row.
+            const direction = 1;
+            const edgeOffset = ACTIVITY_BOX_HEIGHT / 2 + 6;
+            const fromAnchorY = from.y + direction * edgeOffset;
+            const toAnchorY = to.y + direction * edgeOffset;
+
+            // How far away from the handle we step before entering the shared lane.
+            const stubFactor = 0.35;
+            const fromStubX = baseFromX + laneOffset * stubFactor;
+            const toStubX = baseToX + laneOffset * stubFactor;
+
+            // Lane corridor in the middle
+            const baseMidX = (baseFromX + baseToX) / 2;
+            const midX = baseMidX + laneOffset;
+
+            return [
+                `M ${baseFromX} ${from.y}`,
+                `L ${baseFromX} ${fromAnchorY}`,
+                `L ${fromStubX} ${fromAnchorY}`,
+                `L ${midX} ${fromAnchorY}`,
+                `L ${midX} ${toAnchorY}`,
+                `L ${toStubX} ${toAnchorY}`,
+                `L ${baseToX} ${toAnchorY}`,
+                `L ${baseToX} ${to.y}`,
+            ].join(" ");
+        },
+        []
+    );
+
     // ─── Render: Sequence Mode ──────────────────────────────────────
 
     const renderSequenceMode = () => {
-        let currentY = 20;
-
         return (
             <div className="flex flex-col h-[calc(100vh-12rem)] p-4 gap-4">
                 {/* Header bar */}
@@ -595,7 +828,7 @@ export default function ProjectActivityPlan() {
 
                 {/* Legend */}
                 <div className="flex items-center gap-4 text-xs text-muted-foreground flex-shrink-0 px-1">
-                    <span>Drag from a handle (● left = Start, ● right = Finish) to another activity's handle to create a link.</span>
+                    <span>Drag from a handle (● left = Start, ● right = Finish) to another activity&apos;s handle to create a link. Hover links for details.</span>
                     <span className="border-l pl-4 flex gap-3">
                         {(["FS", "SS", "FF", "SF"] as const).map((t) => (
                             <span key={t} className="font-mono font-bold">{t} = {LINK_TYPE_LABELS[t]}</span>
@@ -603,67 +836,136 @@ export default function ProjectActivityPlan() {
                     </span>
                 </div>
 
-                {/* SVG Canvas */}
-                <div className="flex-1 overflow-auto border rounded-lg bg-white shadow-inner">
-                    <svg
-                        ref={svgRef}
-                        width="100%"
-                        height={svgHeight}
-                        className="select-none"
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleGlobalMouseUp}
-                        onMouseLeave={handleGlobalMouseUp}
-                    >
-                        <defs>
-                            <marker
-                                id="arrowhead"
-                                viewBox="0 0 10 7"
-                                refX="10"
-                                refY="3.5"
-                                markerWidth="8"
-                                markerHeight="6"
-                                orient="auto-start-reverse"
-                            >
-                                <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
-                            </marker>
-                        </defs>
-
-                        {/* Render WP groups */}
-                        {workPackages.map((wp) => {
-                            const wpActs = activitiesByWp.get(wp.id) || [];
-                            if (wpActs.length === 0) return null;
-
-                            const groupY = currentY;
-                            const groupHeight =
-                                WP_HEADER_HEIGHT + WP_PADDING_TOP + wpActs.length * (ACTIVITY_BOX_HEIGHT + ACTIVITY_GAP) + WP_PADDING_BOTTOM;
-
-                            currentY += groupHeight + WP_GAP;
-
-                            const color = wpColors.get(wp.id) || "#6b7280";
-
-                            return (
-                                <g key={wp.id}>
-                                    {/* WP background */}
-                                    <rect
-                                        x={20}
-                                        y={groupY}
-                                        width={ACTIVITY_BOX_WIDTH + 40}
-                                        height={groupHeight}
-                                        rx={8}
-                                        fill={`${color}10`}
-                                        stroke={`${color}40`}
-                                        strokeWidth={1}
-                                    />
-                                    {/* WP label */}
-                                    <text
-                                        x={30}
-                                        y={groupY + 26}
-                                        fontSize={13}
-                                        fontWeight="bold"
-                                        fill={color}
+                {/* Two columns: left WP list (~20%), right diagram (~80%) */}
+                <div className="flex flex-1 gap-4 min-h-0">
+                    {/* Left: Work packages column (click to filter) */}
+                    <Card className="w-64 flex-shrink-0 flex flex-col">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base">Work Packages</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 overflow-hidden p-0">
+                            <ScrollArea className="h-full px-4 pb-4">
+                                <div className="space-y-2">
+                                    {/* All work packages pill */}
+                                    <div
+                                        className={`rounded-lg border p-3 shadow-sm cursor-pointer transition-colors ${
+                                            activeWpFilter == null
+                                                ? "bg-indigo-50 border-indigo-400"
+                                                : "bg-white hover:bg-zinc-50"
+                                        }`}
+                                        onClick={() => setActiveWpFilter(null)}
                                     >
-                                        {wp.code} — {wp.name}
-                                    </text>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className="w-3 h-3 rounded-full bg-slate-400 flex-shrink-0" />
+                                            <span className="font-semibold text-sm truncate">
+                                                All
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Show all work packages
+                                        </p>
+                                    </div>
+                                    {workPackages.map((wp) => {
+                                        const wpActs = activitiesByWp.get(wp.id) || [];
+                                        if (wpActs.length === 0) return null;
+                                        const isActive = activeWpFilter === wp.id;
+                                        return (
+                                            <div
+                                                key={wp.id}
+                                                className={`rounded-lg border p-3 shadow-sm cursor-pointer transition-colors ${
+                                                    isActive ? "bg-indigo-50 border-indigo-400" : "bg-white hover:bg-zinc-50"
+                                                }`}
+                                                onClick={() =>
+                                                    setActiveWpFilter((prev) =>
+                                                        prev === wp.id ? null : wp.id
+                                                    )
+                                                }
+                                            >
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <div
+                                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: wpColors.get(wp.id) }}
+                                                    />
+                                                    <span className="font-semibold text-sm truncate">
+                                                        {wp.code}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground truncate">{wp.name}</p>
+                                                <Badge variant="secondary" className="mt-1 text-xs">
+                                                    {wpActs.length} activities
+                                                </Badge>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+
+                    {/* Right: Diagram (~80%) */}
+                    <div className="flex-1 min-w-0 overflow-auto border rounded-lg bg-white shadow-inner">
+                        <svg
+                            ref={svgRef}
+                            width={DIAGRAM_WIDTH}
+                            height={svgHeight}
+                            className="select-none block"
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleGlobalMouseUp}
+                            onMouseLeave={handleGlobalMouseUp}
+                        >
+                            <defs>
+                                <marker
+                                    id="arrowhead"
+                                    viewBox="0 0 10 7"
+                                    refX="10"
+                                    refY="3.5"
+                                    markerWidth="8"
+                                    markerHeight="6"
+                                    orient="auto-start-reverse"
+                                >
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+                                </marker>
+                            </defs>
+
+                            {/* Render WP groups */}
+                                    {workPackages.map((wp) => {
+                                const allActsForWp = activitiesByWp.get(wp.id) || [];
+                                const wpActs =
+                                    visibleActivityIds == null
+                                        ? allActsForWp
+                                        : allActsForWp.filter((act) =>
+                                              visibleActivityIds.has(act.id)
+                                          );
+                                const layout = wpLayout.get(wp.id);
+                                if (wpActs.length === 0 || !layout) return null;
+
+                                const { groupY, groupHeight } = layout;
+                                const color = wpColors.get(wp.id) || "#6b7280";
+                                const groupWidth = ACTIVITIES_PER_ROW * (ACTIVITY_BOX_WIDTH + ACTIVITY_GAP) - ACTIVITY_GAP;
+
+                                return (
+                                    <g key={wp.id}>
+                                        {/* WP background */}
+                                        <rect
+                                            x={DIAGRAM_MARGIN_LEFT}
+                                            y={groupY}
+                                            width={groupWidth}
+                                            height={groupHeight}
+                                            rx={8}
+                                            fill={`${color}10`}
+                                            stroke={`${color}40`}
+                                            strokeWidth={1}
+                                        />
+                                        {/* WP label (small) */}
+                                        <text
+                                            x={DIAGRAM_MARGIN_LEFT + 10}
+                                            y={groupY + 26}
+                                            fontSize={12}
+                                            fontWeight="bold"
+                                            fill={color}
+                                        >
+                                            {wp.code}
+                                        </text>
 
                                     {/* Activity boxes */}
                                     {wpActs.map((act, i) => {
@@ -683,6 +985,8 @@ export default function ProjectActivityPlan() {
                                                     fill={isOrphan ? "#fef3c7" : scheduleResult?.criticalPath.includes(act.id) ? "#fef2f2" : "#fff"}
                                                     stroke={isOrphan ? "#f59e0b" : scheduleResult?.criticalPath.includes(act.id) ? "#ef4444" : "#d4d4d8"}
                                                     strokeWidth={isOrphan || scheduleResult?.criticalPath.includes(act.id) ? 2 : 1}
+                                                    className="cursor-move"
+                                                    onMouseDown={(e) => handleActivityDragStart(e, act.id)}
                                                 />
                                                 {/* Activity name */}
                                                 <text
@@ -751,67 +1055,118 @@ export default function ProjectActivityPlan() {
                             );
                         })}
 
-                        {/* Render existing dependency links */}
-                        {dependencies.map((dep) => {
-                            const predSide = dep.type === "FS" || dep.type === "FF" ? "finish" : "start";
-                            const succSide = dep.type === "FS" || dep.type === "SS" ? "start" : "finish";
-                            const from = getHandlePos(dep.predecessorId, predSide);
-                            const to = getHandlePos(dep.successorId, succSide);
-                            if (!from || !to) return null;
+                            {/* Render existing dependency links (colored, hover for details) */}
+                            {(() => {
+                                const visibleDeps =
+                                    visibleActivityIds == null
+                                        ? dependencies
+                                        : dependencies.filter(
+                                              (dep) =>
+                                                  visibleActivityIds.has(dep.predecessorId) &&
+                                                  visibleActivityIds.has(dep.successorId)
+                                          );
 
-                            // Bezier curve
-                            const dx = Math.abs(to.x - from.x);
-                            const controlOffset = Math.max(40, dx * 0.4);
-                            const path = `M ${from.x} ${from.y} C ${from.x + (predSide === "finish" ? controlOffset : -controlOffset)} ${from.y}, ${to.x + (succSide === "start" ? -controlOffset : controlOffset)} ${to.y}, ${to.x} ${to.y}`;
+                                const laneSpacing = 18;
+                                const laneCenter = (visibleDeps.length - 1) / 2;
 
-                            return (
-                                <g key={dep.id} className="group cursor-pointer" onClick={() => {
-                                    if (confirm(`Delete ${dep.type} link (lag: ${dep.lag} days)?`)) {
-                                        deleteDependencyMutation.mutate(dep.id);
+                                return visibleDeps.map((dep, index) => {
+                                    const predSide = dep.type === "FS" || dep.type === "FF" ? "finish" : "start";
+                                    const succSide = dep.type === "FS" || dep.type === "SS" ? "start" : "finish";
+                                    const from = getHandlePos(dep.predecessorId, predSide);
+                                    const to = getHandlePos(dep.successorId, succSide);
+                                    if (!from || !to) return null;
+
+                                    const laneOffset = (index - laneCenter) * laneSpacing;
+
+                                    // If activities are on roughly the same row, draw a simple straight line
+                                    const sameRow =
+                                        Math.abs(from.y - to.y) < ACTIVITY_BOX_HEIGHT / 2 &&
+                                        Math.abs(from.y - to.y) < 12;
+                                    const path = sameRow
+                                        ? `M ${from.x} ${from.y} L ${to.x} ${to.y}`
+                                        : getOrthogonalPath(from, to, laneOffset);
+
+                                    const predAct = allActivities.find((a) => a.id === dep.predecessorId);
+                                    const succAct = allActivities.find((a) => a.id === dep.successorId);
+                                    const predDuration = predAct?.duration ?? null;
+                                    const succDuration = succAct?.duration ?? null;
+                                    const lagLabel =
+                                        dep.lag > 0 ? `+${dep.lag}d` : dep.lag < 0 ? `${dep.lag}d` : "0d";
+                                    const hoverParts: string[] = [];
+                                    // Relationship / type
+                                    hoverParts.push(`${dep.type} — ${LINK_TYPE_LABELS[dep.type]}`);
+                                    // Durations
+                                    if (predDuration != null || succDuration != null) {
+                                        const durLabel = [
+                                            predDuration != null ? `Pred: ${predDuration}d` : null,
+                                            succDuration != null ? `Succ: ${succDuration}d` : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" | ");
+                                        hoverParts.push(durLabel);
                                     }
-                                }}>
-                                    {/* Invisible wider hitbox */}
-                                    <path d={path} fill="none" stroke="transparent" strokeWidth={14} />
-                                    {/* Visible line */}
-                                    <path
-                                        d={path}
-                                        fill="none"
-                                        stroke="#6b7280"
-                                        strokeWidth={2}
-                                        strokeDasharray={dep.type === "SS" ? "6,3" : dep.type === "FF" ? "2,3" : undefined}
-                                        markerEnd="url(#arrowhead)"
-                                        className="group-hover:stroke-red-500 transition-colors"
-                                    />
-                                    {/* Link type label */}
-                                    <text
-                                        x={(from.x + to.x) / 2}
-                                        y={(from.y + to.y) / 2 - 8}
-                                        fontSize={10}
-                                        fontWeight="bold"
-                                        fill="#6b7280"
-                                        textAnchor="middle"
-                                        className="pointer-events-none group-hover:fill-red-500"
-                                    >
-                                        {dep.type}{dep.lag !== 0 ? ` (${dep.lag > 0 ? "+" : ""}${dep.lag}d)` : ""}
-                                    </text>
-                                </g>
-                            );
-                        })}
+                                    // Lag / lead
+                                    hoverParts.push(`Lag/Lead: ${lagLabel}`);
 
-                        {/* Current drag line */}
-                        {draggingFrom && mousePos && (
-                            <line
-                                x1={draggingFrom.x}
-                                y1={draggingFrom.y}
-                                x2={mousePos.x}
-                                y2={mousePos.y}
-                                stroke="#3b82f6"
-                                strokeWidth={2}
-                                strokeDasharray="6,3"
-                                className="pointer-events-none"
-                            />
-                        )}
-                    </svg>
+                                    const hoverTitle = hoverParts.join(" • ");
+
+                                    return (
+                                        <g
+                                            key={dep.id}
+                                            className="group cursor-pointer"
+                                            onClick={() => {
+                                                if (confirm(`Delete ${dep.type} link (lag: ${dep.lag} days)?`)) {
+                                                    deleteDependencyMutation.mutate(dep.id);
+                                                }
+                                            }}
+                                        >
+                                            <title>{hoverTitle}</title>
+                                            {/* Invisible wider hitbox for hover/click */}
+                                            <path
+                                                d={path}
+                                                fill="none"
+                                                stroke="transparent"
+                                                strokeWidth={14}
+                                                title={hoverTitle}
+                                            />
+                                            {/* Visible line, colored by type */}
+                                            <path
+                                                d={path}
+                                                fill="none"
+                                                stroke={LINK_COLORS[dep.type]}
+                                                strokeWidth={2}
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeDasharray={
+                                                    dep.type === "SS"
+                                                        ? "6,3"
+                                                        : dep.type === "FF"
+                                                        ? "2,3"
+                                                        : undefined
+                                                }
+                                                markerEnd="url(#arrowhead)"
+                                                className="transition-colors pointer-events-none group-hover:opacity-80"
+                                            />
+                                        </g>
+                                    );
+                                });
+                            })()}
+
+                            {/* Current drag line */}
+                            {draggingFrom && mousePos && (
+                                <line
+                                    x1={draggingFrom.x}
+                                    y1={draggingFrom.y}
+                                    x2={mousePos.x}
+                                    y2={mousePos.y}
+                                    stroke="#3b82f6"
+                                    strokeWidth={2}
+                                    strokeDasharray="6,3"
+                                    className="pointer-events-none"
+                                />
+                            )}
+                        </svg>
+                    </div>
                 </div>
 
                 {/* Orphan list */}

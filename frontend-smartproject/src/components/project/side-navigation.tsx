@@ -221,7 +221,7 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                         </Link>
                       </li>
                       <li>
-                        <Link href={`/projects/${currentProjectId}/activities`}>
+                        <Link href={`/projects/${currentProjectId}/activities/page5`}>
                           <a className={cn(
                             "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
                             isActive('/activities') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"

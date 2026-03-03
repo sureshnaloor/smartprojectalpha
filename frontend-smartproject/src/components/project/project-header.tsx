@@ -339,7 +339,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                     : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
                     }`}
                 >
-                  Tab3
+                  Plan Versions
                 </a>
               </Link>
               <Link href={`/projects/${projectId}/${routeContext}/page4`}>
@@ -349,7 +349,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                     : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
                     }`}
                 >
-                  Tab4
+                  Dependencies
                 </a>
               </Link>
               <Link href={`/projects/${projectId}/${routeContext}/page5`}>
@@ -359,7 +359,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                     : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
                     }`}
                 >
-                  Tab5
+                  Activities
                 </a>
               </Link>
             </>

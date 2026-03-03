@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api-client";
@@ -5,89 +6,104 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Loader2, Calendar, Users, Wrench, Truck, CheckCircle2, PlayCircle, AlertCircle } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Loader2, Calendar, GitCompare } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-interface ProjectActivity {
+interface PlanVersionSummary {
   id: number;
-  name: string;
-  description: string | null;
-  unitOfMeasure: string;
-  unitRate: string;
-  quantity: string;
-  plannedFromDate: string | null;
-  plannedToDate: string | null;
-  estimatedStartDate: string | null;
-  estimatedEndDate: string | null;
-  actualStartDate: string | null;
-  actualToDate: string | null;
-  remarks: string | null;
+  version: number;
+  createdAt: string | null;
+  activityCount: number;
+  dependencyCount: number;
+  startDate: string | null;
+  endDate: string | null;
 }
 
-interface ProjectResource {
+interface PlanVersionActivity {
   id: number;
   name: string;
-  description: string | null;
+  duration: number;
+  es: number;
+  ef: number;
+  ls: number;
+  lf: number;
+  float: number;
+  es_date: string | null;
+  ef_date: string | null;
+  ls_date: string | null;
+  lf_date: string | null;
+  isCritical: boolean;
+}
+
+interface PlanVersionDependency {
+  id?: number;
+  projectId: number;
+  predecessorId: number;
+  successorId: number;
   type: string;
-  unitOfMeasure: string;
-  unitRate: string;
-  quantity: string;
-  plannedStartDate: string | null;
-  plannedEndDate: string | null;
-  remarks: string | null;
+  lag: number;
 }
 
-interface ActivityResourceData {
-  activity: ProjectActivity;
-  plannedResources: ProjectResource[];
-  actualResources: Array<{
-    resourceName: string;
-    dates: string[];
-    totalDays: number;
-  }>;
+interface PlanVersionDetail {
+  id: number;
+  projectId: number;
+  version: number;
+  createdAt: string | null;
+  activities: PlanVersionActivity[];
+  dependencies: PlanVersionDependency[];
 }
-
-const getResourceTypeIcon = (type: string) => {
-  switch (type.toLowerCase()) {
-    case "manpower":
-    case "rental_manpower":
-      return <Users className="h-4 w-4" />;
-    case "equipment":
-    case "rental_equipment":
-      return <Truck className="h-4 w-4" />;
-    case "tools":
-      return <Wrench className="h-4 w-4" />;
-    default:
-      return <AlertCircle className="h-4 w-4" />;
-  }
-};
-
-const getResourceTypeColor = (type: string) => {
-  switch (type.toLowerCase()) {
-    case "manpower":
-    case "rental_manpower":
-      return "bg-blue-100 text-blue-700 border-blue-300";
-    case "equipment":
-    case "rental_equipment":
-      return "bg-green-100 text-green-700 border-green-300";
-    case "tools":
-      return "bg-purple-100 text-purple-700 border-purple-300";
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-300";
-  }
-};
 
 export default function ProjectActivitiesPage3() {
   const { projectId } = useParams();
+  const [primaryVersion, setPrimaryVersion] = useState<number | null>(null);
+  const [compareVersion, setCompareVersion] = useState<number | null>(null);
 
-  const { data, isLoading, error } = useQuery<ActivityResourceData[]>({
-    queryKey: ["project-activities-resources", projectId],
-    queryFn: () => get(`/projects/${projectId}/activities/resources`),
+  const {
+    data: versions,
+    isLoading: isLoadingVersions,
+    error: versionsError,
+  } = useQuery<PlanVersionSummary[]>({
+    queryKey: ["project-plan-versions", projectId],
+    queryFn: () => get(`/projects/${projectId}/plan-versions`),
     enabled: !!projectId,
   });
 
-  if (isLoading) {
+  const {
+    data: primaryDetail,
+    isLoading: isLoadingPrimary,
+  } = useQuery<PlanVersionDetail | null>({
+    queryKey: ["project-plan-version-detail", projectId, primaryVersion],
+    queryFn: () =>
+      primaryVersion != null
+        ? get(`/projects/${projectId}/plan-versions/${primaryVersion}`)
+        : null,
+    enabled: !!projectId && primaryVersion != null,
+  });
+
+  const {
+    data: compareDetail,
+    isLoading: isLoadingCompare,
+  } = useQuery<PlanVersionDetail | null>({
+    queryKey: ["project-plan-version-detail", projectId, compareVersion],
+    queryFn: () =>
+      compareVersion != null
+        ? get(`/projects/${projectId}/plan-versions/${compareVersion}`)
+        : null,
+    enabled: !!projectId && compareVersion != null,
+  });
+
+  const handleSelectPrimary = (value: string) => {
+    const v = parseInt(value, 10);
+    setPrimaryVersion(Number.isNaN(v) ? null : v);
+  };
+
+  const handleSelectCompare = (value: string) => {
+    const v = parseInt(value, 10);
+    setCompareVersion(Number.isNaN(v) ? null : v);
+  };
+
+  if (isLoadingVersions) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -95,13 +111,16 @@ export default function ProjectActivitiesPage3() {
     );
   }
 
-  if (error) {
+  if (versionsError) {
     return (
       <div className="p-6">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center text-red-600">
-              <p>Error loading activity resources: {error instanceof Error ? error.message : "Unknown error"}</p>
+              <p>
+                Error loading plan versions:{" "}
+                {versionsError instanceof Error ? versionsError.message : "Unknown error"}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -109,25 +128,25 @@ export default function ProjectActivitiesPage3() {
     );
   }
 
-  const activityResources = data || [];
+  const versionList = versions || [];
 
-  if (activityResources.length === 0) {
+  if (versionList.length === 0) {
     return (
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Activity Resources</h1>
-          <p className="text-gray-600 mt-1">Planned and actual resource utilization for activities</p>
+      <div className="p-6 space-y-4">
+        <div className="mb-2">
+          <h1 className="text-2xl font-bold text-gray-900">Plan Versions</h1>
+          <p className="text-gray-600 mt-1">
+            Once you run the plan for this project, each version of the schedule will appear here.
+          </p>
         </div>
         <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12 text-gray-500">
-              <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium mb-2">No Activity Resources Available</p>
-              <p className="text-sm">
-                Resources will appear here once activities are completed or in progress.
-              </p>
-              <p className="text-sm mt-2">
-                Activities need to have actual start dates to show resource utilization.
+          <CardContent className="pt-6 pb-8">
+            <div className="flex flex-col items-center text-gray-500">
+              <Calendar className="h-12 w-12 mb-3 text-gray-300" />
+              <p className="text-base font-medium mb-1">No plan versions yet</p>
+              <p className="text-sm text-center max-w-md">
+                Use the Activity Plan tab to calculate the schedule. Each time you run it,
+                a new plan version is stored and can be reviewed here without altering the baseline.
               </p>
             </div>
           </CardContent>
@@ -135,261 +154,297 @@ export default function ProjectActivitiesPage3() {
       </div>
     );
   }
+
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return "-";
+    try {
+      return format(new Date(value), "MMM d, yyyy");
+    } catch {
+      return value;
+    }
+  };
+
+  const computeComparisonSummary = () => {
+    if (!primaryDetail || !compareDetail) return null;
+
+    const aActs = new Map(primaryDetail.activities.map(a => [a.id, a]));
+    const bActs = new Map(compareDetail.activities.map(a => [a.id, a]));
+
+    let changedActivities = 0;
+    for (const [id, a] of aActs) {
+      const b = bActs.get(id);
+      if (!b) continue;
+      if (
+        a.es !== b.es ||
+        a.ef !== b.ef ||
+        a.ls !== b.ls ||
+        a.lf !== b.lf ||
+        a.float !== b.float
+      ) {
+        changedActivities += 1;
+      }
+    }
+
+    return {
+      changedActivities,
+      activitiesA: primaryDetail.activities.length,
+      activitiesB: compareDetail.activities.length,
+      depsA: primaryDetail.dependencies.length,
+      depsB: compareDetail.dependencies.length,
+    };
+  };
+
+  const comparison = computeComparisonSummary();
 
   return (
     <div className="p-6 space-y-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Activity Resources</h1>
-        <p className="text-gray-600 mt-1">
-          Planned and actual resource utilization for completed and in-progress activities
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Plan Versions</h1>
+        <p className="text-gray-600">
+          View and compare saved schedule versions. Baseline dates stay in the activities table;
+          each run of the planner creates a new version here.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <Accordion type="multiple" className="w-full">
-          {activityResources.map((item) => {
-            const activity = item.activity;
-            const plannedResources = item.plannedResources;
-            const actualResources = item.actualResources;
-            const isCompleted = activity.actualToDate !== null;
-            const isInProgress = activity.actualStartDate !== null && !activity.actualToDate;
-
-            // Create a map of actual resources for easy lookup
-            const actualResourceMap = new Map(
-              actualResources.map((r) => [r.resourceName.toLowerCase(), r])
-            );
-
-            // Combine planned and actual resources
-            const allResourceNames = new Set<string>();
-            plannedResources.forEach((r) => allResourceNames.add(r.name.toLowerCase()));
-            actualResources.forEach((r) => allResourceNames.add(r.resourceName.toLowerCase()));
-
-            return (
-              <AccordionItem key={activity.id} value={`activity-${activity.id}`} className="border rounded-lg mb-4">
-                <AccordionTrigger className="px-6 hover:no-underline">
-                  <div className="flex items-center justify-between w-full pr-4">
-                    <div className="flex items-center gap-3">
-                      {isCompleted ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      ) : isInProgress ? (
-                        <PlayCircle className="h-5 w-5 text-blue-500" />
-                      ) : null}
-                      <div className="text-left">
-                        <div className="font-semibold text-lg">{activity.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {activity.description || "No description"}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Versions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-80 pr-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Version</TableHead>
+                    <TableHead>Dates</TableHead>
+                    <TableHead>Items</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {versionList.map(v => (
+                    <TableRow
+                      key={v.id}
+                      className={
+                        primaryVersion === v.version
+                          ? "bg-indigo-50 cursor-pointer"
+                          : "cursor-pointer"
+                      }
+                      onClick={() => setPrimaryVersion(v.version)}
+                    >
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-semibold">V{v.version}</span>
+                          {v.createdAt && (
+                            <span className="text-xs text-gray-500">
+                              {formatDate(v.createdAt)}
+                            </span>
+                          )}
                         </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge variant={isCompleted ? "default" : "secondary"} className={isCompleted ? "bg-green-500" : ""}>
-                        {isCompleted ? "Completed" : "In Progress"}
-                      </Badge>
-                      <div className="text-sm text-gray-600">
-                        {plannedResources.length} planned • {actualResources.length} utilized
-                      </div>
-                    </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-gray-600">
+                          {v.startDate && v.endDate ? (
+                            <>
+                              {formatDate(v.startDate)} - {formatDate(v.endDate)}
+                            </>
+                          ) : (
+                            "-"
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-xs text-gray-600">
+                          <span>{v.activityCount} activities</span>
+                          <span>{v.dependencyCount} links</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Primary version</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Select
+                  value={primaryVersion != null ? String(primaryVersion) : undefined}
+                  onValueChange={handleSelectPrimary}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select version" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {versionList.map(v => (
+                      <SelectItem key={v.id} value={String(v.version)}>
+                        V{v.version} ({v.activityCount} activities)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isLoadingPrimary && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading version details...
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6">
-                  <div className="space-y-6 mt-4">
-                    {/* Activity Details */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="text-xs font-medium text-gray-500 mb-1">Planned Dates</div>
-                        <div className="text-sm">
-                          {activity.plannedFromDate && activity.plannedToDate ? (
-                            <>
-                              {format(new Date(activity.plannedFromDate), "MMM d, yyyy")} -{" "}
-                              {format(new Date(activity.plannedToDate), "MMM d, yyyy")}
-                            </>
-                          ) : (
-                            <span className="text-gray-400">Not set</span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-gray-500 mb-1">Actual Dates</div>
-                        <div className="text-sm">
-                          {activity.actualStartDate && activity.actualToDate ? (
-                            <>
-                              {format(new Date(activity.actualStartDate), "MMM d, yyyy")} -{" "}
-                              {format(new Date(activity.actualToDate), "MMM d, yyyy")}
-                            </>
-                          ) : activity.actualStartDate ? (
-                            <>
-                              Started: {format(new Date(activity.actualStartDate), "MMM d, yyyy")}
-                            </>
-                          ) : (
-                            <span className="text-gray-400">Not started</span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-gray-500 mb-1">Quantity</div>
-                        <div className="text-sm font-medium">
-                          {activity.quantity} {activity.unitOfMeasure}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-gray-500 mb-1">Unit Rate</div>
-                        <div className="text-sm font-medium">
-                          {parseFloat(activity.unitRate).toLocaleString()} per {activity.unitOfMeasure}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Resources Table */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Resource Utilization</h3>
-                      {plannedResources.length === 0 && actualResources.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                          <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                          <p>No resources planned or utilized for this activity.</p>
-                        </div>
-                      ) : (
-                        <ScrollArea className="w-full">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Resource Name</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Planned Quantity</TableHead>
-                                <TableHead>Planned Dates</TableHead>
-                                <TableHead>Actual Utilization</TableHead>
-                                <TableHead>Status</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {plannedResources.map((resource) => {
-                                const actual = actualResourceMap.get(resource.name.toLowerCase());
-                                const isUtilized = actual !== undefined;
-                                const utilizationDays = actual?.totalDays || 0;
-                                
-                                // Calculate planned days if dates are available
-                                let plannedDays = 0;
-                                if (resource.plannedStartDate && resource.plannedEndDate) {
-                                  const start = new Date(resource.plannedStartDate);
-                                  const end = new Date(resource.plannedEndDate);
-                                  plannedDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                                }
-
-                                return (
-                                  <TableRow key={resource.id}>
-                                    <TableCell className="font-medium">{resource.name}</TableCell>
-                                    <TableCell>
-                                      <Badge
-                                        variant="outline"
-                                        className={getResourceTypeColor(resource.type)}
-                                      >
-                                        <span className="flex items-center gap-1">
-                                          {getResourceTypeIcon(resource.type)}
-                                          {resource.type.replace(/_/g, " ")}
-                                        </span>
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      {resource.quantity} {resource.unitOfMeasure}
-                                    </TableCell>
-                                    <TableCell>
-                                      {resource.plannedStartDate && resource.plannedEndDate ? (
-                                        <div className="text-sm">
-                                          <div className="flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" />
-                                            {format(new Date(resource.plannedStartDate), "MMM d")} -{" "}
-                                            {format(new Date(resource.plannedEndDate), "MMM d, yyyy")}
-                                          </div>
-                                          <div className="text-xs text-gray-500 mt-1">
-                                            {plannedDays} days
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <span className="text-gray-400 text-sm">Not scheduled</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      {isUtilized ? (
-                                        <div className="space-y-1">
-                                          <div className="text-sm font-medium text-green-600">
-                                            {utilizationDays} day{utilizationDays !== 1 ? "s" : ""} utilized
-                                          </div>
-                                          {actual.dates.length > 0 && (
-                                            <div className="text-xs text-gray-500">
-                                              {format(new Date(actual.dates[0]), "MMM d")} -{" "}
-                                              {format(new Date(actual.dates[actual.dates.length - 1]), "MMM d")}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <span className="text-gray-400 text-sm">Not utilized</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      {isUtilized ? (
-                                        <Badge variant="default" className="bg-green-500">
-                                          Utilized
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="secondary">Not Utilized</Badge>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                              
-                              {/* Show actual resources that weren't planned */}
-                              {actualResources
-                                .filter(
-                                  (actual) =>
-                                    !plannedResources.some(
-                                      (planned) => planned.name.toLowerCase() === actual.resourceName.toLowerCase()
-                                    )
-                                )
-                                .map((actual, index) => (
-                                  <TableRow key={`actual-${index}`} className="bg-yellow-50">
-                                    <TableCell className="font-medium">{actual.resourceName}</TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">
-                                        Unplanned
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <span className="text-gray-400 text-sm">-</span>
-                                    </TableCell>
-                                    <TableCell>
-                                      <span className="text-gray-400 text-sm">-</span>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="space-y-1">
-                                        <div className="text-sm font-medium text-yellow-600">
-                                          {actual.totalDays} day{actual.totalDays !== 1 ? "s" : ""} utilized
-                                        </div>
-                                        {actual.dates.length > 0 && (
-                                          <div className="text-xs text-gray-500">
-                                            {format(new Date(actual.dates[0]), "MMM d")} -{" "}
-                                            {format(new Date(actual.dates[actual.dates.length - 1]), "MMM d")}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">
-                                        Unplanned
-                                      </Badge>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                            </TableBody>
-                          </Table>
-                        </ScrollArea>
+                )}
+                {primaryDetail && (
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <Badge variant="outline">Version V{primaryDetail.version}</Badge>
+                      {primaryDetail.createdAt && (
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(primaryDetail.createdAt)}
+                        </span>
                       )}
                     </div>
+                    <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+                      <span>{primaryDetail.activities.length} activities</span>
+                      <span>{primaryDetail.dependencies.length} links</span>
+                    </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <GitCompare className="h-4 w-4" />
+                  Compare with
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Select
+                  value={compareVersion != null ? String(compareVersion) : undefined}
+                  onValueChange={handleSelectCompare}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional: select version to compare" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {versionList.map(v => (
+                      <SelectItem key={v.id} value={String(v.version)}>
+                        V{v.version} ({v.activityCount} activities)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isLoadingCompare && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading comparison version...
+                  </div>
+                )}
+                {primaryDetail && compareDetail && comparison && (
+                  <div className="space-y-2 text-xs text-gray-700">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <Badge variant="outline">Primary V{primaryDetail.version}</Badge>
+                      <Badge variant="outline">Compare V{compareDetail.version}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-gray-700">
+                      <div>
+                        <div className="text-[11px] uppercase text-gray-500">Activities</div>
+                        <div>
+                          {comparison.activitiesA} → {comparison.activitiesB}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase text-gray-500">Dependencies</div>
+                        <div>
+                          {comparison.depsA} → {comparison.depsB}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase text-gray-500">
+                          Activities with timing changes
+                        </div>
+                        <div>{comparison.changedActivities}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {primaryDetail && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Activities in version V{primaryDetail.version}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {primaryDetail.activities.length === 0 ? (
+                  <div className="text-sm text-gray-500 py-4">
+                    No activities stored for this version.
+                  </div>
+                ) : (
+                  <ScrollArea className="h-80">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Activity</TableHead>
+                          <TableHead>ES / EF</TableHead>
+                          <TableHead>LS / LF</TableHead>
+                          <TableHead>Float</TableHead>
+                          <TableHead>Dates</TableHead>
+                          <TableHead>Critical</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {primaryDetail.activities.map(a => (
+                          <TableRow key={a.id}>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium text-sm">{a.name}</span>
+                                <span className="text-[11px] text-gray-500">ID {a.id}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              ES {a.es}, EF {a.ef}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              LS {a.ls}, LF {a.lf}
+                            </TableCell>
+                            <TableCell className="text-xs">{a.float}</TableCell>
+                            <TableCell className="text-xs">
+                              {a.es_date && a.ef_date ? (
+                                <>
+                                  {formatDate(a.es_date)} - {formatDate(a.ef_date)}
+                                </>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {a.isCritical ? (
+                                <Badge variant="outline" className="border-red-400 text-red-600">
+                                  Critical
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-gray-300 text-gray-600">
+                                  Non-critical
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
