@@ -1,4 +1,4 @@
-import { Package, Ruler, Layers, Folder } from "lucide-react";
+import { Package, Ruler, Layers, Folder, FileText } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 import { GlobalToolsHeader } from "@/components/global-tools-header";
 
@@ -11,6 +11,7 @@ const tabs = [
   { label: "UOM", href: "/material-master/uom", Icon: Ruler },
   { label: "Material Type", href: "/material-master/material-type", Icon: Layers },
   { label: "Material Group", href: "/material-master/material-group", Icon: Folder },
+  { label: "Material POs", href: "/material-master/purchase-orders", Icon: FileText },
 ];
 
 export default function MaterialMasterLayout({ children }: MaterialMasterLayoutProps) {

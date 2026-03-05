@@ -329,7 +329,7 @@ export function ProjectHeader({ projectId, onToggleSidebar, onClose }: ProjectHe
                     : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
                     }`}
                 >
-                  Tab2
+                  Activities Overview
                 </a>
               </Link>
               <Link href={`/projects/${projectId}/${routeContext}/page3`}>

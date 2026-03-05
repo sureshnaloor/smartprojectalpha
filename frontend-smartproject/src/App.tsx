@@ -95,6 +95,7 @@ import ProjectEquipmentCatalogue from "@/pages/project-equipment-catalogue";
 import NewLanding from "@/pages/new-landing";
 import NewProject from "@/pages/new-project";
 import ProjectCharts from "@/pages/project-charts";
+import PurchaseOrdersPage from "@/pages/purchase-orders";
 
 
 // Implementing a flatter routing approach without nesting
@@ -524,6 +525,11 @@ function Router() {
       </Route>
 
       {/* Material Master */}
+      <Route path="/material-master/purchase-orders">
+        <MaterialMasterLayout>
+          <PurchaseOrdersPage />
+        </MaterialMasterLayout>
+      </Route>
       <Route path="/material-master/uom">
         <MaterialMasterLayout>
           <MaterialMasterUom />
@@ -546,6 +552,11 @@ function Router() {
       </Route>
 
       {/* Service Master */}
+      <Route path="/service-master/purchase-orders">
+        <ServiceMasterLayout>
+          <PurchaseOrdersPage />
+        </ServiceMasterLayout>
+      </Route>
       <Route path="/service-master/uom">
         <ServiceMasterLayout>
           <ServiceMasterUom />
@@ -585,6 +596,11 @@ function Router() {
       </Route>
 
       {/* Employee Master */}
+      <Route path="/employee-master/rental-po">
+        <EmployeeMasterLayout>
+          <PurchaseOrdersPage />
+        </EmployeeMasterLayout>
+      </Route>
       <Route path="/employee-master/nationality" component={EmployeeMasterNationality} />
       <Route path="/employee-master/title" component={EmployeeMasterTitle} />
       <Route path="/employee-master/position" component={EmployeeMasterPosition} />
@@ -602,6 +618,11 @@ function Router() {
       </Route>
 
       {/* Equipment Master */}
+      <Route path="/equipment-master/rental-po">
+        <EquipmentMasterLayout>
+          <PurchaseOrdersPage />
+        </EquipmentMasterLayout>
+      </Route>
       <Route path="/equipment-master/rental">
         <EquipmentMasterLayout>
           <EquipmentMasterRental />
@@ -619,6 +640,10 @@ function Router() {
       <Route path="/newlanding" component={NewLanding} />
       <Route path="/newproject/:projectId">
         {params => <NewProject />}
+      </Route>
+
+      <Route path="/purchase-orders">
+        {() => <PurchaseOrdersPage />}
       </Route>
 
 

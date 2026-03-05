@@ -1,4 +1,4 @@
-import { Wrench, Ruler, Layers, Folder } from "lucide-react";
+import { Wrench, Ruler, Layers, Folder, FileText } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 import { GlobalToolsHeader } from "@/components/global-tools-header";
 
@@ -11,6 +11,7 @@ const tabs = [
   { label: "UOM", href: "/service-master/uom", Icon: Ruler },
   { label: "Service Type", href: "/service-master/service-type", Icon: Layers },
   { label: "Service Group", href: "/service-master/service-group", Icon: Folder },
+  { label: "Service POs", href: "/service-master/purchase-orders", Icon: FileText },
 ];
 
 export default function ServiceMasterLayout({ children }: ServiceMasterLayoutProps) {

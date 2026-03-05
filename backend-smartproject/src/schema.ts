@@ -85,6 +85,22 @@ export const workPackages = pgTable("work_packages", {
   projectCodeUnique: uniqueIndex("work_packages_project_id_code_unique").on(table.projectId, table.code),
 }));
 
+// Planned Cost per Work Package Table
+export const plannedCostWorkpackages = pgTable("planned_cost_workpackages", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  wpId: integer("wp_id").notNull().references(() => workPackages.id, { onDelete: "cascade" }),
+  materialsPlannedValue: numeric("materials_planned_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  servicesPlannedValue: numeric("services_planned_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  resourcesPlannedValue: numeric("resources_planned_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalPlannedValue: numeric("total_planned_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  isLocked: boolean("is_locked").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectWpUnique: uniqueIndex("planned_cost_workpackages_project_id_wp_id_unique").on(table.projectId, table.wpId),
+}));
+
 // Activities Table
 export const activities = pgTable("activities", {
   id: serial("id").primaryKey(),
@@ -342,6 +358,18 @@ export const insertWorkPackageSchema = createInsertSchema(workPackages)
     budgetedCost: z.string().or(z.number()).transform(val => val.toString()),
   });
 
+// Planned Cost per Work Package schema
+export const insertPlannedCostWorkpackageSchema = createInsertSchema(plannedCostWorkpackages)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    projectId: z.number(),
+    wpId: z.number(),
+    materialsPlannedValue: z.string().or(z.number()).transform(val => val.toString()),
+    servicesPlannedValue: z.string().or(z.number()).transform(val => val.toString()),
+    resourcesPlannedValue: z.string().or(z.number()).transform(val => val.toString()),
+    totalPlannedValue: z.string().or(z.number()).transform(val => val.toString()),
+  });
+
 // Task schema
 export const insertTaskSchema = createInsertSchema(tasks)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
@@ -439,6 +467,9 @@ export type InsertCostEntry = z.infer<typeof insertCostEntrySchema>;
 
 export type WorkPackage = typeof workPackages.$inferSelect;
 export type InsertWorkPackage = z.infer<typeof insertWorkPackageSchema>;
+
+export type PlannedCostWorkpackage = typeof plannedCostWorkpackages.$inferSelect;
+export type InsertPlannedCostWorkpackage = z.infer<typeof insertPlannedCostWorkpackageSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
@@ -917,6 +948,38 @@ export const workPackageServices = pgTable("work_package_services", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Purchase Orders header table
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: serial("id").primaryKey(),
+  poNumber: text("po_number").notNull().unique(),
+  poDate: date("po_date").notNull(),
+  vendor: text("vendor").notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Purchase Order line items table
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: serial("id").primaryKey(),
+  poId: integer("po_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
+  lineNumber: integer("line_number").notNull(),
+  itemType: text("item_type").notNull(), // 'material' | 'service'
+  itemDescription: text("item_description").notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  unitOfMeasure: text("unit_of_measure").notNull(),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
+  estimatedDeliveryDate: date("estimated_delivery_date"),
+  actualDeliveryDate: date("actual_delivery_date"),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
+  wpId: integer("wp_id").references(() => workPackages.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  poLineUnique: uniqueIndex("purchase_order_items_po_id_line_number_unique").on(table.poId, table.lineNumber),
+}));
+
 // Vendor Master Table
 export const vendorMaster = pgTable("vendor_master", {
   id: serial("id").primaryKey(),
@@ -1108,6 +1171,32 @@ export const insertWorkPackageServiceSchema = createInsertSchema(workPackageServ
     estimatedValue: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
   });
 
+// Purchase Orders schemas
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    poDate: z.date().or(z.string()).transform(val => {
+      if (typeof val === "string") {
+        return new Date(val).toISOString().split("T")[0];
+      }
+      return val.toISOString().split("T")[0];
+    }),
+  });
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any)
+  .extend({
+    poId: z.number(),
+    lineNumber: z.number().int().min(1),
+    quantity: z.union([z.string(), z.number()]).transform(v => (typeof v === "number" ? String(v) : v)),
+    unitPrice: z.union([z.string(), z.number()]).transform(v => (typeof v === "number" ? String(v) : v)),
+    totalPrice: z.union([z.string(), z.number()]).transform(v => (typeof v === "number" ? String(v) : v)),
+    estimatedDeliveryDate: z.string().optional().nullable(),
+    actualDeliveryDate: z.string().optional().nullable(),
+    projectId: z.number().optional().nullable(),
+    wpId: z.number().optional().nullable(),
+  });
+
 // Vendor Master Schema
 export const insertVendorMasterSchema = createInsertSchema(vendorMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
@@ -1173,6 +1262,11 @@ export type InsertWorkPackageService = z.infer<typeof insertWorkPackageServiceSc
 
 export type VendorMaster = typeof vendorMaster.$inferSelect;
 export type InsertVendorMaster = z.infer<typeof insertVendorMasterSchema>;
+
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
 
 export type EmployeeMaster = typeof employeeMaster.$inferSelect;
 export type InsertEmployeeMaster = z.infer<typeof insertEmployeeMasterSchema>;

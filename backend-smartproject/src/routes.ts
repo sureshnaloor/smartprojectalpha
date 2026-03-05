@@ -105,6 +105,11 @@ import {
   projectActivityDependencies,
   projectActivities,
   projectActivityPlanVersions,
+  plannedCostWorkpackages,
+  purchaseOrders,
+  purchaseOrderItems,
+  insertPurchaseOrderSchema,
+  insertPurchaseOrderItemSchema,
 } from "./schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -3823,6 +3828,316 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const resources = await storage.getProjectResourcesByWorkPackage(wpId);
       res.json(resources);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Capture planned cost snapshot for a specific work package
+  app.post("/api/work-packages/:wpId/planned-cost", async (req: Request, res: Response) => {
+    try {
+      const wpId = parseInt(req.params.wpId);
+      if (isNaN(wpId)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(wpId);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      const projectId = workPackage.projectId;
+
+      const materialRows = await db.select().from(workPackageMaterials).where(eq(workPackageMaterials.wpId, wpId));
+      const serviceRows = await db.select().from(workPackageServices).where(eq(workPackageServices.wpId, wpId));
+      const resourceRows = await storage.getProjectResourcesByWorkPackage(wpId);
+
+      const materialsPlannedValue = materialRows.reduce((sum, m: any) => sum + Number(m.estimatedValue || 0), 0);
+      const servicesPlannedValue = serviceRows.reduce((sum, s: any) => sum + Number(s.estimatedValue || 0), 0);
+      const resourcesPlannedValue = resourceRows.reduce(
+        (sum: number, r: any) => sum + Number(r.unitRate || 0) * Number(r.quantity || 0),
+        0
+      );
+      const totalPlannedValue = materialsPlannedValue + servicesPlannedValue + resourcesPlannedValue;
+
+      const [existing] = await db
+        .select()
+        .from(plannedCostWorkpackages)
+        .where(
+          and(
+            eq(plannedCostWorkpackages.projectId, projectId),
+            eq(plannedCostWorkpackages.wpId, wpId)
+          )
+        );
+
+      let row;
+      if (existing) {
+        [row] = await db
+          .update(plannedCostWorkpackages)
+          .set({
+            materialsPlannedValue: materialsPlannedValue.toFixed(2),
+            servicesPlannedValue: servicesPlannedValue.toFixed(2),
+            resourcesPlannedValue: resourcesPlannedValue.toFixed(2),
+            totalPlannedValue: totalPlannedValue.toFixed(2),
+            isLocked: true,
+            updatedAt: new Date(),
+          } as any)
+          .where(
+            and(
+              eq(plannedCostWorkpackages.projectId, projectId),
+              eq(plannedCostWorkpackages.wpId, wpId)
+            )
+          )
+          .returning();
+      } else {
+        [row] = await db
+          .insert(plannedCostWorkpackages)
+          .values({
+            projectId,
+            wpId,
+            materialsPlannedValue: materialsPlannedValue.toFixed(2),
+            servicesPlannedValue: servicesPlannedValue.toFixed(2),
+            resourcesPlannedValue: resourcesPlannedValue.toFixed(2),
+            totalPlannedValue: totalPlannedValue.toFixed(2),
+            isLocked: true,
+          } as any)
+          .returning();
+      }
+
+      res.status(existing ? 200 : 201).json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Get planned cost snapshot for a specific work package
+  app.get("/api/work-packages/:wpId/planned-cost", async (req: Request, res: Response) => {
+    try {
+      const wpId = parseInt(req.params.wpId);
+      if (isNaN(wpId)) {
+        return res.status(400).json({ message: "Invalid work package ID" });
+      }
+
+      const workPackage = await storage.getWorkPackage(wpId);
+      if (!workPackage) {
+        return res.status(404).json({ message: "Work package not found" });
+      }
+
+      const projectId = workPackage.projectId;
+
+      const [row] = await db
+        .select()
+        .from(plannedCostWorkpackages)
+        .where(
+          and(
+            eq(plannedCostWorkpackages.projectId, projectId),
+            eq(plannedCostWorkpackages.wpId, wpId)
+          )
+        );
+
+      if (!row) {
+        return res.status(404).json({ message: "No planned cost snapshot for this work package" });
+      }
+
+      res.json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Purchase Orders
+  app.get("/api/purchase-orders", async (req: Request, res: Response) => {
+    try {
+      const orders = await db.select().from(purchaseOrders);
+      if (orders.length === 0) {
+        return res.json(orders);
+      }
+      const orderIds = orders.map((o: any) => o.id);
+      const allItems = await db
+        .select()
+        .from(purchaseOrderItems)
+        .where(inArray(purchaseOrderItems.poId, orderIds));
+      const itemsByPo = new Map<number, typeof allItems>();
+      for (const item of allItems) {
+        const list = itemsByPo.get(item.poId) ?? [];
+        list.push(item);
+        itemsByPo.set(item.poId, list);
+      }
+      const itemTypeFilter = typeof req.query.itemType === "string" ? req.query.itemType : null;
+      const result = orders.map((o: any) => {
+        const poItems = itemsByPo.get(o.id) ?? [];
+        const isDelivered =
+          poItems.length > 0 &&
+          poItems.every((i: any) => i.actualDeliveryDate != null && String(i.actualDeliveryDate).trim() !== "");
+        const typeSet = new Set(poItems.map((i: any) => i.itemType));
+        const primaryItemType = typeSet.size === 1 ? Array.from(typeSet)[0] : null;
+        return { ...o, isDelivered: !!isDelivered, primaryItemType };
+      });
+      const filtered = itemTypeFilter
+        ? result.filter((o: any) => o.primaryItemType === itemTypeFilter)
+        : result;
+      res.json(filtered);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/purchase-orders/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid purchase order ID" });
+      }
+
+      const [order] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+      if (!order) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+
+      const items = await db
+        .select()
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.poId, id));
+
+      res.json({ order, items });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/purchase-orders", async (req: Request, res: Response) => {
+    try {
+      const { items, ...header } = req.body as {
+        items?: any[];
+        poNumber: string;
+        poDate: string;
+        vendor: string;
+        remarks?: string | null;
+      };
+
+      const headerData = insertPurchaseOrderSchema.parse(header);
+      const [createdOrder] = await db.insert(purchaseOrders).values(headerData as any).returning();
+
+      if (items && Array.isArray(items) && items.length > 0) {
+        const parsedItems = items.map((raw, index) =>
+          insertPurchaseOrderItemSchema.parse({
+            ...raw,
+            poId: createdOrder.id,
+            lineNumber: raw.lineNumber ?? index + 1,
+            totalPrice:
+              raw.totalPrice ??
+              String(
+                Number(raw.quantity ?? 0) *
+                  Number(raw.unitPrice ?? 0)
+              ),
+          })
+        );
+        await db.insert(purchaseOrderItems).values(parsedItems as any);
+      }
+
+      res.status(201).json(createdOrder);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid purchase order ID" });
+      }
+      const [existing] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+      if (!existing) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+      const poItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, id));
+      const isDelivered =
+        poItems.length > 0 &&
+        poItems.every((i: any) => i.actualDeliveryDate != null && String(i.actualDeliveryDate).trim() !== "");
+      if (isDelivered) {
+        return res.status(403).json({ message: "Purchase order is already delivered; editing is not allowed." });
+      }
+      const body = req.body as {
+        poNumber?: string;
+        poDate?: string;
+        vendor?: string;
+        remarks?: string | null;
+        items?: any[];
+      };
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      if (body.poNumber !== undefined) updates.poNumber = body.poNumber;
+      if (body.poDate !== undefined) updates.poDate = body.poDate;
+      if (body.vendor !== undefined) updates.vendor = body.vendor;
+      if (body.remarks !== undefined) updates.remarks = body.remarks;
+      if (Object.keys(updates).length > 1) {
+        await db.update(purchaseOrders).set(updates as any).where(eq(purchaseOrders.id, id));
+      }
+      if (body.items && Array.isArray(body.items)) {
+        await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.poId, id));
+        if (body.items.length > 0) {
+          const parsedItems = body.items.map((raw: any, index: number) =>
+            insertPurchaseOrderItemSchema.parse({
+              ...raw,
+              poId: id,
+              lineNumber: raw.lineNumber ?? index + 1,
+              totalPrice:
+                raw.totalPrice ??
+                String(Number(raw.quantity ?? 0) * Number(raw.unitPrice ?? 0)),
+            })
+          );
+          await db.insert(purchaseOrderItems).values(parsedItems as any);
+        }
+      }
+      const [updated] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/items/bulk", async (req: Request, res: Response) => {
+    try {
+      const poId = parseInt(req.params.id);
+      if (isNaN(poId)) {
+        return res.status(400).json({ message: "Invalid purchase order ID" });
+      }
+
+      const { items } = req.body as { items: any[] };
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "No items provided" });
+      }
+
+      const existingItems = await db
+        .select()
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.poId, poId));
+      const usedLineNumbers = new Set(existingItems.map((i: any) => Number(i.lineNumber)));
+
+      let nextLineNumber = existingItems.length + 1;
+      const parsedItems = items.map((raw) => {
+        let lineNumber = raw.lineNumber ? Number(raw.lineNumber) : nextLineNumber;
+        while (usedLineNumbers.has(lineNumber)) {
+          lineNumber += 1;
+        }
+        usedLineNumbers.add(lineNumber);
+        nextLineNumber = lineNumber + 1;
+
+        return insertPurchaseOrderItemSchema.parse({
+          ...raw,
+          poId,
+          lineNumber,
+          totalPrice:
+            raw.totalPrice ??
+            String(
+              Number(raw.quantity ?? 0) *
+                Number(raw.unitPrice ?? 0)
+            ),
+        });
+      });
+
+      const inserted = await db.insert(purchaseOrderItems).values(parsedItems as any).returning();
+      res.status(201).json(inserted);
     } catch (err) {
       handleError(err, res);
     }

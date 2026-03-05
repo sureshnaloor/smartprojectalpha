@@ -1,4 +1,4 @@
-import { Cog, Truck, Factory, Settings } from "lucide-react";
+import { Cog, Truck, Factory, Settings, FileText } from "lucide-react";
 import MasterLayout from "@/layouts/master-layout";
 import { GlobalToolsHeader } from "@/components/global-tools-header";
 
@@ -9,6 +9,7 @@ interface EquipmentMasterLayoutProps {
 const tabs = [
   { label: "Equipment Master", href: "/equipment-master", Icon: Cog },
   { label: "Rental Equipment", href: "/equipment-master/rental", Icon: Truck },
+  { label: "Rental Equipment POs", href: "/equipment-master/rental-po", Icon: FileText },
   { label: "Manufacturer / OEM", href: "/equipment-master/manufacturers", Icon: Factory },
   { label: "Equipment Type", href: "/equipment-master/equipment-types", Icon: Settings },
 ];

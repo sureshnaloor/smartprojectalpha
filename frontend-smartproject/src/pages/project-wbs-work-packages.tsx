@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { buildWbsHierarchy } from "@/lib/utils";
 import type { WbsItem } from "@shared/schema";
@@ -23,6 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { ChevronRight, Package, Wrench, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface WorkPackage {
   id: number;
@@ -49,6 +51,8 @@ export default function ProjectWbsWorkPackages() {
   const [activeTab, setActiveTab] = useState<TabKey>(getTabFromHash);
   const [selectedWpId, setSelectedWpId] = useState<number | null>(null);
   const [expandedWbs, setExpandedWbs] = useState<Set<number>>(new Set());
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     const onHashChange = () => setActiveTab(getTabFromHash());
@@ -150,6 +154,56 @@ export default function ProjectWbsWorkPackages() {
 
   const selectedWP = workPackages.find((wp) => wp.id === selectedWpId);
   const isLoading = loadingWbs || loadingWps;
+
+  const { data: plannedCost, isLoading: loadingPlannedCost } = useQuery<any | null>({
+    queryKey: ["wp-planned-cost", selectedWpId],
+    queryFn: async () => {
+      if (!selectedWpId) return null;
+      const res = await fetch(`/api/work-packages/${selectedWpId}/planned-cost`);
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        throw new Error("Failed to load planned cost status");
+      }
+      return res.json();
+    },
+    enabled: !!selectedWpId,
+  });
+
+  const isAlreadyPlanned = !!plannedCost?.isLocked;
+
+  const markPlannedMutation = useMutation({
+    mutationFn: async (wpId: number) => {
+      const res = await apiRequest("POST", `/api/work-packages/${wpId}/planned-cost`);
+      if (!res.ok) {
+        let message = "Failed to save planned costs";
+        try {
+          const data = await res.json();
+          if (data?.message) message = data.message;
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: (_data, wpId) => {
+      toast({
+        title: "Work package planned",
+        description: "Planned materials, services and resources have been saved.",
+      });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/projects/${parseInt(projectId, 10)}/wbs`] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["wp-planned-cost", wpId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Could not save planned costs",
+        description: error?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   function renderWbsNode(items: (WbsItem & { children?: WbsItem[] })[], level: number) {
     return items.map((item) => {
@@ -429,6 +483,28 @@ export default function ProjectWbsWorkPackages() {
                 </div>
               )}
             </CardContent>
+            {selectedWpId && (
+              <div className="px-6 pb-6 pt-2 flex justify-end border-t border-zinc-100">
+                {isAlreadyPlanned && !loadingPlannedCost && (
+                  <div className="flex flex-col items-end mr-4">
+                    <span className="text-xs font-semibold tracking-wide text-emerald-700 uppercase">
+                      Already planned
+                    </span>
+                  </div>
+                )}
+                <Button
+                  variant="default"
+                  disabled={markPlannedMutation.isLoading || isAlreadyPlanned || loadingPlannedCost}
+                  onClick={() => markPlannedMutation.mutate(selectedWpId)}
+                >
+                  {markPlannedMutation.isLoading
+                    ? "Saving planned costs..."
+                    : isAlreadyPlanned
+                      ? "Mark work package as planned"
+                      : "Mark work package as planned"}
+                </Button>
+              </div>
+            )}
           </Card>
         </TabsContent>
 
