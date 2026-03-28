@@ -1201,23 +1201,78 @@ export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderIte
 export const insertVendorMasterSchema = createInsertSchema(vendorMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
 
+const parseDateInput = (val: Date | string | number): Date | null => {
+  if (val instanceof Date) {
+    return Number.isNaN(val.getTime()) ? null : val;
+  }
+
+  if (typeof val === "number") {
+    if (!Number.isFinite(val)) return null;
+    // Excel serial date support (days since 1899-12-30)
+    if (val >= 1 && val <= 60000) {
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const dateFromSerial = new Date(excelEpoch + Math.trunc(val) * 86400000);
+      return Number.isNaN(dateFromSerial.getTime()) ? null : dateFromSerial;
+    }
+    // Unix timestamp support (seconds or milliseconds)
+    const timestampMs = val < 1e12 ? val * 1000 : val;
+    const dateFromTimestamp = new Date(timestampMs);
+    return Number.isNaN(dateFromTimestamp.getTime()) ? null : dateFromTimestamp;
+  }
+
+  const trimmed = val.trim();
+  if (!trimmed) return null;
+
+  // DD/MM/YYYY, DD-MM-YYYY, MM/DD/YYYY, MM-DD-YYYY
+  const slashOrDashMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (slashOrDashMatch) {
+    const first = Number(slashOrDashMatch[1]);
+    const second = Number(slashOrDashMatch[2]);
+    const year = Number(slashOrDashMatch[3]);
+    const dayFirst = first > 12;
+    const month = dayFirst ? second : first;
+    const day = dayFirst ? first : second;
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    ) {
+      return parsed;
+    }
+    return null;
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const toIsoDateString = (val: Date | string | number, fieldName: string, ctx: z.RefinementCtx): string => {
+  const parsedDate = parseDateInput(val);
+  if (!parsedDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Invalid ${fieldName}`,
+    });
+    return z.NEVER;
+  }
+  return parsedDate.toISOString().split("T")[0];
+};
+
 // Employee Master Schema
 export const insertEmployeeMasterSchema = createInsertSchema(employeeMaster)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
-    empDob: z.date().or(z.string()).transform(val => {
-      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
-      return val.toISOString().split('T')[0];
+    empDob: z.union([z.date(), z.string(), z.number()]).transform((val, ctx) => {
+      return toIsoDateString(val, "empDob", ctx);
     }),
-    entryDate: z.date().or(z.string()).optional().nullable().transform(val => {
-      if (!val) return new Date().toISOString().split('T')[0];
-      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
-      return val.toISOString().split('T')[0];
+    entryDate: z.union([z.date(), z.string(), z.number()]).optional().nullable().transform((val, ctx) => {
+      if (!val) return new Date().toISOString().split("T")[0];
+      return toIsoDateString(val, "entryDate", ctx);
     }),
-    exitDate: z.date().or(z.string()).optional().nullable().transform(val => {
+    exitDate: z.union([z.date(), z.string(), z.number()]).optional().nullable().transform((val, ctx) => {
       if (!val) return null;
-      if (typeof val === 'string') return new Date(val).toISOString().split('T')[0];
-      return val.toISOString().split('T')[0];
+      return toIsoDateString(val, "exitDate", ctx);
     }),
     empGender: z.enum(["M", "F"]),
   });
@@ -1226,19 +1281,16 @@ export const insertEmployeeMasterSchema = createInsertSchema(employeeMaster)
 export const insertRentalManpowerSchema = createInsertSchema(rentalManpower)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
-    empDob: z.date().or(z.string()).transform(val => {
-      if (typeof val === "string") return new Date(val).toISOString().split("T")[0];
-      return val.toISOString().split("T")[0];
+    empDob: z.union([z.date(), z.string(), z.number()]).transform((val, ctx) => {
+      return toIsoDateString(val, "empDob", ctx);
     }),
-    entryDate: z.date().or(z.string()).optional().nullable().transform(val => {
+    entryDate: z.union([z.date(), z.string(), z.number()]).optional().nullable().transform((val, ctx) => {
       if (!val) return new Date().toISOString().split("T")[0];
-      if (typeof val === "string") return new Date(val).toISOString().split("T")[0];
-      return val.toISOString().split("T")[0];
+      return toIsoDateString(val, "entryDate", ctx);
     }),
-    exitDate: z.date().or(z.string()).optional().nullable().transform(val => {
+    exitDate: z.union([z.date(), z.string(), z.number()]).optional().nullable().transform((val, ctx) => {
       if (!val) return null;
-      if (typeof val === "string") return new Date(val).toISOString().split("T")[0];
-      return val.toISOString().split("T")[0];
+      return toIsoDateString(val, "exitDate", ctx);
     }),
     empGender: z.enum(["M", "F"]),
   });

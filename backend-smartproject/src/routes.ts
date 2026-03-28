@@ -374,6 +374,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk import activity masters
+  app.post("/api/activities/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const activitiesToCreate: any[] = [];
+      const rowErrors: Array<{ row: number; errors: unknown[] }> = [];
+
+      csvData.forEach((row: any, index: number) => {
+        const parsed = insertActivitySchema.safeParse(row);
+        if (parsed.success) {
+          activitiesToCreate.push(parsed.data);
+        } else {
+          rowErrors.push({
+            row: index + 1,
+            errors: parsed.error.errors,
+          });
+        }
+      });
+
+      if (rowErrors.length > 0) {
+        return res.status(400).json({
+          message: "Validation error in uploaded rows",
+          errors: rowErrors,
+        });
+      }
+
+      const createdActivities = await Promise.all(
+        activitiesToCreate.map((activityData) => storage.createActivity(activityData))
+      );
+      res.status(201).json(createdActivities);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   app.put("/api/activities/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
@@ -3153,6 +3192,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resourceData = insertResourceSchema.parse(req.body);
       const resource = await storage.createResource(resourceData as any);
       res.status(201).json(resource);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Bulk import resources
+  app.post("/api/resources/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const resourcesToCreate: any[] = [];
+      const rowErrors: Array<{ row: number; errors: unknown[] }> = [];
+
+      csvData.forEach((row: any, index: number) => {
+        const parsed = insertResourceSchema.safeParse(row);
+        if (parsed.success) {
+          resourcesToCreate.push(parsed.data);
+        } else {
+          rowErrors.push({
+            row: index + 1,
+            errors: parsed.error.errors,
+          });
+        }
+      });
+
+      if (rowErrors.length > 0) {
+        return res.status(400).json({
+          message: "Validation error in uploaded rows",
+          errors: rowErrors,
+        });
+      }
+
+      const createdResources = await db.insert(resources).values(resourcesToCreate as any).returning();
+      res.status(201).json(createdResources);
     } catch (err) {
       handleError(err, res);
     }
@@ -7502,9 +7578,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "csvData must be an array" });
       }
 
-      const employees = csvData.map((row: any) => insertEmployeeMasterSchema.parse(row));
-      const createdEmployees = await db.insert(employeeMaster).values(employees as any).returning();
-      res.status(201).json(createdEmployees);
+      const employeesWithRow: Array<{ row: number; data: any }> = [];
+      const rowErrors: Array<{ row: number; errors: unknown[] }> = [];
+
+      csvData.forEach((row: any, index: number) => {
+        const parsed = insertEmployeeMasterSchema.safeParse(row);
+        if (parsed.success) {
+          employeesWithRow.push({ row: index + 1, data: parsed.data });
+        } else {
+          rowErrors.push({
+            row: index + 1,
+            errors: parsed.error.errors,
+          });
+        }
+      });
+
+      if (rowErrors.length > 0) {
+        return res.status(400).json({
+          message: "Validation error in uploaded rows",
+          errors: rowErrors,
+        });
+      }
+
+      const employees = employeesWithRow.map(item => item.data);
+
+      // Check duplicate unique fields inside CSV itself before DB insert.
+      const nationalIdRows = new Map<string, number[]>();
+      const employeeNumberRows = new Map<string, number[]>();
+      employeesWithRow.forEach(({ row, data }) => {
+        const nationalId = String(data.empNationalId).trim();
+        const employeeNumber = String(data.employeeNumber).trim();
+        nationalIdRows.set(nationalId, [...(nationalIdRows.get(nationalId) ?? []), row]);
+        employeeNumberRows.set(employeeNumber, [...(employeeNumberRows.get(employeeNumber) ?? []), row]);
+      });
+
+      nationalIdRows.forEach((rows, value) => {
+        if (rows.length > 1) {
+          rows.forEach(row => {
+            rowErrors.push({
+              row,
+              errors: [{ message: `Duplicate empNationalId in upload: ${value}`, path: ["empNationalId"] }],
+            });
+          });
+        }
+      });
+
+      employeeNumberRows.forEach((rows, value) => {
+        if (rows.length > 1) {
+          rows.forEach(row => {
+            rowErrors.push({
+              row,
+              errors: [{ message: `Duplicate employeeNumber in upload: ${value}`, path: ["employeeNumber"] }],
+            });
+          });
+        }
+      });
+
+      // Check duplicates against existing DB rows (unique constraints).
+      const nationalIds = [...new Set(employees.map(emp => String(emp.empNationalId).trim()))];
+      const employeeNumbers = [...new Set(employees.map(emp => String(emp.employeeNumber).trim()))];
+
+      const existingByNationalId = nationalIds.length
+        ? await db
+            .select({ empNationalId: employeeMaster.empNationalId })
+            .from(employeeMaster)
+            .where(inArray(employeeMaster.empNationalId, nationalIds))
+        : [];
+      const existingByEmployeeNumber = employeeNumbers.length
+        ? await db
+            .select({ employeeNumber: employeeMaster.employeeNumber })
+            .from(employeeMaster)
+            .where(inArray(employeeMaster.employeeNumber, employeeNumbers))
+        : [];
+
+      const existingNationalIdSet = new Set(existingByNationalId.map(item => item.empNationalId));
+      const existingEmployeeNumberSet = new Set(existingByEmployeeNumber.map(item => item.employeeNumber));
+
+      employeesWithRow.forEach(({ row, data }) => {
+        const nationalId = String(data.empNationalId).trim();
+        const employeeNumber = String(data.employeeNumber).trim();
+        if (existingNationalIdSet.has(nationalId)) {
+          rowErrors.push({
+            row,
+            errors: [{ message: `empNationalId already exists: ${nationalId}`, path: ["empNationalId"] }],
+          });
+        }
+        if (existingEmployeeNumberSet.has(employeeNumber)) {
+          rowErrors.push({
+            row,
+            errors: [{ message: `employeeNumber already exists: ${employeeNumber}`, path: ["employeeNumber"] }],
+          });
+        }
+      });
+
+      const rowsWithErrors = new Set(rowErrors.map(item => item.row));
+      const validEmployees = employeesWithRow
+        .filter(item => !rowsWithErrors.has(item.row))
+        .map(item => item.data);
+
+      if (validEmployees.length === 0) {
+        return res.status(400).json({
+          message: "No valid rows to import",
+          createdCount: 0,
+          skippedCount: rowErrors.length,
+          errors: rowErrors,
+        });
+      }
+
+      const createdEmployees = await db.insert(employeeMaster).values(validEmployees as any).returning();
+      res.status(201).json({
+        message: rowErrors.length > 0 ? "Imported with skipped rows" : "Imported successfully",
+        createdCount: createdEmployees.length,
+        skippedCount: rowErrors.length,
+        createdEmployees,
+        skippedRows: rowErrors,
+      });
     } catch (err) {
       handleError(err, res);
     }
