@@ -1050,6 +1050,18 @@ export const rentalManpower = pgTable("rental_manpower", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Rental Manpower Resource Mapping (rental employee → rental_manpower type resource, one-to-one)
+export const rentalManpowerResourceMappings = pgTable("rental_manpower_resource_mappings", {
+  id: serial("id").primaryKey(),
+  rentalManpowerId: integer("rental_manpower_id")
+    .notNull()
+    .unique()
+    .references(() => rentalManpower.id, { onDelete: "cascade" }),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Equipment Manufacturer/OEM Table
 export const equipmentManufacturers = pgTable("equipment_manufacturers", {
   id: serial("id").primaryKey(),
@@ -1101,6 +1113,18 @@ export const rentalEquipment = pgTable("rental_equipment", {
   unit: text("unit"),
   costPerHour: numeric("cost_per_hour", { precision: 12, scale: 2 }).notNull(),
   vendorId: integer("vendor_id").notNull().references(() => vendorMaster.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Rental equipment ↔ rental_equipment global resource (one-to-one)
+export const rentalEquipmentResourceMappings = pgTable("rental_equipment_resource_mappings", {
+  id: serial("id").primaryKey(),
+  rentalEquipmentId: integer("rental_equipment_id")
+    .notNull()
+    .unique()
+    .references(() => rentalEquipment.id, { onDelete: "cascade" }),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1333,6 +1357,12 @@ export const insertEmployeeResourceMappingSchema = createInsertSchema(employeeRe
 export type EmployeeResourceMapping = typeof employeeResourceMappings.$inferSelect;
 export type InsertEmployeeResourceMapping = z.infer<typeof insertEmployeeResourceMappingSchema>;
 
+export const insertRentalManpowerResourceMappingSchema = createInsertSchema(rentalManpowerResourceMappings)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export type RentalManpowerResourceMapping = typeof rentalManpowerResourceMappings.$inferSelect;
+export type InsertRentalManpowerResourceMapping = z.infer<typeof insertRentalManpowerResourceMappingSchema>;
+
 // Equipment Manufacturer Schema
 export const insertEquipmentManufacturerSchema = createInsertSchema(equipmentManufacturers)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
@@ -1364,6 +1394,12 @@ export const insertEquipmentResourceMappingSchema = createInsertSchema(equipment
 
 export type EquipmentResourceMapping = typeof equipmentResourceMappings.$inferSelect;
 export type InsertEquipmentResourceMapping = z.infer<typeof insertEquipmentResourceMappingSchema>;
+
+export const insertRentalEquipmentResourceMappingSchema = createInsertSchema(rentalEquipmentResourceMappings)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+
+export type RentalEquipmentResourceMapping = typeof rentalEquipmentResourceMappings.$inferSelect;
+export type InsertRentalEquipmentResourceMapping = z.infer<typeof insertRentalEquipmentResourceMappingSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

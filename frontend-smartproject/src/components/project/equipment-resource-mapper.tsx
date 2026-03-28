@@ -108,8 +108,9 @@ export function EquipmentResourceMapper({
   } = useQuery({
     queryKey: ["equipmentResourceMapping", equipmentId],
     queryFn: () => getEquipmentResourceMapping(equipmentId),
-    enabled: isOpen,
   });
+
+  const isMapped = !!currentMapping;
 
   // Mutation for creating/updating mapping
   const mapResourceMutation = useMutation({
@@ -139,6 +140,7 @@ export function EquipmentResourceMapper({
     mutationFn: () => unmapResourceFromEquipment(equipmentId),
     onSuccess: () => {
       toast({ title: "Resource unmapped successfully" });
+      setIsOpen(false);
       queryClient.invalidateQueries({
         queryKey: ["equipmentResourceMapping", equipmentId],
       });
@@ -175,17 +177,45 @@ export function EquipmentResourceMapper({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          title="Map this equipment to an equipment resource"
-        >
-          <Link2 className="h-4 w-4" />
-          Map Resource
-        </Button>
-      </DialogTrigger>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {isMapped ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 opacity-50 cursor-not-allowed pointer-events-none"
+              disabled
+              title="This equipment is already mapped to a resource"
+            >
+              <Link2 className="h-4 w-4" />
+              Map Resource
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1 text-xs"
+              onClick={() => setIsOpen(true)}
+              title="View or remove resource mapping"
+            >
+              Manage
+            </Button>
+          </>
+        ) : (
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              title="Map this equipment to an equipment resource"
+            >
+              <Link2 className="h-4 w-4" />
+              Map Resource
+            </Button>
+          </DialogTrigger>
+        )}
+      </div>
 
       <DialogContent className="max-w-2xl">
         <DialogHeader>

@@ -33,6 +33,7 @@ import {
   projectCollaborationThreads,
   projectCollaborationMessages,
   projects,
+  workPackages,
   tasks,
   insertDailyProgressSchema,
   insertResourcePlanSchema,
@@ -52,8 +53,10 @@ import {
   insertVendorMasterSchema,
   insertEmployeeMasterSchema,
   insertEmployeeResourceMappingSchema,
+  insertRentalManpowerResourceMappingSchema,
   insertEquipmentMasterSchema,
   insertEquipmentResourceMappingSchema,
+  insertRentalEquipmentResourceMappingSchema,
   insertRentalManpowerSchema,
   materialMaster,
   serviceMaster,
@@ -67,10 +70,12 @@ import {
   employeeMaster,
   rentalManpower,
   employeeResourceMappings,
+  rentalManpowerResourceMappings,
   equipmentMaster,
   equipmentManufacturers,
   equipmentTypes,
   rentalEquipment,
+  rentalEquipmentResourceMappings,
   insertEquipmentManufacturerSchema,
   insertEquipmentTypeSchema,
   insertRentalEquipmentSchema,
@@ -2407,6 +2412,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      const normalizeWbsTypeCsv = (raw: unknown): string | null => {
+        if (raw == null) return null;
+        const s = String(raw)
+          .replace(/^\uFEFF/g, "")
+          .replace(/[\u200B-\u200D\uFEFF]/g, "")
+          .normalize("NFKC")
+          .trim();
+        const compact = s.replace(/\s+/g, "");
+        if (["SUMMARY", "WBS", "WorkPackage"].includes(compact)) return compact;
+        const key = s.toLowerCase().replace(/[\s_-]+/g, "");
+        if (key === "summary") return "SUMMARY";
+        if (key === "wbs") return "WBS";
+        if (key === "workpackage") return "WorkPackage";
+        return null;
+      };
+
       const existingWbsItems = await storage.getWbsItems(projectId);
       const wbsItemsByCode = new Map(existingWbsItems.map((item: { code: string; id: number }) => [item.code, item]));
 
@@ -2432,6 +2453,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return 0;
       });
+
+      for (const row of sortedRows) {
+        const n = normalizeWbsTypeCsv((row as { wbsType?: unknown }).wbsType);
+        if (n) (row as { wbsType: string }).wbsType = n;
+      }
 
       // First pass: validate hierarchy rules (level vs type, and same-level children consistency)
       const rowsByCode = new Map(sortedRows.map((r: { wbsCode: string }, idx: number) => [r.wbsCode, { ...r, _index: idx + 1 }]));
@@ -3146,7 +3172,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(inArray(employeeMaster.id, ids));
           result.ownManpower = employees;
         }
-        // rentalManpower: no mapping table yet - leave empty for now
+      } else if (type === "rental_manpower") {
+        const rmMappings = await db
+          .select({ rentalManpowerId: rentalManpowerResourceMappings.rentalManpowerId })
+          .from(rentalManpowerResourceMappings)
+          .where(eq(rentalManpowerResourceMappings.resourceId, resourceId));
+        if (rmMappings.length > 0) {
+          const ids = rmMappings.map((m) => m.rentalManpowerId);
+          const rentalEmployees = await db
+            .select()
+            .from(rentalManpower)
+            .where(inArray(rentalManpower.id, ids));
+          result.rentalManpower = rentalEmployees;
+        }
       } else if (type === "equipment") {
         const eqMappings = await db
           .select({ equipmentId: equipmentResourceMappings.equipmentId })
@@ -3160,7 +3198,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(inArray(equipmentMaster.id, ids));
           result.ownEquipment = equipment;
         }
-        // rentalEquipment: no mapping table yet - leave empty for now
+      } else if (type === "rental_equipment") {
+        const reMappings = await db
+          .select({ rentalEquipmentId: rentalEquipmentResourceMappings.rentalEquipmentId })
+          .from(rentalEquipmentResourceMappings)
+          .where(eq(rentalEquipmentResourceMappings.resourceId, resourceId));
+        if (reMappings.length > 0) {
+          const ids = reMappings.map((m) => m.rentalEquipmentId);
+          const rentalEq = await db
+            .select()
+            .from(rentalEquipment)
+            .where(inArray(rentalEquipment.id, ids));
+          result.rentalEquipment = rentalEq;
+        }
       }
 
       res.json(result);
@@ -3903,7 +3953,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const resources = await storage.getProjectResourcesByWorkPackage(wpId);
-      res.json(resources);
+      const withEstimatedValue = resources.map((r: Record<string, unknown>) => {
+        const unitRate = Number(r.unitRate ?? r.unit_rate ?? 0);
+        const quantity = Number(r.quantity ?? r.qty ?? 0);
+        const estimatedValue =
+          Number.isFinite(unitRate) && Number.isFinite(quantity) ? unitRate * quantity : 0;
+        return {
+          ...r,
+          estimatedValue: estimatedValue.toFixed(2),
+        };
+      });
+      res.json(withEstimatedValue);
     } catch (err) {
       handleError(err, res);
     }
@@ -6608,6 +6668,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // ALLOCATION (cross-project rollups for materials / resources on work packages)
+  // ========================================
+
+  /** Global material master rows with total qty across all WPs and per-WP breakdown (project + WP). */
+  app.get("/api/allocation/materials", async (_req: Request, res: Response) => {
+    try {
+      const allMaterials = await db.select().from(materialMaster);
+      const allocationRows = await db
+        .select({
+          id: workPackageMaterials.id,
+          materialId: workPackageMaterials.materialId,
+          quantity: workPackageMaterials.quantity,
+          wpId: workPackages.id,
+          wpName: workPackages.name,
+          wpCode: workPackages.code,
+          projectId: projects.id,
+          projectName: projects.name,
+        })
+        .from(workPackageMaterials)
+        .innerJoin(workPackages, eq(workPackageMaterials.wpId, workPackages.id))
+        .innerJoin(projects, eq(workPackageMaterials.projectId, projects.id));
+
+      type Alloc = {
+        allocationId: number;
+        projectId: number;
+        projectName: string;
+        wpId: number;
+        wpCode: string;
+        wpName: string;
+        quantity: number;
+      };
+      const byMaterial = new Map<number, { total: number; allocations: Alloc[] }>();
+      for (const row of allocationRows) {
+        const q = parseFloat(String(row.quantity ?? "0"));
+        const qty = Number.isFinite(q) ? q : 0;
+        const cur = byMaterial.get(row.materialId) ?? { total: 0, allocations: [] as Alloc[] };
+        cur.total += qty;
+        cur.allocations.push({
+          allocationId: row.id,
+          projectId: row.projectId,
+          projectName: row.projectName,
+          wpId: row.wpId,
+          wpCode: row.wpCode,
+          wpName: row.wpName,
+          quantity: qty,
+        });
+        byMaterial.set(row.materialId, cur);
+      }
+
+      const materials = allMaterials.map((m) => {
+        const agg = byMaterial.get(m.id);
+        const allocations = [...(agg?.allocations ?? [])].sort((a, b) => {
+          const pc = a.projectName.localeCompare(b.projectName, undefined, { sensitivity: "base" });
+          if (pc !== 0) return pc;
+          return a.wpCode.localeCompare(b.wpCode, undefined, { numeric: true });
+        });
+        return {
+          ...m,
+          totalQuantityRequired: agg?.total ?? 0,
+          allocations,
+        };
+      });
+      materials.sort((a, b) =>
+        String(a.materialCode ?? "").localeCompare(String(b.materialCode ?? ""), undefined, { sensitivity: "base" })
+      );
+
+      /** PO lines store free-text description (usually material master description); match to material rows. */
+      const poMaterialLines = await db
+        .select()
+        .from(purchaseOrderItems)
+        .where(eq(purchaseOrderItems.itemType, "material"));
+      const poIdSet = [...new Set(poMaterialLines.map((r) => r.poId))];
+      const orderRows =
+        poIdSet.length > 0
+          ? await db.select().from(purchaseOrders).where(inArray(purchaseOrders.id, poIdSet))
+          : [];
+      const orderById = new Map(orderRows.map((o) => [o.id, o]));
+
+      const lineMatchesMaterial = (
+        itemDescription: string,
+        row: { materialCode: string; materialDescription: string }
+      ): boolean => {
+        const d = (itemDescription ?? "").trim();
+        if (!d) return false;
+        const md = (row.materialDescription ?? "").trim();
+        const code = (row.materialCode ?? "").trim();
+        if (d === md) return true;
+        const combinedEm = `${code} — ${md}`;
+        const combinedHyphen = `${code} - ${md}`;
+        if (code && (d === combinedEm || d === combinedHyphen)) return true;
+        if (code && (d.startsWith(`${code} —`) || d.startsWith(`${code} -`))) return true;
+        return false;
+      };
+
+      type PoLineOut = {
+        id: number;
+        lineNumber: number;
+        itemDescription: string;
+        quantity: string;
+        unitOfMeasure: string;
+        unitPrice: string;
+        totalPrice: string;
+        estimatedDeliveryDate: string | null;
+        actualDeliveryDate: string | null;
+        projectId: number | null;
+        wpId: number | null;
+      };
+      type PoOut = {
+        poId: number;
+        poNumber: string;
+        poDate: string;
+        vendor: string;
+        remarks: string | null;
+        lines: PoLineOut[];
+      };
+
+      const materialsWithPo = materials.map((m) => {
+        const matching = poMaterialLines.filter((line) => lineMatchesMaterial(line.itemDescription, m));
+        const byPoId = new Map<number, (typeof purchaseOrderItems.$inferSelect)[]>();
+        for (const line of matching) {
+          const list = byPoId.get(line.poId) ?? [];
+          list.push(line);
+          byPoId.set(line.poId, list);
+        }
+        const purchaseOrders: PoOut[] = [];
+        for (const [poId, lines] of byPoId) {
+          const hdr = orderById.get(poId);
+          if (!hdr) continue;
+          const sorted = [...lines].sort((a, b) => a.lineNumber - b.lineNumber);
+          purchaseOrders.push({
+            poId: hdr.id,
+            poNumber: hdr.poNumber,
+            poDate:
+              hdr.poDate instanceof Date
+                ? hdr.poDate.toISOString().slice(0, 10)
+                : String(hdr.poDate ?? ""),
+            vendor: hdr.vendor,
+            remarks: hdr.remarks ?? null,
+            lines: sorted.map((line) => ({
+              id: line.id,
+              lineNumber: line.lineNumber,
+              itemDescription: line.itemDescription,
+              quantity: String(line.quantity),
+              unitOfMeasure: line.unitOfMeasure,
+              unitPrice: String(line.unitPrice),
+              totalPrice: String(line.totalPrice),
+              estimatedDeliveryDate: line.estimatedDeliveryDate
+                ? String(line.estimatedDeliveryDate)
+                : null,
+              actualDeliveryDate: line.actualDeliveryDate ? String(line.actualDeliveryDate) : null,
+              projectId: line.projectId ?? null,
+              wpId: line.wpId ?? null,
+            })),
+          });
+        }
+        purchaseOrders.sort((a, b) => String(b.poDate).localeCompare(String(a.poDate)));
+        return { ...m, purchaseOrders };
+      });
+
+      res.json({ materials: materialsWithPo });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ========================================
   // WORK PACKAGE MATERIALS (assign materials to WP; estimated value = quantity * base_rate)
   // ========================================
 
@@ -7823,6 +8049,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/resources/rental_manpower/all", async (_req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.type, "rental_manpower"));
+      res.json(rows);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/resources/rental_equipment/all", async (_req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.type, "rental_equipment"));
+      res.json(rows);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   // Get resource mapping for an employee
   app.get("/api/employee/:id/resource-mapping", async (req: Request, res: Response) => {
     try {
@@ -7931,6 +8181,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Mapping not found" });
       }
 
+      res.json({ message: "Mapping deleted successfully", deletedMapping: result[0] });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Rental manpower ↔ rental_manpower resource mapping (one-to-one)
+  app.get("/api/rental-manpower/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const rentalId = parseInt(req.params.id);
+      if (isNaN(rentalId)) {
+        return res.status(400).json({ message: "Invalid rental manpower ID" });
+      }
+      const mapping = await db
+        .select()
+        .from(rentalManpowerResourceMappings)
+        .where(eq(rentalManpowerResourceMappings.rentalManpowerId, rentalId));
+      if (mapping.length === 0) {
+        return res.json(null);
+      }
+      res.json(mapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/rental-manpower/:id/map-resource", async (req: Request, res: Response) => {
+    try {
+      const rentalId = parseInt(req.params.id);
+      if (isNaN(rentalId)) {
+        return res.status(400).json({ message: "Invalid rental manpower ID" });
+      }
+      const mappingData = insertRentalManpowerResourceMappingSchema.parse({
+        rentalManpowerId: rentalId,
+        resourceId: req.body.resourceId,
+      });
+      const [rentalRow] = await db.select().from(rentalManpower).where(eq(rentalManpower.id, rentalId));
+      if (!rentalRow) {
+        return res.status(404).json({ message: "Rental manpower record not found" });
+      }
+      const [resource] = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, (mappingData as { resourceId: number }).resourceId));
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      if (resource.type !== "rental_manpower") {
+        return res.status(400).json({ message: "Resource must be of type 'rental_manpower'" });
+      }
+      const existingMapping = await db
+        .select()
+        .from(rentalManpowerResourceMappings)
+        .where(eq(rentalManpowerResourceMappings.rentalManpowerId, rentalId));
+      if (existingMapping.length > 0) {
+        const [updated] = await db
+          .update(rentalManpowerResourceMappings)
+          .set({
+            resourceId: (mappingData as { resourceId: number }).resourceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(rentalManpowerResourceMappings.rentalManpowerId, rentalId))
+          .returning();
+        return res.json(updated);
+      }
+      const [created] = await db
+        .insert(rentalManpowerResourceMappings)
+        .values(mappingData as any)
+        .returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/rental-manpower/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const rentalId = parseInt(req.params.id);
+      if (isNaN(rentalId)) {
+        return res.status(400).json({ message: "Invalid rental manpower ID" });
+      }
+      const result = await db
+        .delete(rentalManpowerResourceMappings)
+        .where(eq(rentalManpowerResourceMappings.rentalManpowerId, rentalId))
+        .returning();
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
       res.json({ message: "Mapping deleted successfully", deletedMapping: result[0] });
     } catch (err) {
       handleError(err, res);
@@ -8212,6 +8550,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
       await db.delete(rentalEquipment).where(eq(rentalEquipment.id, id));
       res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/rental-equipment/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const rentalId = parseInt(req.params.id);
+      if (isNaN(rentalId)) {
+        return res.status(400).json({ message: "Invalid rental equipment ID" });
+      }
+      const mapping = await db
+        .select()
+        .from(rentalEquipmentResourceMappings)
+        .where(eq(rentalEquipmentResourceMappings.rentalEquipmentId, rentalId));
+      if (mapping.length === 0) {
+        return res.json(null);
+      }
+      res.json(mapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/rental-equipment/:id/map-resource", async (req: Request, res: Response) => {
+    try {
+      const rentalId = parseInt(req.params.id);
+      if (isNaN(rentalId)) {
+        return res.status(400).json({ message: "Invalid rental equipment ID" });
+      }
+      const mappingData = insertRentalEquipmentResourceMappingSchema.parse({
+        rentalEquipmentId: rentalId,
+        resourceId: req.body.resourceId,
+      });
+      const [rentalRow] = await db.select().from(rentalEquipment).where(eq(rentalEquipment.id, rentalId));
+      if (!rentalRow) {
+        return res.status(404).json({ message: "Rental equipment not found" });
+      }
+      const [resource] = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, (mappingData as { resourceId: number }).resourceId));
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      if (resource.type !== "rental_equipment") {
+        return res.status(400).json({ message: "Resource must be of type 'rental_equipment'" });
+      }
+      const existingMapping = await db
+        .select()
+        .from(rentalEquipmentResourceMappings)
+        .where(eq(rentalEquipmentResourceMappings.rentalEquipmentId, rentalId));
+      if (existingMapping.length > 0) {
+        const [updated] = await db
+          .update(rentalEquipmentResourceMappings)
+          .set({
+            resourceId: (mappingData as { resourceId: number }).resourceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(rentalEquipmentResourceMappings.rentalEquipmentId, rentalId))
+          .returning();
+        return res.json(updated);
+      }
+      const [created] = await db
+        .insert(rentalEquipmentResourceMappings)
+        .values(mappingData as any)
+        .returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/rental-equipment/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const rentalId = parseInt(req.params.id);
+      if (isNaN(rentalId)) {
+        return res.status(400).json({ message: "Invalid rental equipment ID" });
+      }
+      const result = await db
+        .delete(rentalEquipmentResourceMappings)
+        .where(eq(rentalEquipmentResourceMappings.rentalEquipmentId, rentalId))
+        .returning();
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+      res.json({ message: "Mapping deleted successfully", deletedMapping: result[0] });
     } catch (err) {
       handleError(err, res);
     }

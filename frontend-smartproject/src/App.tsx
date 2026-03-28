@@ -96,6 +96,7 @@ import NewLanding from "@/pages/new-landing";
 import NewProject from "@/pages/new-project";
 import ProjectCharts from "@/pages/project-charts";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
+import AllocationMaterials from "@/pages/allocation-materials";
 
 
 // Implementing a flatter routing approach without nesting
@@ -656,6 +657,33 @@ function Router() {
       <Route path="/collab/thread/:threadId">
         <MasterLayout>
           <ThreadDetailPage />
+        </MasterLayout>
+      </Route>
+
+      {/* Allocation (cross-project) */}
+      <Route path="/allocation/materials">
+        <MasterLayout>
+          <AllocationMaterials />
+        </MasterLayout>
+      </Route>
+      <Route path="/allocation/manpower">
+        <MasterLayout>
+          <GlobalToolsPlaceholder />
+        </MasterLayout>
+      </Route>
+      <Route path="/allocation/equipment">
+        <MasterLayout>
+          <GlobalToolsPlaceholder />
+        </MasterLayout>
+      </Route>
+      <Route path="/allocation/rental-manpower">
+        <MasterLayout>
+          <GlobalToolsPlaceholder />
+        </MasterLayout>
+      </Route>
+      <Route path="/allocation/rental-equipment">
+        <MasterLayout>
+          <GlobalToolsPlaceholder />
         </MasterLayout>
       </Route>
 

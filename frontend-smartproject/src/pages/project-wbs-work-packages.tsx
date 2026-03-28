@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -155,6 +154,24 @@ export default function ProjectWbsWorkPackages() {
   const selectedWP = workPackages.find((wp) => wp.id === selectedWpId);
   const isLoading = loadingWbs || loadingWps;
 
+  /** Prefer API `estimatedValue`; else qty × unit rate (camelCase or snake_case). */
+  function getResourceEstimatedValue(r: Record<string, unknown>): number {
+    const direct = r.estimatedValue ?? r.estimated_value;
+    if (direct != null && direct !== "") {
+      const v = Number(direct);
+      if (Number.isFinite(v)) return v;
+    }
+    const rate = Number(r.unitRate ?? r.unit_rate ?? 0);
+    const qty = Number(r.quantity ?? r.qty ?? 0);
+    if (!Number.isFinite(rate) || !Number.isFinite(qty)) return 0;
+    return rate * qty;
+  }
+
+  function getResourceUnitRate(r: Record<string, unknown>): number {
+    const rate = Number(r.unitRate ?? r.unit_rate ?? 0);
+    return Number.isFinite(rate) ? rate : 0;
+  }
+
   const { data: plannedCost, isLoading: loadingPlannedCost } = useQuery<any | null>({
     queryKey: ["wp-planned-cost", selectedWpId],
     queryFn: async () => {
@@ -265,35 +282,31 @@ export default function ProjectWbsWorkPackages() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] p-4 gap-4">
+    <div className="flex w-full max-w-full flex-col gap-4 p-4 pb-12">
       <Tabs value={activeTab}>
-        <TabsContent value="home" className="flex-1 mt-4 min-h-0 flex gap-4">
-          <Card className="w-96 flex-shrink-0 flex flex-col">
+        <TabsContent value="home" className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
+          <Card className="flex w-full shrink-0 flex-col lg:w-96">
             <CardHeader>
               <CardTitle className="text-base">WBS & Work Packages</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden p-0">
+            <CardContent className="p-0 px-2 pb-4">
               {isLoading ? (
                 <div className="p-4 space-y-2">
                   <Skeleton className="h-6 w-full" />
                   <Skeleton className="h-6 w-full" />
                   <Skeleton className="h-6 w-full" />
                 </div>
+              ) : hierarchy.length === 0 ? (
+                <p className="text-sm text-zinc-500 p-4">
+                  No WBS items. Import WBS or add from project.
+                </p>
               ) : (
-                <ScrollArea className="h-full px-2 pb-4">
-                  {hierarchy.length === 0 ? (
-                    <p className="text-sm text-zinc-500 p-4">
-                      No WBS items. Import WBS or add from project.
-                    </p>
-                  ) : (
-                    renderWbsNode(hierarchy, 0)
-                  )}
-                </ScrollArea>
+                renderWbsNode(hierarchy, 0)
               )}
             </CardContent>
           </Card>
 
-          <Card className="flex-1 flex flex-col min-h-0">
+          <Card className="flex min-w-0 w-full flex-1 flex-col">
             <CardHeader>
               <CardTitle className="text-lg font-extrabold tracking-tight text-amber-800">
                 {selectedWP
@@ -306,7 +319,7 @@ export default function ProjectWbsWorkPackages() {
                 </p>
               )}
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto">
+            <CardContent>
               {!selectedWpId ? (
                 <div className="flex h-full items-center justify-center text-zinc-500 border-2 border-dashed rounded-lg p-8">
                   <p>Click a work package in the list to view its materials, services and resources.</p>
@@ -326,6 +339,7 @@ export default function ProjectWbsWorkPackages() {
                     {wpMaterials.length === 0 ? (
                       <p className="text-sm text-zinc-500">No materials assigned.</p>
                     ) : (
+                      <div className="w-full overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -368,6 +382,7 @@ export default function ProjectWbsWorkPackages() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </div>
 
@@ -384,6 +399,7 @@ export default function ProjectWbsWorkPackages() {
                     {wpServices.length === 0 ? (
                       <p className="text-sm text-zinc-500">No services assigned.</p>
                     ) : (
+                      <div className="w-full overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -426,6 +442,7 @@ export default function ProjectWbsWorkPackages() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </div>
 
@@ -442,7 +459,8 @@ export default function ProjectWbsWorkPackages() {
                     {wpResources.length === 0 ? (
                       <p className="text-sm text-zinc-500">No resources assigned.</p>
                     ) : (
-                      <Table>
+                      <div className="w-full overflow-x-auto">
+                      <Table className="min-w-[640px]">
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
@@ -455,7 +473,13 @@ export default function ProjectWbsWorkPackages() {
                               UOM
                             </TableHead>
                             <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Unit rate
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
                               Qty
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold tracking-wide text-zinc-500 uppercase text-right">
+                              Est. Value
                             </TableHead>
                           </TableRow>
                         </TableHeader>
@@ -469,15 +493,22 @@ export default function ProjectWbsWorkPackages() {
                                 {r.type}
                               </TableCell>
                               <TableCell className="text-zinc-600">
-                                {r.unitOfMeasure}
+                                {r.unitOfMeasure ?? r.unit_of_measure}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-zinc-800">
+                                {formatCurrency(getResourceUnitRate(r))}
                               </TableCell>
                               <TableCell className="text-right font-mono text-zinc-800">
                                 {r.quantity}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-emerald-700">
+                                {formatCurrency(getResourceEstimatedValue(r))}
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </div>
                 </div>

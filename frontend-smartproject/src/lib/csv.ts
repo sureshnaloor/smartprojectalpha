@@ -171,6 +171,69 @@ export function validateCsvData(data: any[]): any {
 // --- WBS upload: SUMMARY (root), WBS (2nd/3rd level), WorkPackage (leaves) ---
 const WBS_TYPES = ["SUMMARY", "WBS", "WorkPackage"] as const;
 
+/** Strip BOM, zero-width chars, normalize unicode (Excel often emits odd spaces). */
+function cleanCsvCell(raw: string): string {
+  let s = raw
+    .replace(/^\uFEFF/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .normalize("NFKC")
+    .trim();
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+    s = s.slice(1, -1).replace(/""/g, '"');
+  }
+  return s.trim();
+}
+
+/**
+ * Parse one CSV line respecting quoted fields (commas inside "..." do not split).
+ * Naive split(",") breaks when wbsDescription contains commas and shifts wbsType.
+ */
+function parseCsvRowLine(line: string, delimiter: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === delimiter && !inQuotes) {
+      out.push(cleanCsvCell(cur));
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cleanCsvCell(cur));
+  return out;
+}
+
+function detectWbsDelimiter(headerLine: string): string {
+  const byComma = parseCsvRowLine(headerLine, ",");
+  const bySemi = parseCsvRowLine(headerLine, ";");
+  if (byComma.length >= 3) return ",";
+  if (bySemi.length >= 3) return ";";
+  return ",";
+}
+
+/** Accept common spreadsheet variants (case, camelCase, spaces). */
+function normalizeWbsType(raw: string): (typeof WBS_TYPES)[number] | null {
+  const s = cleanCsvCell(raw || "");
+  const compact = s.replace(/\s+/g, "");
+  if (WBS_TYPES.includes(compact as (typeof WBS_TYPES)[number])) {
+    return compact as (typeof WBS_TYPES)[number];
+  }
+  const key = s.toLowerCase().replace(/[\s_-]+/g, "");
+  if (key === "summary") return "SUMMARY";
+  if (key === "wbs") return "WBS";
+  if (key === "workpackage") return "WorkPackage";
+  return null;
+}
+
 export function parseWbsCsvText(text: string): { data: any[]; errors: string[] } {
   try {
     const cleanText = text.replace(/^\uFEFF/, "");
@@ -178,7 +241,8 @@ export function parseWbsCsvText(text: string): { data: any[]; errors: string[] }
     if (lines.length === 0) {
       return { data: [], errors: ["CSV file is empty or contains no valid data"] };
     }
-    const headers = lines[0].split(",").map((h) => h.trim());
+    const delimiter = detectWbsDelimiter(lines[0]);
+    const headers = parseCsvRowLine(lines[0], delimiter).map((h) => cleanCsvCell(h));
     const requiredColumns = ["wbsCode", "wbsName", "wbsType"];
     const missingColumns = requiredColumns.filter((col) => !headers.includes(col));
     if (missingColumns.length > 0) {
@@ -193,14 +257,14 @@ export function parseWbsCsvText(text: string): { data: any[]; errors: string[] }
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      const values = line.split(",").map((v) => v.trim());
+      const values = parseCsvRowLine(line, delimiter);
       if (values.length !== headers.length) {
         errors.push(`Line ${i + 1}: Column count mismatch (expected ${headers.length}, got ${values.length})`);
         continue;
       }
       const row: Record<string, string> = {};
       headers.forEach((header, index) => {
-        row[header] = values[index];
+        row[header] = values[index] ?? "";
       });
       if (!row.wbsCode) {
         errors.push(`Line ${i + 1}: Missing WBS code`);
@@ -210,10 +274,12 @@ export function parseWbsCsvText(text: string): { data: any[]; errors: string[] }
         errors.push(`Line ${i + 1}: Missing WBS name`);
         continue;
       }
-      if (!row.wbsType || !WBS_TYPES.includes(row.wbsType as (typeof WBS_TYPES)[number])) {
+      const normalizedType = normalizeWbsType(row.wbsType ?? "");
+      if (!normalizedType) {
         errors.push(`Line ${i + 1}: Invalid wbsType - must be SUMMARY, WBS, or WorkPackage`);
         continue;
       }
+      row.wbsType = normalizedType;
       const budgetVal = row[budgetCol] ?? row.amount ?? row.budget ?? "";
       if (row.wbsType === "SUMMARY" || row.wbsType === "WBS" || row.wbsType === "WorkPackage") {
         if (!budgetVal || isNaN(Number(budgetVal)) || Number(budgetVal) < 0) {

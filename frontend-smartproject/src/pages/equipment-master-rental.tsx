@@ -27,6 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { RentalEquipmentResourceMapper } from "@/components/project/rental-equipment-resource-mapper";
 
 interface RentalEquipment {
   id: number;
@@ -445,7 +446,11 @@ export default function EquipmentMasterRental() {
                       <TableCell>{item.year ?? "—"}</TableCell>
                       <TableCell>{parseFloat(item.costPerHour).toFixed(2)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center flex-wrap">
+                          <RentalEquipmentResourceMapper
+                            rentalEquipmentId={item.id}
+                            equipmentDisplayName={item.equipmentName}
+                          />
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                             <Pencil className="h-4 w-4" />
                           </Button>

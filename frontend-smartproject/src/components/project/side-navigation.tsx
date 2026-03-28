@@ -43,7 +43,11 @@ import {
   LayoutDashboard,
   Briefcase,
   Package,
-  LayoutGrid
+  LayoutGrid,
+  Wrench,
+  HardHat,
+  UserRound,
+  Truck,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -429,6 +433,70 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                     </Link>
                   </li>
 
+                </ul>
+
+                {/* Allocation (materials, manpower, equipment — own & rental) */}
+                <div className="px-4 py-3 border-t border-slate-800 bg-slate-900/95">
+                  <h2 className="text-xs font-extrabold text-amber-300 uppercase tracking-widest" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.2em' }}>
+                    Allocation
+                  </h2>
+                </div>
+                <ul className="py-1">
+                  <li>
+                    <Link href="/allocation/materials">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/allocation/materials') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/materials') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Package className="mr-3 h-4 w-4" />
+                        <span>Materials</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/allocation/manpower">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/allocation/manpower') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/manpower') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <HardHat className="mr-3 h-4 w-4" />
+                        <span>Manpower</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/allocation/equipment">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/allocation/equipment') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/equipment') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Wrench className="mr-3 h-4 w-4" />
+                        <span>Equipment</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/allocation/rental-manpower">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/allocation/rental-manpower') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/rental-manpower') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <UserRound className="mr-3 h-4 w-4" />
+                        <span>Rental Manpower</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/allocation/rental-equipment">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/allocation/rental-equipment') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/rental-equipment') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Truck className="mr-3 h-4 w-4" />
+                        <span>Rental Equipment</span>
+                      </a>
+                    </Link>
+                  </li>
                 </ul>
 
                 {/* Reports & Analytics */}

@@ -25,144 +25,118 @@ interface Resource {
   updatedAt: string;
 }
 
-interface EmployeeResourceMapping {
+interface RentalManpowerResourceMapping {
   id: number;
-  employeeId: number;
+  rentalManpowerId: number;
   resourceId: number;
   createdAt: string;
   updatedAt: string;
 }
 
-interface EmployeeResourceMapperProps {
-  employeeId: number;
-  employeeName: string;
+interface RentalManpowerResourceMapperProps {
+  rentalManpowerId: number;
+  employeeDisplayName: string;
   onMappingChanged?: () => void;
 }
 
-// Fetch all manpower resources
-async function getManpowerResources(): Promise<Resource[]> {
-  const response = await fetch("/api/resources/manpower/all");
-  if (!response.ok) throw new Error("Failed to fetch manpower resources");
+async function getRentalManpowerResources(): Promise<Resource[]> {
+  const response = await fetch("/api/resources/rental_manpower/all");
+  if (!response.ok) throw new Error("Failed to fetch rental manpower resources");
   return response.json();
 }
 
-// Get employee's current resource mapping
-async function getEmployeeResourceMapping(
-  employeeId: number
-): Promise<EmployeeResourceMapping | null> {
-  const response = await fetch(`/api/employee/${employeeId}/resource-mapping`);
+async function getRentalManpowerResourceMapping(
+  rentalId: number
+): Promise<RentalManpowerResourceMapping | null> {
+  const response = await fetch(`/api/rental-manpower/${rentalId}/resource-mapping`);
   if (!response.ok) throw new Error("Failed to fetch resource mapping");
   return response.json();
 }
 
-// Create or update resource mapping
-async function mapResourceToEmployee(
-  employeeId: number,
+async function mapResourceToRentalManpower(
+  rentalId: number,
   resourceId: number
-): Promise<EmployeeResourceMapping> {
-  const response = await fetch(`/api/employee/${employeeId}/map-resource`, {
+): Promise<RentalManpowerResourceMapping> {
+  const response = await fetch(`/api/rental-manpower/${rentalId}/map-resource`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resourceId }),
   });
-  if (!response.ok) throw new Error("Failed to map resource to employee");
+  if (!response.ok) throw new Error("Failed to map resource");
   return response.json();
 }
 
-// Delete resource mapping
-async function unmapResourceFromEmployee(
-  employeeId: number
-): Promise<void> {
-  const response = await fetch(
-    `/api/employee/${employeeId}/resource-mapping`,
-    {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    }
-  );
-  if (!response.ok) throw new Error("Failed to unmap resource from employee");
+async function unmapResourceFromRentalManpower(rentalId: number): Promise<void> {
+  const response = await fetch(`/api/rental-manpower/${rentalId}/resource-mapping`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error("Failed to unmap resource");
 }
 
-export function EmployeeResourceMapper({
-  employeeId,
-  employeeName,
+export function RentalManpowerResourceMapper({
+  rentalManpowerId,
+  employeeDisplayName,
   onMappingChanged,
-}: EmployeeResourceMapperProps) {
+}: RentalManpowerResourceMapperProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
 
-  // Fetch manpower resources
   const {
     data: resources = [],
     isLoading: resourcesLoading,
     error: resourcesError,
   } = useQuery({
-    queryKey: ["manpowerResources"],
-    queryFn: getManpowerResources,
+    queryKey: ["rentalManpowerResources"],
+    queryFn: getRentalManpowerResources,
   });
 
-  // Fetch employee's current mapping
   const {
     data: currentMapping,
     isLoading: mappingLoading,
     refetch: refetchMapping,
   } = useQuery({
-    queryKey: ["employeeResourceMapping", employeeId],
-    queryFn: () => getEmployeeResourceMapping(employeeId),
+    queryKey: ["rentalManpowerResourceMapping", rentalManpowerId],
+    queryFn: () => getRentalManpowerResourceMapping(rentalManpowerId),
   });
 
   const isMapped = !!currentMapping;
 
-  // Mutation for creating/updating mapping
   const mapResourceMutation = useMutation({
     mutationFn: (resourceId: number) =>
-      mapResourceToEmployee(employeeId, resourceId),
+      mapResourceToRentalManpower(rentalManpowerId, resourceId),
     onSuccess: () => {
       toast({ title: "Resource mapped successfully" });
       queryClient.invalidateQueries({
-        queryKey: ["employeeResourceMapping", employeeId],
+        queryKey: ["rentalManpowerResourceMapping", rentalManpowerId],
       });
       refetchMapping();
-      if (onMappingChanged) {
-        onMappingChanged();
-      }
+      onMappingChanged?.();
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
-  // Mutation for deleting mapping
   const unmapResourceMutation = useMutation({
-    mutationFn: () => unmapResourceFromEmployee(employeeId),
+    mutationFn: () => unmapResourceFromRentalManpower(rentalManpowerId),
     onSuccess: () => {
       toast({ title: "Resource unmapped successfully" });
       setIsOpen(false);
       queryClient.invalidateQueries({
-        queryKey: ["employeeResourceMapping", employeeId],
+        queryKey: ["rentalManpowerResourceMapping", rentalManpowerId],
       });
       refetchMapping();
       setSelectedResourceId(null);
-      if (onMappingChanged) {
-        onMappingChanged();
-      }
+      onMappingChanged?.();
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
-  // Get the currently mapped resource
   const currentMappedResource = currentMapping
     ? resources.find((r) => r.id === currentMapping.resourceId)
     : null;
@@ -189,7 +163,7 @@ export function EmployeeResourceMapper({
               size="sm"
               className="gap-2 opacity-50 cursor-not-allowed pointer-events-none"
               disabled
-              title="This employee is already mapped to a manpower resource"
+              title="This rental employee is already mapped to a resource"
             >
               <Link2 className="h-4 w-4" />
               Map Resource
@@ -211,7 +185,7 @@ export function EmployeeResourceMapper({
               variant="outline"
               size="sm"
               className="gap-2"
-              title="Map this employee to a manpower resource"
+              title="Map this rental employee to a rental_manpower resource"
             >
               <Link2 className="h-4 w-4" />
               Map Resource
@@ -222,23 +196,21 @@ export function EmployeeResourceMapper({
 
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Map Employee to Manpower Resource</DialogTitle>
+          <DialogTitle>Map rental employee to resource</DialogTitle>
           <p className="text-sm text-gray-500 mt-2">
-            Employee: <span className="font-semibold text-gray-700">{employeeName}</span>
+            Employee: <span className="font-semibold text-gray-700">{employeeDisplayName}</span>
           </p>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Current Mapping Section */}
           {currentMapping && currentMappedResource && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-semibold text-blue-900">Current Mapping</h3>
+                  <h3 className="font-semibold text-blue-900">Current mapping</h3>
                   <div className="mt-3 space-y-2 text-sm text-blue-800">
                     <p>
-                      <span className="font-medium">Resource:</span>{" "}
-                      {currentMappedResource.name}
+                      <span className="font-medium">Resource:</span> {currentMappedResource.name}
                     </p>
                     {currentMappedResource.description && (
                       <p>
@@ -247,9 +219,8 @@ export function EmployeeResourceMapper({
                       </p>
                     )}
                     <p>
-                      <span className="font-medium">Unit Rate:</span>{" "}
-                      {currentMappedResource.unitRate} {currentMappedResource.currency} /{" "}
-                      {currentMappedResource.unitOfMeasure}
+                      <span className="font-medium">Unit rate:</span> {currentMappedResource.unitRate}{" "}
+                      {currentMappedResource.currency} / {currentMappedResource.unitOfMeasure}
                     </p>
                   </div>
                 </div>
@@ -266,14 +237,13 @@ export function EmployeeResourceMapper({
             </div>
           )}
 
-          {/* Select Resource Section */}
           {mappingLoading ? (
             <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
             </div>
           ) : resourcesLoading ? (
             <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
             </div>
           ) : resourcesError ? (
             <div className="text-center py-4 text-red-600">
@@ -285,70 +255,58 @@ export function EmployeeResourceMapper({
               );
               return availableResources.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">
-                  <p>No other manpower resources available to map</p>
+                  <p>No other rental_manpower resources available to map</p>
                 </div>
               ) : (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Available Manpower Resources
-              </h3>
-              <div className="grid gap-3 max-h-96 overflow-y-auto">
-                {availableResources.map((resource) => (
-                  <div
-                    key={resource.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                      selectedResourceId === resource.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50"
-                    }`}
-                    onClick={() => setSelectedResourceId(resource.id)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">
-                          {resource.name}
-                        </h4>
-                        {resource.description && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            {resource.description}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-4 mt-3 text-sm">
-                          <span className="text-gray-600">
-                            <span className="font-medium">Rate:</span>{" "}
-                            {resource.unitRate} {resource.currency} /
-                            {resource.unitOfMeasure}
-                          </span>
-                          <span className="text-gray-600">
-                            <span className="font-medium">Availability:</span>{" "}
-                            {resource.availability}%
-                          </span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">Available resources (type: rental_manpower)</h3>
+                  <div className="grid gap-3 max-h-96 overflow-y-auto">
+                    {availableResources.map((resource) => (
+                      <div
+                        key={resource.id}
+                        className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                          selectedResourceId === resource.id
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50"
+                        }`}
+                        onClick={() => setSelectedResourceId(resource.id)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">{resource.name}</h4>
+                            {resource.description && (
+                              <p className="text-sm text-gray-600 mt-1">{resource.description}</p>
+                            )}
+                            <div className="flex flex-wrap gap-4 mt-3 text-sm">
+                              <span className="text-gray-600">
+                                <span className="font-medium">Rate:</span> {resource.unitRate}{" "}
+                                {resource.currency} /{resource.unitOfMeasure}
+                              </span>
+                              <span className="text-gray-600">
+                                <span className="font-medium">Availability:</span> {resource.availability}%
+                              </span>
+                            </div>
+                          </div>
+                          <input
+                            type="radio"
+                            name="rental-resource"
+                            checked={selectedResourceId === resource.id}
+                            onChange={() => setSelectedResourceId(resource.id)}
+                            className="mt-1"
+                          />
                         </div>
                       </div>
-                      <input
-                        type="radio"
-                        name="resource"
-                        checked={selectedResourceId === resource.id}
-                        onChange={() => setSelectedResourceId(resource.id)}
-                        className="mt-1"
-                      />
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
               );
             })()}
 
-          {/* Action Buttons */}
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => setIsOpen(false)}
-              disabled={
-                mapResourceMutation.isPending ||
-                unmapResourceMutation.isPending
-              }
+              disabled={mapResourceMutation.isPending || unmapResourceMutation.isPending}
             >
               Cancel
             </Button>
@@ -364,7 +322,7 @@ export function EmployeeResourceMapper({
                 mapResourceMutation.isPending
               }
             >
-              {mapResourceMutation.isPending ? "Mapping..." : "Save Mapping"}
+              {mapResourceMutation.isPending ? "Mapping..." : "Save mapping"}
             </Button>
           </div>
         </div>

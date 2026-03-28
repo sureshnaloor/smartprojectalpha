@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
 import EmployeeMasterLayout from "@/layouts/employee-master-layout";
+import { RentalManpowerResourceMapper } from "@/components/project/rental-manpower-resource-mapper";
 
 interface RentalManpower {
     id: number;
@@ -566,7 +567,11 @@ export default function EmployeeMasterRental() {
                                             <TableCell>{item.empTrade}</TableCell>
                                             <TableCell>{parseFloat(item.empCostPerHour).toFixed(2)}</TableCell>
                                             <TableCell>
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-2 items-center flex-wrap">
+                                                    <RentalManpowerResourceMapper
+                                                        rentalManpowerId={item.id}
+                                                        employeeDisplayName={`${item.empFirstName} ${item.empLastName}`}
+                                                    />
                                                     <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}><Pencil className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="sm" className="text-red-500" onClick={() => { if (confirm("Confirm delete?")) deleteMutation.mutate(item.id) }}><Trash2 className="h-4 w-4" /></Button>
                                                 </div>
