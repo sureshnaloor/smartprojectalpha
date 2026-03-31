@@ -127,7 +127,14 @@ async function bulkUploadRentalManpower(csvData: any[]): Promise<RentalManpower[
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csvData }),
     });
-    if (!response.ok) throw new Error("Failed to upload rental manpower");
+    if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const message =
+            typeof (body as { message?: unknown }).message === "string"
+                ? (body as { message: string }).message
+                : "Failed to upload rental manpower";
+        throw new Error(message);
+    }
     return response.json();
 }
 
@@ -213,8 +220,12 @@ export default function EmployeeMasterRental() {
             queryClient.invalidateQueries({ queryKey: ["/api/rental-manpower"] });
             toast({ title: `${data.length} records uploaded successfully` });
         },
-        onError: () => {
-            toast({ title: "Error uploading rental manpower", variant: "destructive" });
+        onError: (err: Error) => {
+            toast({
+                title: "Bulk upload failed",
+                description: err.message,
+                variant: "destructive",
+            });
         },
     });
 
@@ -230,7 +241,9 @@ export default function EmployeeMasterRental() {
                     toast({ title: "CSV must have a header row and at least one data row", variant: "destructive" });
                     return;
                 }
-                const headers = lines[0].split(",").map((h) => h.trim());
+                const headers = lines[0]
+                    .split(",")
+                    .map((h) => h.trim().replace(/^\uFEFF/, ""));
                 const requiredHeaders = ["employeeNumber", "empFirstName", "empLastName", "empNationalId", "empNationality", "empDob", "empGender", "empPosition", "empTitle", "empTrade", "empGrade", "empCostPerHour", "vendorCode"];
                 const missing = requiredHeaders.filter((h) => !headers.includes(h));
                 if (missing.length > 0) {

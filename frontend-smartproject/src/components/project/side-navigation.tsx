@@ -48,6 +48,8 @@ import {
   HardHat,
   UserRound,
   Truck,
+  Hammer,
+  Clock3,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useMobile } from "@/hooks/use-mobile";
@@ -432,6 +434,17 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       </a>
                     </Link>
                   </li>
+                  <li>
+                    <Link href={`/tool-master`}>
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/tool-master') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/tool-master') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Hammer className="mr-3 h-4 w-4" />
+                        <span>Tool Master</span>
+                      </a>
+                    </Link>
+                  </li>
 
                 </ul>
 
@@ -494,6 +507,28 @@ export function SideNavigation({ currentProjectId }: SideNavigationProps) {
                       )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/rental-equipment') ? 600 : 500, letterSpacing: '0.12em' }}>
                         <Truck className="mr-3 h-4 w-4" />
                         <span>Rental Equipment</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/allocation/tools">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/allocation/tools') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/allocation/tools') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Hammer className="mr-3 h-4 w-4" />
+                        <span>Tools</span>
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/timesheets">
+                      <a className={cn(
+                        "flex items-center px-4 py-2.5 text-slate-100 hover:bg-slate-800/80 hover:text-white transition-colors duration-200 uppercase",
+                        isActive('/timesheets') && "text-teal-300 font-semibold bg-slate-800 border-r-2 border-teal-400"
+                      )} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontSize: '0.65rem', fontWeight: isActive('/timesheets') ? 600 : 500, letterSpacing: '0.12em' }}>
+                        <Clock3 className="mr-3 h-4 w-4" />
+                        <span>Timesheets</span>
                       </a>
                     </Link>
                   </li>

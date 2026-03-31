@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Download } from "lucide-react";
 import { RentalEquipmentResourceMapper } from "@/components/project/rental-equipment-resource-mapper";
 
 interface RentalEquipment {
@@ -112,6 +112,23 @@ async function deleteRentalEquipment(id: number): Promise<void> {
   if (!res.ok) throw new Error("Failed to delete");
 }
 
+async function bulkUploadRentalEquipment(csvData: Record<string, string>[]): Promise<RentalEquipment[]> {
+  const res = await fetch("/api/rental-equipment/bulk-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csvData }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const message =
+      typeof (body as { message?: unknown }).message === "string"
+        ? (body as { message: string }).message
+        : "Failed to upload rental equipment";
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export default function EquipmentMasterRental() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -178,6 +195,85 @@ export default function EquipmentMasterRental() {
     },
     onError: (e: Error) => toast({ title: e.message || "Error deleting", variant: "destructive" }),
   });
+
+  const bulkUploadMutation = useMutation({
+    mutationFn: bulkUploadRentalEquipment,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rental-equipment"] });
+      toast({ title: `${data.length} record(s) uploaded successfully` });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Bulk upload failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const csv = event.target?.result as string;
+        const lines = csv.split("\n").filter((line) => line.trim());
+        if (lines.length < 2) {
+          toast({
+            title: "CSV must have a header row and at least one data row",
+            variant: "destructive",
+          });
+          return;
+        }
+        const headers = lines[0]
+          .split(",")
+          .map((h) => h.trim().replace(/^\uFEFF/, ""));
+        const hasEquipmentId =
+          headers.includes("equipmentNumber") || headers.includes("equipmentCode");
+        const requiredHeaders = ["equipmentName", "equipmentType", "costPerHour", "vendorCode"];
+        const missing = requiredHeaders.filter((h) => !headers.includes(h));
+        if (!hasEquipmentId || missing.length > 0) {
+          toast({
+            title: "CSV missing required columns",
+            description: [
+              !hasEquipmentId ? "equipmentNumber or equipmentCode" : null,
+              ...missing,
+            ]
+              .filter(Boolean)
+              .join(", "),
+            variant: "destructive",
+          });
+          return;
+        }
+        const csvData = lines.slice(1).map((line) => {
+          const values = line.split(",").map((v) => v.trim());
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => {
+            row[h] = values[i] ?? "";
+          });
+          return {
+            equipmentNumber: row.equipmentNumber || row.equipmentCode || "",
+            equipmentName: row.equipmentName,
+            equipmentType: row.equipmentType,
+            description: row.description || undefined,
+            manufacturer: row.manufacturer || undefined,
+            model: row.model || undefined,
+            year: row.year || undefined,
+            capacity: row.capacity || undefined,
+            unit: row.unit || undefined,
+            costPerHour: row.costPerHour,
+            vendorCode: row.vendorCode,
+          };
+        });
+        bulkUploadMutation.mutate(csvData);
+      } catch {
+        toast({ title: "Error parsing CSV file", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const resetForm = () => {
     setFormData({
@@ -413,6 +509,35 @@ export default function EquipmentMasterRental() {
                   </form>
                 </DialogContent>
               </Dialog>
+
+              <label>
+                <Button variant="outline" asChild>
+                  <span>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Bulk Upload
+                  </span>
+                </Button>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleBulkUpload}
+                  className="hidden"
+                  disabled={bulkUploadMutation.isPending}
+                />
+              </label>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.href = "/templates/rental-equipment-template.csv";
+                  link.download = "rental-equipment-template.csv";
+                  link.click();
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Template
+              </Button>
             </div>
           </div>
 

@@ -57,6 +57,9 @@ import {
   insertEquipmentMasterSchema,
   insertEquipmentResourceMappingSchema,
   insertRentalEquipmentResourceMappingSchema,
+  insertToolMasterSchema,
+  insertToolResourceMappingSchema,
+  insertResourceTimesheetSchema,
   insertRentalManpowerSchema,
   materialMaster,
   serviceMaster,
@@ -76,6 +79,9 @@ import {
   equipmentTypes,
   rentalEquipment,
   rentalEquipmentResourceMappings,
+  toolMaster,
+  toolResourceMappings,
+  resourceTimesheets,
   insertEquipmentManufacturerSchema,
   insertEquipmentTypeSchema,
   insertRentalEquipmentSchema,
@@ -111,6 +117,7 @@ import {
   projectActivities,
   projectActivityPlanVersions,
   plannedCostWorkpackages,
+  projectResources,
   purchaseOrders,
   purchaseOrderItems,
   insertPurchaseOrderSchema,
@@ -157,6 +164,95 @@ const handleError = (err: unknown, res: Response) => {
 
   return res.status(500).json({ message: "An unexpected error occurred" });
 };
+
+/** Work package rows for global resources (manpower, equipment, tools, etc.) joined to project/WP names. */
+type WpAssignmentRollup = {
+  projectResourceId: number;
+  projectId: number;
+  projectName: string;
+  wpId: number;
+  wpCode: string;
+  wpName: string;
+  quantity: string;
+  plannedStartDate: string | null;
+  plannedEndDate: string | null;
+  durationDays: number | null;
+};
+
+function toIsoDateWp(d: unknown): string | null {
+  if (d == null) return null;
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  const s = String(d);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
+function durationDaysWp(start: unknown, end: unknown): number | null {
+  const a = toIsoDateWp(start);
+  const b = toIsoDateWp(end);
+  if (!a || !b) return null;
+  const t0 = new Date(a + "T12:00:00").getTime();
+  const t1 = new Date(b + "T12:00:00").getTime();
+  if (Number.isNaN(t0) || Number.isNaN(t1)) return null;
+  return Math.round((t1 - t0) / (24 * 60 * 60 * 1000)) + 1;
+}
+
+async function loadWpAssignmentsByGlobalResourceIds(
+  resourceIds: number[],
+  projectResourceType: string
+): Promise<Map<number, WpAssignmentRollup[]>> {
+  const assignmentsByResourceId = new Map<number, WpAssignmentRollup[]>();
+  if (resourceIds.length === 0) return assignmentsByResourceId;
+
+  const prRows = await db
+    .select({
+      id: projectResources.id,
+      globalResourceId: projectResources.globalResourceId,
+      projectId: projectResources.projectId,
+      wpId: projectResources.wpId,
+      quantity: projectResources.quantity,
+      plannedStartDate: projectResources.plannedStartDate,
+      plannedEndDate: projectResources.plannedEndDate,
+      projectName: projects.name,
+      wpCode: workPackages.code,
+      wpName: workPackages.name,
+    })
+    .from(projectResources)
+    .innerJoin(projects, eq(projectResources.projectId, projects.id))
+    .innerJoin(workPackages, eq(projectResources.wpId, workPackages.id))
+    .where(
+      and(eq(projectResources.type, projectResourceType), inArray(projectResources.globalResourceId, resourceIds))
+    );
+
+  for (const row of prRows) {
+    const gid = row.globalResourceId;
+    if (gid == null) continue;
+    const out: WpAssignmentRollup = {
+      projectResourceId: row.id,
+      projectId: row.projectId,
+      projectName: row.projectName,
+      wpId: row.wpId,
+      wpCode: row.wpCode,
+      wpName: row.wpName,
+      quantity: String(row.quantity ?? "0"),
+      plannedStartDate: toIsoDateWp(row.plannedStartDate),
+      plannedEndDate: toIsoDateWp(row.plannedEndDate),
+      durationDays: durationDaysWp(row.plannedStartDate, row.plannedEndDate),
+    };
+    const list = assignmentsByResourceId.get(gid) ?? [];
+    list.push(out);
+    assignmentsByResourceId.set(gid, list);
+  }
+
+  for (const [, list] of assignmentsByResourceId) {
+    list.sort((a, b) => {
+      const pc = a.projectName.localeCompare(b.projectName, undefined, { sensitivity: "base" });
+      if (pc !== 0) return pc;
+      return a.wpCode.localeCompare(b.wpCode, undefined, { numeric: true });
+    });
+  }
+
+  return assignmentsByResourceId;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -6833,6 +6929,323 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /** Employees mapped to manpower resources, with WP/project assignments from project resources; unmapped employees listed separately. */
+  app.get("/api/allocation/manpower", async (_req: Request, res: Response) => {
+    try {
+      const employees = await db.select().from(employeeMaster).orderBy(employeeMaster.employeeNumber);
+      const mappings = await db.select().from(employeeResourceMappings);
+      const mappingByEmployeeId = new Map(mappings.map((m) => [m.employeeId, m]));
+      const mappedResourceIds = [...new Set(mappings.map((m) => m.resourceId))];
+
+      const resourceRows =
+        mappedResourceIds.length > 0
+          ? await db.select().from(resources).where(inArray(resources.id, mappedResourceIds))
+          : [];
+      const resourceById = new Map(resourceRows.map((r) => [r.id, r]));
+
+      const assignmentsByResourceId = await loadWpAssignmentsByGlobalResourceIds(mappedResourceIds, "manpower");
+
+      const employeeOut = (e: (typeof employees)[0]) => ({
+        id: e.id,
+        employeeNumber: e.employeeNumber,
+        empFirstName: e.empFirstName,
+        empMiddleName: e.empMiddleName,
+        empLastName: e.empLastName,
+        empPosition: e.empPosition,
+      });
+
+      const mapped: Array<{
+        employee: ReturnType<typeof employeeOut>;
+        resource: {
+          id: number;
+          name: string;
+          unitOfMeasure: string;
+          unitRate: string;
+        } | null;
+        assignments: WpAssignmentRollup[];
+      }> = [];
+      const unmapped: ReturnType<typeof employeeOut>[] = [];
+
+      for (const e of employees) {
+        const mapRow = mappingByEmployeeId.get(e.id);
+        if (!mapRow) {
+          unmapped.push(employeeOut(e));
+          continue;
+        }
+        const resRow = resourceById.get(mapRow.resourceId);
+        mapped.push({
+          employee: employeeOut(e),
+          resource: resRow
+            ? {
+                id: resRow.id,
+                name: resRow.name,
+                unitOfMeasure: resRow.unitOfMeasure,
+                unitRate: String(resRow.unitRate ?? ""),
+              }
+            : null,
+          assignments: assignmentsByResourceId.get(mapRow.resourceId) ?? [],
+        });
+      }
+
+      res.json({ mapped, unmapped });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  /** Owned equipment mapped to equipment resources + WP assignments. */
+  app.get("/api/allocation/equipment", async (_req: Request, res: Response) => {
+    try {
+      const items = await db.select().from(equipmentMaster).orderBy(equipmentMaster.equipmentNumber);
+      const mappings = await db.select().from(equipmentResourceMappings);
+      const mappingByEquipmentId = new Map(mappings.map((m) => [m.equipmentId, m]));
+      const mappedResourceIds = [...new Set(mappings.map((m) => m.resourceId))];
+      const resourceRows =
+        mappedResourceIds.length > 0
+          ? await db.select().from(resources).where(inArray(resources.id, mappedResourceIds))
+          : [];
+      const resourceById = new Map(resourceRows.map((r) => [r.id, r]));
+      const assignmentsByResourceId = await loadWpAssignmentsByGlobalResourceIds(mappedResourceIds, "equipment");
+
+      const equipmentOut = (e: (typeof items)[0]) => ({
+        id: e.id,
+        equipmentNumber: e.equipmentNumber,
+        equipmentName: e.equipmentName,
+        equipmentType: e.equipmentType,
+      });
+
+      const mapped: Array<{
+        equipment: ReturnType<typeof equipmentOut>;
+        resource: {
+          id: number;
+          name: string;
+          unitOfMeasure: string;
+          unitRate: string;
+        } | null;
+        assignments: WpAssignmentRollup[];
+      }> = [];
+      const unmapped: ReturnType<typeof equipmentOut>[] = [];
+
+      for (const e of items) {
+        const mapRow = mappingByEquipmentId.get(e.id);
+        if (!mapRow) {
+          unmapped.push(equipmentOut(e));
+          continue;
+        }
+        const resRow = resourceById.get(mapRow.resourceId);
+        mapped.push({
+          equipment: equipmentOut(e),
+          resource: resRow
+            ? {
+                id: resRow.id,
+                name: resRow.name,
+                unitOfMeasure: resRow.unitOfMeasure,
+                unitRate: String(resRow.unitRate ?? ""),
+              }
+            : null,
+          assignments: assignmentsByResourceId.get(mapRow.resourceId) ?? [],
+        });
+      }
+
+      res.json({ mapped, unmapped });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  /** Rental manpower mapped to rental_manpower resources + WP assignments. */
+  app.get("/api/allocation/rental-manpower", async (_req: Request, res: Response) => {
+    try {
+      const items = await db.select().from(rentalManpower).orderBy(rentalManpower.employeeNumber);
+      const mappings = await db.select().from(rentalManpowerResourceMappings);
+      const mappingById = new Map(mappings.map((m) => [m.rentalManpowerId, m]));
+      const mappedResourceIds = [...new Set(mappings.map((m) => m.resourceId))];
+      const resourceRows =
+        mappedResourceIds.length > 0
+          ? await db.select().from(resources).where(inArray(resources.id, mappedResourceIds))
+          : [];
+      const resourceById = new Map(resourceRows.map((r) => [r.id, r]));
+      const assignmentsByResourceId = await loadWpAssignmentsByGlobalResourceIds(
+        mappedResourceIds,
+        "rental_manpower"
+      );
+
+      const rentalOut = (e: (typeof items)[0]) => ({
+        id: e.id,
+        employeeNumber: e.employeeNumber,
+        empFirstName: e.empFirstName,
+        empMiddleName: e.empMiddleName,
+        empLastName: e.empLastName,
+        empPosition: e.empPosition,
+      });
+
+      const mapped: Array<{
+        employee: ReturnType<typeof rentalOut>;
+        resource: {
+          id: number;
+          name: string;
+          unitOfMeasure: string;
+          unitRate: string;
+        } | null;
+        assignments: WpAssignmentRollup[];
+      }> = [];
+      const unmapped: ReturnType<typeof rentalOut>[] = [];
+
+      for (const e of items) {
+        const mapRow = mappingById.get(e.id);
+        if (!mapRow) {
+          unmapped.push(rentalOut(e));
+          continue;
+        }
+        const resRow = resourceById.get(mapRow.resourceId);
+        mapped.push({
+          employee: rentalOut(e),
+          resource: resRow
+            ? {
+                id: resRow.id,
+                name: resRow.name,
+                unitOfMeasure: resRow.unitOfMeasure,
+                unitRate: String(resRow.unitRate ?? ""),
+              }
+            : null,
+          assignments: assignmentsByResourceId.get(mapRow.resourceId) ?? [],
+        });
+      }
+
+      res.json({ mapped, unmapped });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  /** Rental equipment mapped to rental_equipment resources + WP assignments. */
+  app.get("/api/allocation/rental-equipment", async (_req: Request, res: Response) => {
+    try {
+      const items = await db.select().from(rentalEquipment).orderBy(rentalEquipment.equipmentNumber);
+      const mappings = await db.select().from(rentalEquipmentResourceMappings);
+      const mappingById = new Map(mappings.map((m) => [m.rentalEquipmentId, m]));
+      const mappedResourceIds = [...new Set(mappings.map((m) => m.resourceId))];
+      const resourceRows =
+        mappedResourceIds.length > 0
+          ? await db.select().from(resources).where(inArray(resources.id, mappedResourceIds))
+          : [];
+      const resourceById = new Map(resourceRows.map((r) => [r.id, r]));
+      const assignmentsByResourceId = await loadWpAssignmentsByGlobalResourceIds(
+        mappedResourceIds,
+        "rental_equipment"
+      );
+
+      const equipmentOut = (e: (typeof items)[0]) => ({
+        id: e.id,
+        equipmentNumber: e.equipmentNumber,
+        equipmentName: e.equipmentName,
+        equipmentType: e.equipmentType,
+      });
+
+      const mapped: Array<{
+        equipment: ReturnType<typeof equipmentOut>;
+        resource: {
+          id: number;
+          name: string;
+          unitOfMeasure: string;
+          unitRate: string;
+        } | null;
+        assignments: WpAssignmentRollup[];
+      }> = [];
+      const unmapped: ReturnType<typeof equipmentOut>[] = [];
+
+      for (const e of items) {
+        const mapRow = mappingById.get(e.id);
+        if (!mapRow) {
+          unmapped.push(equipmentOut(e));
+          continue;
+        }
+        const resRow = resourceById.get(mapRow.resourceId);
+        mapped.push({
+          equipment: equipmentOut(e),
+          resource: resRow
+            ? {
+                id: resRow.id,
+                name: resRow.name,
+                unitOfMeasure: resRow.unitOfMeasure,
+                unitRate: String(resRow.unitRate ?? ""),
+              }
+            : null,
+          assignments: assignmentsByResourceId.get(mapRow.resourceId) ?? [],
+        });
+      }
+
+      res.json({ mapped, unmapped });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  /** Tools mapped to tools resources + WP assignments. */
+  app.get("/api/allocation/tools", async (_req: Request, res: Response) => {
+    try {
+      const tools = await db.select().from(toolMaster).orderBy(toolMaster.toolNumber);
+      const mappings = await db.select().from(toolResourceMappings);
+      const mappingByToolId = new Map(mappings.map((m) => [m.toolId, m]));
+      const mappedResourceIds = [...new Set(mappings.map((m) => m.resourceId))];
+      const resourceRows =
+        mappedResourceIds.length > 0
+          ? await db.select().from(resources).where(inArray(resources.id, mappedResourceIds))
+          : [];
+      const resourceById = new Map(resourceRows.map((r) => [r.id, r]));
+      const assignmentsByResourceId = await loadWpAssignmentsByGlobalResourceIds(mappedResourceIds, "tools");
+
+      const toolOut = (t: (typeof tools)[0]) => ({
+        id: t.id,
+        toolNumber: t.toolNumber,
+        name: t.name,
+        description: t.description,
+        brand: t.brand,
+        model: t.model,
+        unitOfMeasure: t.unitOfMeasure,
+        accessories: t.accessories,
+        unitRate: String(t.unitRate ?? ""),
+      });
+
+      const mapped: Array<{
+        tool: ReturnType<typeof toolOut>;
+        resource: {
+          id: number;
+          name: string;
+          unitOfMeasure: string;
+          unitRate: string;
+        } | null;
+        assignments: WpAssignmentRollup[];
+      }> = [];
+      const unmapped: ReturnType<typeof toolOut>[] = [];
+
+      for (const t of tools) {
+        const mapRow = mappingByToolId.get(t.id);
+        if (!mapRow) {
+          unmapped.push(toolOut(t));
+          continue;
+        }
+        const resRow = resourceById.get(mapRow.resourceId);
+        mapped.push({
+          tool: toolOut(t),
+          resource: resRow
+            ? {
+                id: resRow.id,
+                name: resRow.name,
+                unitOfMeasure: resRow.unitOfMeasure,
+                unitRate: String(resRow.unitRate ?? ""),
+              }
+            : null,
+          assignments: assignmentsByResourceId.get(mapRow.resourceId) ?? [],
+        });
+      }
+
+      res.json({ mapped, unmapped });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   // ========================================
   // WORK PACKAGE MATERIALS (assign materials to WP; estimated value = quantity * base_rate)
   // ========================================
@@ -7937,6 +8350,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register before GET /:id so paths like /bulk-upload are not captured as an id.
+  app.get("/api/rental-manpower/bulk-upload", (_req: Request, res: Response) => {
+    res.status(405).setHeader("Allow", "POST").json({
+      message:
+        "Bulk upload is only available via POST with JSON body { csvData: [...] }. GET is not supported.",
+    });
+  });
+
+  // Bulk import rental manpower
+  app.post("/api/rental-manpower/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+
+      const allVendors = await db.select().from(vendorMaster);
+      const vendorByNormalizedCode = new Map(
+        allVendors.map((v) => [String(v.vendorCode).trim().toUpperCase(), v])
+      );
+
+      const employees: any[] = [];
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i] as Record<string, unknown>;
+        const vendorCodeRaw =
+          row.vendorCode != null ? String(row.vendorCode).trim() : "";
+        if (!vendorCodeRaw) {
+          return res.status(400).json({
+            message: `Row ${i + 1}: vendorCode is required. Add a vendorCode column or ensure it has a value.`,
+          });
+        }
+        const vendor = vendorByNormalizedCode.get(vendorCodeRaw.toUpperCase());
+        if (!vendor) {
+          const validCodes = Array.from(vendorByNormalizedCode.keys())
+            .slice(0, 10)
+            .join(", ");
+          return res.status(400).json({
+            message: `Row ${i + 1}: vendorCode "${vendorCodeRaw}" not found. Ensure the vendor exists in Vendor Master. Valid codes include: ${validCodes}${vendorByNormalizedCode.size > 10 ? "..." : ""}`,
+          });
+        }
+        const { vendorCode: _vendorCode, ...rowFields } = row;
+        const parsed = insertRentalManpowerSchema.safeParse({
+          ...rowFields,
+          vendorId: vendor.id,
+        });
+        if (!parsed.success) {
+          const detail = parsed.error.issues
+            .map((e) => `${e.path.length ? e.path.join(".") : "field"}: ${e.message}`)
+            .join("; ");
+          return res.status(400).json({
+            message: `Row ${i + 1}: ${detail}`,
+          });
+        }
+        employees.push(parsed.data);
+      }
+
+      const createdEmployees = await db.insert(rentalManpower).values(employees as any).returning();
+      res.status(201).json(createdEmployees);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   app.get("/api/rental-manpower/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
@@ -7997,45 +8473,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk import rental manpower
-  app.post("/api/rental-manpower/bulk-upload", async (req: Request, res: Response) => {
-    try {
-      const { csvData } = req.body;
-      if (!Array.isArray(csvData)) {
-        return res.status(400).json({ message: "csvData must be an array" });
-      }
-
-      // Fetch all vendors to map vendorCode to vendorId
-      const allVendors = await db.select().from(vendorMaster);
-      const vendorMap = new Map(allVendors.map((v) => [String(v.vendorCode).trim(), v.id]));
-
-      const employees: any[] = [];
-      for (let i = 0; i < csvData.length; i++) {
-        const row = csvData[i];
-        const vendorCode = row.vendorCode != null ? String(row.vendorCode).trim() : "";
-        if (!vendorCode) {
-          return res.status(400).json({
-            message: `Row ${i + 1}: vendorCode is required. Add a vendorCode column or ensure it has a value.`,
-          });
-        }
-        const vendorId = vendorMap.get(vendorCode);
-        if (vendorId == null) {
-          const validCodes = Array.from(vendorMap.keys()).slice(0, 10).join(", ");
-          return res.status(400).json({
-            message: `Row ${i + 1}: vendorCode "${vendorCode}" not found. Ensure the vendor exists in Vendor Master. Valid codes include: ${validCodes}${vendorMap.size > 10 ? "..." : ""}`,
-          });
-        }
-        const mappedRow = { ...row, vendorId };
-        employees.push(insertRentalManpowerSchema.parse(mappedRow));
-      }
-
-      const createdEmployees = await db.insert(rentalManpower).values(employees as any).returning();
-      res.status(201).json(createdEmployees);
-    } catch (err) {
-      handleError(err, res);
-    }
-  });
-
   // Get all manpower type resources for the mapping dialog
   app.get("/api/resources/manpower/all", async (req: Request, res: Response) => {
     try {
@@ -8067,6 +8504,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .from(resources)
         .where(eq(resources.type, "rental_equipment"));
+      res.json(rows);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/resources/tools/all", async (_req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.type, "tools"));
       res.json(rows);
     } catch (err) {
       handleError(err, res);
@@ -8387,6 +8836,355 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== TOOL MASTER ENDPOINTS =====
+
+  app.get("/api/tool-masters", async (_req: Request, res: Response) => {
+    try {
+      const tools = await db.select().from(toolMaster).orderBy(toolMaster.toolNumber);
+      res.json(tools);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/tool-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid tool ID" });
+      const [row] = await db.select().from(toolMaster).where(eq(toolMaster.id, id));
+      if (!row) return res.status(404).json({ message: "Tool not found" });
+      res.json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/tool-masters", async (req: Request, res: Response) => {
+    try {
+      const data = insertToolMasterSchema.parse(req.body);
+      const [created] = await db.insert(toolMaster).values(data as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/tool-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid tool ID" });
+      const data = insertToolMasterSchema.partial().parse(req.body);
+      const [updated] = await db
+        .update(toolMaster)
+        .set({ ...data, updatedAt: new Date() } as any)
+        .where(eq(toolMaster.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Tool not found" });
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/tool-masters/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid tool ID" });
+      const result = await db.delete(toolMaster).where(eq(toolMaster.id, id)).returning();
+      if (result.length === 0) return res.status(404).json({ message: "Tool not found" });
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/tool-masters/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+      if (csvData.length === 0) {
+        return res.status(400).json({ message: "csvData must contain at least one row" });
+      }
+
+      const parsedRows: any[] = [];
+      const seenNumbers = new Set<string>();
+
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i] as Record<string, unknown>;
+        const toolNumberRaw =
+          row.toolNumber != null && String(row.toolNumber).trim() !== ""
+            ? String(row.toolNumber).trim()
+            : row.toolCode != null && String(row.toolCode).trim() !== ""
+              ? String(row.toolCode).trim()
+              : "";
+        if (!toolNumberRaw) {
+          return res.status(400).json({ message: `Row ${i + 1}: toolNumber (or toolCode) is required.` });
+        }
+        if (seenNumbers.has(toolNumberRaw)) {
+          return res.status(400).json({
+            message: `Row ${i + 1}: duplicate toolNumber "${toolNumberRaw}" in upload.`,
+          });
+        }
+        seenNumbers.add(toolNumberRaw);
+
+        const { toolCode: _toolCode, ...fields } = row;
+        const optional = ["description", "brand", "model", "accessories"] as const;
+        for (const key of optional) {
+          if (fields[key] == null || fields[key] === "") delete fields[key];
+        }
+        const parsed = insertToolMasterSchema.safeParse({
+          ...fields,
+          toolNumber: toolNumberRaw,
+        });
+        if (!parsed.success) {
+          const detail = parsed.error.issues
+            .map((e) => `${e.path.length ? e.path.join(".") : "field"}: ${e.message}`)
+            .join("; ");
+          return res.status(400).json({ message: `Row ${i + 1}: ${detail}` });
+        }
+        parsedRows.push(parsed.data);
+      }
+
+      const existing = await db
+        .select({ toolNumber: toolMaster.toolNumber })
+        .from(toolMaster)
+        .where(inArray(toolMaster.toolNumber, [...seenNumbers]));
+      if (existing.length > 0) {
+        return res.status(400).json({
+          message: `toolNumber already exists: ${existing.map((e) => e.toolNumber).join(", ")}`,
+        });
+      }
+
+      const created = await db.insert(toolMaster).values(parsedRows as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  const TIMESHEET_RESOURCE_TYPES = [
+    "manpower",
+    "rental_manpower",
+    "equipment",
+    "rental_equipment",
+    "tools",
+  ] as const;
+  const TIMESHEET_STATUSES = [
+    "worked",
+    "idle_bench",
+    "leave_off",
+    "un_utilized",
+    "weekly_off_rest",
+  ] as const;
+  type TimesheetResourceType = (typeof TIMESHEET_RESOURCE_TYPES)[number];
+
+  function normalizeTimesheetPayload(payload: Record<string, unknown>) {
+    const parsed = insertResourceTimesheetSchema.safeParse(payload);
+    if (!parsed.success) {
+      const detail = parsed.error.issues
+        .map((e) => `${e.path.length ? e.path.join(".") : "field"}: ${e.message}`)
+        .join("; ");
+      return { ok: false as const, message: detail };
+    }
+    const data = { ...parsed.data } as any;
+    if (data.projectId == null || data.projectId === "") data.projectId = null;
+    if (data.wpId == null || data.wpId === "") data.wpId = null;
+
+    const idFields = ["employeeId", "rentalManpowerId", "equipmentId", "rentalEquipmentId", "toolId"] as const;
+    for (const key of idFields) {
+      if (data[key] == null || data[key] === "") data[key] = null;
+      else data[key] = Number(data[key]);
+    }
+
+    const hasOne =
+      (data.employeeId != null ? 1 : 0) +
+      (data.rentalManpowerId != null ? 1 : 0) +
+      (data.equipmentId != null ? 1 : 0) +
+      (data.rentalEquipmentId != null ? 1 : 0) +
+      (data.toolId != null ? 1 : 0);
+    if (hasOne !== 1) {
+      return { ok: false as const, message: "Exactly one resource ID field is required." };
+    }
+
+    const typeToIdField: Record<TimesheetResourceType, keyof typeof data> = {
+      manpower: "employeeId",
+      rental_manpower: "rentalManpowerId",
+      equipment: "equipmentId",
+      rental_equipment: "rentalEquipmentId",
+      tools: "toolId",
+    };
+    const requiredField = typeToIdField[data.resourceType as TimesheetResourceType];
+    if (data[requiredField] == null) {
+      return { ok: false as const, message: `${requiredField} is required for resourceType ${data.resourceType}.` };
+    }
+    if (data.status !== "worked") {
+      data.projectId = null;
+      data.wpId = null;
+    }
+    return { ok: true as const, data };
+  }
+
+  app.get("/api/timesheets", async (req: Request, res: Response) => {
+    try {
+      const resourceType = String(req.query.resourceType ?? "").trim();
+      if (resourceType && !TIMESHEET_RESOURCE_TYPES.includes(resourceType as TimesheetResourceType)) {
+        return res.status(400).json({ message: "Invalid resourceType." });
+      }
+
+      const rows = await db.select().from(resourceTimesheets);
+      const projectRows = await db.select().from(projects);
+      const wpRows = await db.select().from(workPackages);
+      const empRows = await db.select().from(employeeMaster);
+      const rempRows = await db.select().from(rentalManpower);
+      const eqRows = await db.select().from(equipmentMaster);
+      const reqRows = await db.select().from(rentalEquipment);
+      const toolRows = await db.select().from(toolMaster);
+
+      const projectById = new Map(projectRows.map((p) => [p.id, p]));
+      const wpById = new Map(wpRows.map((w) => [w.id, w]));
+      const empById = new Map(empRows.map((e) => [e.id, e]));
+      const rempById = new Map(rempRows.map((e) => [e.id, e]));
+      const eqById = new Map(eqRows.map((e) => [e.id, e]));
+      const reqById = new Map(reqRows.map((e) => [e.id, e]));
+      const toolById = new Map(toolRows.map((t) => [t.id, t]));
+
+      const out = rows
+        .filter((r) => (!resourceType ? true : r.resourceType === resourceType))
+        .map((r) => {
+          let resourceLabel = "";
+          if (r.employeeId) {
+            const e = empById.get(r.employeeId);
+            resourceLabel = e ? `${e.employeeNumber} - ${e.empFirstName} ${e.empLastName}` : `Employee #${r.employeeId}`;
+          } else if (r.rentalManpowerId) {
+            const e = rempById.get(r.rentalManpowerId);
+            resourceLabel = e ? `${e.employeeNumber} - ${e.empFirstName} ${e.empLastName}` : `Rental employee #${r.rentalManpowerId}`;
+          } else if (r.equipmentId) {
+            const e = eqById.get(r.equipmentId);
+            resourceLabel = e ? `${e.equipmentNumber} - ${e.equipmentName}` : `Equipment #${r.equipmentId}`;
+          } else if (r.rentalEquipmentId) {
+            const e = reqById.get(r.rentalEquipmentId);
+            resourceLabel = e ? `${e.equipmentNumber} - ${e.equipmentName}` : `Rental equipment #${r.rentalEquipmentId}`;
+          } else if (r.toolId) {
+            const t = toolById.get(r.toolId);
+            resourceLabel = t ? `${t.toolNumber} - ${t.name}` : `Tool #${r.toolId}`;
+          }
+          return {
+            ...r,
+            projectName: r.projectId ? projectById.get(r.projectId)?.name ?? null : null,
+            wpCode: r.wpId ? wpById.get(r.wpId)?.code ?? null : null,
+            wpName: r.wpId ? wpById.get(r.wpId)?.name ?? null : null,
+            resourceLabel,
+          };
+        })
+        .sort((a, b) => `${b.date}`.localeCompare(`${a.date}`));
+      res.json(out);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/timesheets", async (req: Request, res: Response) => {
+    try {
+      const normalized = normalizeTimesheetPayload(req.body ?? {});
+      if (!normalized.ok) return res.status(400).json({ message: normalized.message });
+      const [created] = await db.insert(resourceTimesheets).values(normalized.data as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.get("/api/timesheets/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid timesheet ID" });
+      const [row] = await db.select().from(resourceTimesheets).where(eq(resourceTimesheets.id, id));
+      if (!row) return res.status(404).json({ message: "Timesheet not found" });
+      res.json(row);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.patch("/api/timesheets/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid timesheet ID" });
+      const existing = await db.select().from(resourceTimesheets).where(eq(resourceTimesheets.id, id));
+      if (existing.length === 0) return res.status(404).json({ message: "Timesheet not found" });
+      const merged = { ...existing[0], ...(req.body ?? {}) } as Record<string, unknown>;
+      const normalized = normalizeTimesheetPayload(merged);
+      if (!normalized.ok) return res.status(400).json({ message: normalized.message });
+      const [updated] = await db
+        .update(resourceTimesheets)
+        .set({ ...(normalized.data as any), updatedAt: new Date() })
+        .where(eq(resourceTimesheets.id, id))
+        .returning();
+      res.json(updated);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.delete("/api/timesheets/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid timesheet ID" });
+      const deleted = await db.delete(resourceTimesheets).where(eq(resourceTimesheets.id, id)).returning();
+      if (deleted.length === 0) return res.status(404).json({ message: "Timesheet not found" });
+      res.status(204).end();
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/timesheets/bulk-upload/project-wise", async (req: Request, res: Response) => {
+    try {
+      const projectId = Number.parseInt(String(req.body?.projectId ?? ""), 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "projectId is required." });
+      const csvData = req.body?.csvData;
+      if (!Array.isArray(csvData) || csvData.length === 0) {
+        return res.status(400).json({ message: "csvData must be a non-empty array." });
+      }
+      const rows: any[] = [];
+      for (let i = 0; i < csvData.length; i++) {
+        const row = { ...(csvData[i] as Record<string, unknown>), projectId };
+        const normalized = normalizeTimesheetPayload(row);
+        if (!normalized.ok) {
+          return res.status(400).json({ message: `Row ${i + 1}: ${normalized.message}` });
+        }
+        rows.push(normalized.data);
+      }
+      const created = await db.insert(resourceTimesheets).values(rows as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  app.post("/api/timesheets/bulk-upload/company-wise", async (req: Request, res: Response) => {
+    try {
+      const csvData = req.body?.csvData;
+      if (!Array.isArray(csvData) || csvData.length === 0) {
+        return res.status(400).json({ message: "csvData must be a non-empty array." });
+      }
+      const rows: any[] = [];
+      for (let i = 0; i < csvData.length; i++) {
+        const normalized = normalizeTimesheetPayload(csvData[i] as Record<string, unknown>);
+        if (!normalized.ok) {
+          return res.status(400).json({ message: `Row ${i + 1}: ${normalized.message}` });
+        }
+        rows.push(normalized.data);
+      }
+      const created = await db.insert(resourceTimesheets).values(rows as any).returning();
+      res.status(201).json(created);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   // ===== EQUIPMENT MANUFACTURERS (OEM) ENDPOINTS =====
   app.get("/api/equipment-manufacturers", async (req: Request, res: Response) => {
     try {
@@ -8504,6 +9302,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const list = await db.select().from(rentalEquipment).orderBy(rentalEquipment.equipmentNumber);
       res.json(list);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Register before GET /:id so /bulk-upload is not captured as an id.
+  app.get("/api/rental-equipment/bulk-upload", (_req: Request, res: Response) => {
+    res.status(405).setHeader("Allow", "POST").json({
+      message:
+        "Bulk upload is only available via POST with JSON body { csvData: [...] }. GET is not supported.",
+    });
+  });
+
+  app.post("/api/rental-equipment/bulk-upload", async (req: Request, res: Response) => {
+    try {
+      const { csvData } = req.body;
+      if (!Array.isArray(csvData)) {
+        return res.status(400).json({ message: "csvData must be an array" });
+      }
+      if (csvData.length === 0) {
+        return res.status(400).json({ message: "csvData must contain at least one row" });
+      }
+
+      const allVendors = await db.select().from(vendorMaster);
+      const vendorByNormalizedCode = new Map(
+        allVendors.map((v) => [String(v.vendorCode).trim().toUpperCase(), v])
+      );
+
+      const employees: any[] = [];
+      const seenEquipmentNumbers = new Set<string>();
+
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i] as Record<string, unknown>;
+        const vendorCodeRaw =
+          row.vendorCode != null ? String(row.vendorCode).trim() : "";
+        if (!vendorCodeRaw) {
+          return res.status(400).json({
+            message: `Row ${i + 1}: vendorCode is required.`,
+          });
+        }
+        const vendor = vendorByNormalizedCode.get(vendorCodeRaw.toUpperCase());
+        if (!vendor) {
+          const validCodes = Array.from(vendorByNormalizedCode.keys())
+            .slice(0, 10)
+            .join(", ");
+          return res.status(400).json({
+            message: `Row ${i + 1}: vendorCode "${vendorCodeRaw}" not found. Ensure the vendor exists in Vendor Master. Valid codes include: ${validCodes}${vendorByNormalizedCode.size > 10 ? "..." : ""}`,
+          });
+        }
+
+        const equipmentNumberRaw =
+          row.equipmentNumber != null && String(row.equipmentNumber).trim() !== ""
+            ? String(row.equipmentNumber).trim()
+            : row.equipmentCode != null && String(row.equipmentCode).trim() !== ""
+              ? String(row.equipmentCode).trim()
+              : "";
+        if (!equipmentNumberRaw) {
+          return res.status(400).json({
+            message: `Row ${i + 1}: equipmentNumber (or equipmentCode) is required.`,
+          });
+        }
+
+        if (seenEquipmentNumbers.has(equipmentNumberRaw)) {
+          return res.status(400).json({
+            message: `Row ${i + 1}: duplicate equipmentNumber "${equipmentNumberRaw}" in this upload. Each row must have a unique equipment number.`,
+          });
+        }
+        seenEquipmentNumbers.add(equipmentNumberRaw);
+
+        const { vendorCode: _vendorCode, equipmentCode: _equipmentCode, ...rowFields } = row;
+
+        const optionalText = [
+          "description",
+          "manufacturer",
+          "model",
+          "capacity",
+          "unit",
+        ] as const;
+        for (const k of optionalText) {
+          const v = rowFields[k];
+          if (v === "" || v == null) {
+            delete rowFields[k];
+          }
+        }
+        if (rowFields.year === "" || rowFields.year == null) {
+          delete rowFields.year;
+        } else if (typeof rowFields.year === "string") {
+          const y = parseInt(rowFields.year.trim(), 10);
+          if (!Number.isNaN(y)) {
+            rowFields.year = y;
+          } else {
+            delete rowFields.year;
+          }
+        }
+
+        const payload = {
+          ...rowFields,
+          equipmentNumber: equipmentNumberRaw,
+          vendorId: vendor.id,
+        };
+
+        const parsed = insertRentalEquipmentSchema.safeParse(payload);
+        if (!parsed.success) {
+          const detail = parsed.error.issues
+            .map((e) => `${e.path.length ? e.path.join(".") : "field"}: ${e.message}`)
+            .join("; ");
+          return res.status(400).json({
+            message: `Row ${i + 1}: ${detail}`,
+          });
+        }
+        employees.push(parsed.data);
+      }
+
+      const uniqueNums = [...seenEquipmentNumbers];
+      if (uniqueNums.length > 0) {
+        const existing = await db
+          .select({ equipmentNumber: rentalEquipment.equipmentNumber })
+          .from(rentalEquipment)
+          .where(inArray(rentalEquipment.equipmentNumber, uniqueNums));
+        if (existing.length > 0) {
+          const nums = existing.map((e) => e.equipmentNumber).join(", ");
+          return res.status(400).json({
+            message: `Equipment number(s) already exist in the database: ${nums}. Remove or change duplicate codes.`,
+          });
+        }
+      }
+
+      const created = await db.insert(rentalEquipment).values(employees as any).returning();
+      res.status(201).json(created);
     } catch (err) {
       handleError(err, res);
     }
@@ -8759,6 +9686,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db
         .delete(equipmentResourceMappings)
         .where(eq(equipmentResourceMappings.equipmentId, equipmentId))
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+
+      res.json({ message: "Mapping deleted successfully", deletedMapping: result[0] });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // ===== TOOL RESOURCE MAPPING ENDPOINTS =====
+
+  // Get resource mapping for tool
+  app.get("/api/tools/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const toolId = parseInt(req.params.id);
+      if (isNaN(toolId)) {
+        return res.status(400).json({ message: "Invalid tool ID" });
+      }
+
+      const mapping = await db
+        .select()
+        .from(toolResourceMappings)
+        .where(eq(toolResourceMappings.toolId, toolId));
+
+      if (mapping.length === 0) {
+        return res.json(null);
+      }
+
+      res.json(mapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Create or update resource mapping for tool (one-to-one)
+  app.post("/api/tools/:id/map-resource", async (req: Request, res: Response) => {
+    try {
+      const toolId = parseInt(req.params.id);
+      if (isNaN(toolId)) {
+        return res.status(400).json({ message: "Invalid tool ID" });
+      }
+
+      const mappingData = insertToolResourceMappingSchema.parse({
+        toolId,
+        resourceId: req.body.resourceId,
+      });
+
+      // Check if tool exists
+      const tool = await db
+        .select()
+        .from(toolMaster)
+        .where(eq(toolMaster.id, toolId));
+
+      if (tool.length === 0) {
+        return res.status(404).json({ message: "Tool not found" });
+      }
+
+      // Check if resource exists
+      const resource = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, (mappingData as any).resourceId));
+
+      if (resource.length === 0) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+
+      // Check if resource is of type tools
+      if (resource[0].type !== "tools") {
+        return res.status(400).json({ message: "Resource must be of type 'tools'" });
+      }
+
+      // Check if mapping already exists for this tool
+      const existingMapping = await db
+        .select()
+        .from(toolResourceMappings)
+        .where(eq(toolResourceMappings.toolId, toolId));
+
+      if (existingMapping.length > 0) {
+        // Update existing mapping
+        const updatedMapping = await db
+          .update(toolResourceMappings)
+          .set({
+            resourceId: (mappingData as any).resourceId,
+            updatedAt: new Date(),
+          })
+          .where(eq(toolResourceMappings.toolId, toolId))
+          .returning();
+        return res.json(updatedMapping[0]);
+      }
+
+      // Create new mapping
+      const newMapping = await db
+        .insert(toolResourceMappings)
+        .values(mappingData as any)
+        .returning();
+      res.status(201).json(newMapping[0]);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Delete resource mapping for tool
+  app.delete("/api/tools/:id/resource-mapping", async (req: Request, res: Response) => {
+    try {
+      const toolId = parseInt(req.params.id);
+      if (isNaN(toolId)) {
+        return res.status(400).json({ message: "Invalid tool ID" });
+      }
+
+      const result = await db
+        .delete(toolResourceMappings)
+        .where(eq(toolResourceMappings.toolId, toolId))
         .returning();
 
       if (result.length === 0) {

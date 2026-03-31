@@ -50,6 +50,7 @@ import EquipmentMasterLayout from "@/layouts/equipment-master-layout";
 import EquipmentMasterRental from "@/pages/equipment-master-rental";
 import EquipmentMasterManufacturers from "@/pages/equipment-master-manufacturers";
 import EquipmentMasterTypes from "@/pages/equipment-master-types";
+import ToolMaster from "@/pages/tool-master";
 import RiskRegister from "@/pages/risk-register";
 import ProjectDailyProgress from "@/pages/project-daily-progress";
 import ResourcePlan from "@/pages/resource-plan";
@@ -97,6 +98,12 @@ import NewProject from "@/pages/new-project";
 import ProjectCharts from "@/pages/project-charts";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
 import AllocationMaterials from "@/pages/allocation-materials";
+import AllocationManpower from "@/pages/allocation-manpower";
+import AllocationEquipment from "@/pages/allocation-equipment";
+import AllocationRentalManpower from "@/pages/allocation-rental-manpower";
+import AllocationRentalEquipment from "@/pages/allocation-rental-equipment";
+import AllocationTools from "@/pages/allocation-tools";
+import TimesheetsPage from "@/pages/timesheets";
 
 
 // Implementing a flatter routing approach without nesting
@@ -636,6 +643,11 @@ function Router() {
           <EquipmentMaster />
         </EquipmentMasterLayout>
       </Route>
+      <Route path="/tool-master">
+        <MasterLayout>
+          <ToolMaster />
+        </MasterLayout>
+      </Route>
 
       {/* New Pages Ported from Vanilla JS */}
       <Route path="/newlanding" component={NewLanding} />
@@ -668,22 +680,32 @@ function Router() {
       </Route>
       <Route path="/allocation/manpower">
         <MasterLayout>
-          <GlobalToolsPlaceholder />
+          <AllocationManpower />
         </MasterLayout>
       </Route>
       <Route path="/allocation/equipment">
         <MasterLayout>
-          <GlobalToolsPlaceholder />
+          <AllocationEquipment />
         </MasterLayout>
       </Route>
       <Route path="/allocation/rental-manpower">
         <MasterLayout>
-          <GlobalToolsPlaceholder />
+          <AllocationRentalManpower />
         </MasterLayout>
       </Route>
       <Route path="/allocation/rental-equipment">
         <MasterLayout>
-          <GlobalToolsPlaceholder />
+          <AllocationRentalEquipment />
+        </MasterLayout>
+      </Route>
+      <Route path="/allocation/tools">
+        <MasterLayout>
+          <AllocationTools />
+        </MasterLayout>
+      </Route>
+      <Route path="/timesheets">
+        <MasterLayout>
+          <TimesheetsPage />
         </MasterLayout>
       </Route>
 

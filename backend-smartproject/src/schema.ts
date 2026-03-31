@@ -1138,6 +1138,50 @@ export const equipmentResourceMappings = pgTable("equipment_resource_mappings", 
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Tool Master Table
+export const toolMaster = pgTable("tool_master", {
+  id: serial("id").primaryKey(),
+  toolNumber: text("tool_number").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  brand: text("brand"),
+  model: text("model"),
+  unitOfMeasure: text("unit_of_measure").notNull(), // each, set, etc.
+  accessories: text("accessories"),
+  unitRate: numeric("unit_rate", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Tool Resource Mapping Table (maps tool master rows to tools resources - one-to-one)
+export const toolResourceMappings = pgTable("tool_resource_mappings", {
+  id: serial("id").primaryKey(),
+  toolId: integer("tool_id").notNull().unique().references(() => toolMaster.id, { onDelete: "cascade" }),
+  resourceId: integer("resource_id").notNull().references(() => resources.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Timesheet table shared across manpower/equipment/rental/tool entities
+export const resourceTimesheets = pgTable("resource_timesheets", {
+  id: serial("id").primaryKey(),
+  date: date("date").notNull(),
+  resourceType: text("resource_type").notNull(), // manpower | rental_manpower | equipment | rental_equipment | tools
+  employeeId: integer("employee_id").references(() => employeeMaster.id, { onDelete: "cascade" }),
+  rentalManpowerId: integer("rental_manpower_id").references(() => rentalManpower.id, { onDelete: "cascade" }),
+  equipmentId: integer("equipment_id").references(() => equipmentMaster.id, { onDelete: "cascade" }),
+  rentalEquipmentId: integer("rental_equipment_id").references(() => rentalEquipment.id, { onDelete: "cascade" }),
+  toolId: integer("tool_id").references(() => toolMaster.id, { onDelete: "cascade" }),
+  status: text("status").notNull(), // worked | idle_bench | leave_off | un_utilized | weekly_off_rest
+  projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
+  wpId: integer("wp_id").references(() => workPackages.id, { onDelete: "set null" }),
+  enteredBy: text("entered_by").notNull(),
+  enteredDate: timestamp("entered_date").defaultNow().notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertPlannedActivityTaskSchema = createInsertSchema(plannedActivityTasks)
   .omit({ id: true, createdAt: true, updatedAt: true } as any)
   .extend({
@@ -1193,6 +1237,17 @@ export const insertWorkPackageServiceSchema = createInsertSchema(workPackageServ
     serviceId: z.number(),
     quantity: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
     estimatedValue: z.union([z.string(), z.number()]).transform((v) => (typeof v === "number" ? String(v) : v)),
+  });
+
+export const insertResourceTimesheetSchema = createInsertSchema(resourceTimesheets)
+  .omit({ id: true, createdAt: true, updatedAt: true, enteredDate: true } as any)
+  .extend({
+    resourceType: z.enum(["manpower", "rental_manpower", "equipment", "rental_equipment", "tools"]),
+    status: z.enum(["worked", "idle_bench", "leave_off", "un_utilized", "weekly_off_rest"]),
+    date: z.string().min(1),
+    projectId: z.number().nullable().optional(),
+    wpId: z.number().nullable().optional(),
+    enteredBy: z.string().min(1),
   });
 
 // Purchase Orders schemas
@@ -1388,6 +1443,12 @@ export const insertRentalEquipmentSchema = createInsertSchema(rentalEquipment)
 export type RentalEquipment = typeof rentalEquipment.$inferSelect;
 export type InsertRentalEquipment = z.infer<typeof insertRentalEquipmentSchema>;
 
+// Tool Master Schema
+export const insertToolMasterSchema = createInsertSchema(toolMaster)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type ToolMaster = typeof toolMaster.$inferSelect;
+export type InsertToolMaster = z.infer<typeof insertToolMasterSchema>;
+
 // Equipment Resource Mapping Schema
 export const insertEquipmentResourceMappingSchema = createInsertSchema(equipmentResourceMappings)
   .omit({ id: true, createdAt: true, updatedAt: true } as any);
@@ -1400,6 +1461,14 @@ export const insertRentalEquipmentResourceMappingSchema = createInsertSchema(ren
 
 export type RentalEquipmentResourceMapping = typeof rentalEquipmentResourceMappings.$inferSelect;
 export type InsertRentalEquipmentResourceMapping = z.infer<typeof insertRentalEquipmentResourceMappingSchema>;
+
+export const insertToolResourceMappingSchema = createInsertSchema(toolResourceMappings)
+  .omit({ id: true, createdAt: true, updatedAt: true } as any);
+export type ToolResourceMapping = typeof toolResourceMappings.$inferSelect;
+export type InsertToolResourceMapping = z.infer<typeof insertToolResourceMappingSchema>;
+
+export type ResourceTimesheet = typeof resourceTimesheets.$inferSelect;
+export type InsertResourceTimesheet = z.infer<typeof insertResourceTimesheetSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

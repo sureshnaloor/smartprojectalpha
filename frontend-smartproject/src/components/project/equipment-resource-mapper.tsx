@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useMapSuccessAutoClose } from "@/hooks/use-map-success-auto-close";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Link2, X } from "lucide-react";
+import { CheckCircle2, Link2, X } from "lucide-react";
 
 interface Resource {
   id: number;
@@ -89,6 +90,8 @@ export function EquipmentResourceMapper({
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
+  const { mapSuccess, beginSuccessAndScheduleClose, handleDialogOpenChange } =
+    useMapSuccessAutoClose();
 
   // Fetch equipment resources
   const {
@@ -121,10 +124,15 @@ export function EquipmentResourceMapper({
       queryClient.invalidateQueries({
         queryKey: ["equipmentResourceMapping", equipmentId],
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/allocation/equipment"] });
       refetchMapping();
       if (onMappingChanged) {
         onMappingChanged();
       }
+      beginSuccessAndScheduleClose(() => {
+        setIsOpen(false);
+        setSelectedResourceId(null);
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -144,6 +152,7 @@ export function EquipmentResourceMapper({
       queryClient.invalidateQueries({
         queryKey: ["equipmentResourceMapping", equipmentId],
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/allocation/equipment"] });
       refetchMapping();
       setSelectedResourceId(null);
       if (onMappingChanged) {
@@ -176,7 +185,10 @@ export function EquipmentResourceMapper({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => handleDialogOpenChange(open, setIsOpen)}
+    >
       <div className="flex items-center gap-1.5 flex-wrap">
         {isMapped ? (
           <>
@@ -217,14 +229,29 @@ export function EquipmentResourceMapper({
         )}
       </div>
 
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl duration-500">
         <DialogHeader>
           <DialogTitle>Map Equipment to Equipment Resource</DialogTitle>
-          <p className="text-sm text-gray-500 mt-2">
-            Equipment: <span className="font-semibold text-gray-700">{equipmentName}</span>
-          </p>
+          {!mapSuccess && (
+            <p className="text-sm text-gray-500 mt-2">
+              Equipment:{" "}
+              <span className="font-semibold text-gray-700">{equipmentName}</span>
+            </p>
+          )}
         </DialogHeader>
 
+        {mapSuccess ? (
+          <div className="flex flex-col items-center justify-center py-14 px-4 text-center animate-in fade-in zoom-in-95 duration-300">
+            <CheckCircle2
+              className="h-14 w-14 text-green-600 shrink-0"
+              aria-hidden
+            />
+            <p className="mt-4 text-lg font-medium text-foreground">
+              Resource mapped successfully
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">Closing shortly…</p>
+          </div>
+        ) : (
         <div className="space-y-6">
           {/* Current Mapping Section */}
           {currentMapping && currentMappedResource && (
@@ -365,6 +392,7 @@ export function EquipmentResourceMapper({
             </Button>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
