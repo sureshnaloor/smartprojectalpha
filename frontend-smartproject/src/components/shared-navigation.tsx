@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { UserProfile } from '@/components/user-profile'
 import { Button } from '@/components/ui/button'
 import { ArrowUpRight } from 'lucide-react'
+import { AppWorkbenchNav, AppWorkbenchNavMobile } from '@/components/app-workbench-nav'
 
 interface SharedNavigationProps {
   variant?: 'landing' | 'app'
@@ -55,6 +56,7 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
   }
 
   const isLanding = variant === 'landing'
+  const testbenchHref = authenticated ? '/newlanding' : '/login'
   const navBgClass = isLanding
     ? 'bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-slate-100'
     : 'bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-slate-100'
@@ -66,10 +68,10 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
   return (
     <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${navBgClass} ${navElevationClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className={`flex justify-between items-center ${navHeightClass} transition-all duration-300`}>
-          <div className="flex items-center">
+        <div className={`flex justify-between items-center gap-2 ${navHeightClass} transition-all duration-300`}>
+          <div className="flex items-center gap-2 lg:gap-4 min-w-0 flex-1">
             <div
-              className={`font-display font-bold gradient-text cursor-pointer flex items-center gap-2 transition-all duration-300 ${brandTextSizeClass}`}
+              className={`font-display font-bold gradient-text cursor-pointer flex items-center gap-2 transition-all duration-300 shrink-0 ${brandTextSizeClass}`}
               onClick={() => handleNavClick('/')}
             >
               {!isLanding && (
@@ -81,9 +83,12 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
               )}
               <span>ConstructPro</span>
             </div>
+            {!isLanding && (
+              <AppWorkbenchNav className="hidden md:flex" />
+            )}
           </div>
 
-          <div className="hidden md:flex items-center space-x-6">
+          <div className="hidden md:flex items-center space-x-4 lg:space-x-6 shrink-0">
             {/* Navigation Links */}
             {isLanding ? (
               <>
@@ -116,12 +121,9 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   Contact
                 </a>
                 <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (authenticated) { setLocation('/newlanding'); }
-                    else { setLocation('/login'); }
-                  }}
+                  href={testbenchHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="nav-link flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold"
                 >
                   <span>Project testbench</span>
@@ -131,12 +133,9 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
             ) : (
               <>
                 <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (authenticated) { setLocation('/newlanding'); }
-                    else { setLocation('/login'); }
-                  }}
+                  href={testbenchHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="nav-link flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold"
                 >
                   <span>Project testbench</span>
@@ -276,13 +275,10 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
                   Contact
                 </a>
                 <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (authenticated) { setLocation('/newlanding'); }
-                    else { setLocation('/login'); }
-                    setMobileMenuOpen(false);
-                  }}
+                  href={testbenchHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="block py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
                   <span>Project testbench</span>
@@ -292,46 +288,18 @@ export const SharedNavigation: React.FC<SharedNavigationProps> = ({ variant = 'a
             ) : (
               <>
                 <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (authenticated) { setLocation('/newlanding'); }
-                    else { setLocation('/login'); }
-                    setMobileMenuOpen(false);
-                  }}
+                  href={testbenchHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="block w-full text-left py-2 text-teal-600 font-semibold flex items-center gap-1.5"
                 >
                   <span>Project testbench</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </a>
-                {authenticated && (
-                  <>
-                    <button
-                      className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
-                      onClick={() => handleNavClick('/activity-master')}
-                    >
-                      Activity Master
-                    </button>
-                    <button
-                      className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
-                      onClick={() => handleNavClick('/task-master')}
-                    >
-                      Task Master
-                    </button>
-                    <button
-                      className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
-                      onClick={() => handleNavClick('/resource-master')}
-                    >
-                      Resource Master
-                    </button>
-                    <button
-                      className="block w-full text-left py-2 text-gray-700 hover:text-orange-600"
-                      onClick={() => handleNavClick('/collab')}
-                    >
-                      Collaboration
-                    </button>
-                  </>
-                )}
+                <div className="rounded-lg bg-slate-900 p-3 -mx-1">
+                  <AppWorkbenchNavMobile />
+                </div>
               </>
             )}
 
